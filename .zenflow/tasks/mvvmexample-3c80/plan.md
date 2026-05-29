@@ -26,7 +26,25 @@ Focus on **what** the feature should do and **why**, not **how** it should be bu
 
 Save the PRD to `{@artifacts_path}/requirements.md`.
 
+
+### [x] Step: Repository Bootstrap
+<!-- chat-id: 11ceef44-c2fa-4bc7-9475-31bcef33fcdb -->
+
+Bootstrapped the new repository before technical specification work:
+- transferred the reusable non-app-specific documentation baseline from the previous task;
+- copied project-local reusable `ios-*` skills and external environment skill snapshots;
+- created canonical project docs from reusable templates;
+- created a hardened `.gitignore`;
+- created `README.md`;
+- created a minimal SwiftUI iOS Xcode project `MVVMExample.xcodeproj`;
+- verified project structure with `xcodebuild -list -project MVVMExample.xcodeproj`;
+- verified formatting with `git diff --check`;
+- verified no source-app leakage tokens in transferred reusable docs.
+
+Build/tests were not run because the current instruction is repository bootstrap only and test-writing remains disabled.
+
 ### [ ] Step: Technical Specification
+<!-- chat-id: ab4d9fac-23f1-409e-899c-02e004829803 -->
 
 Create a technical specification based on the PRD in `{@artifacts_path}/requirements.md`.
 
