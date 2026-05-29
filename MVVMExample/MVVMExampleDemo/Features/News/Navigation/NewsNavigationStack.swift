@@ -1,0 +1,28 @@
+import SwiftUI
+
+struct NewsNavigationStack: View {
+    @Bindable var router: NewsRouter
+    let dependencies: AppDependencies
+
+    var body: some View {
+        NavigationStack(path: $router.path) {
+            NewsListScreen(
+                viewModel: NewsListViewModel(
+                    repository: dependencies.newsRepository,
+                    router: router
+                )
+            )
+            .navigationDestination(for: NewsRoute.self) { route in
+                switch route {
+                case .detail(let payload):
+                    NewsDetailScreen(
+                        viewModel: NewsDetailViewModel(
+                            payload: payload,
+                            repository: dependencies.newsRepository
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
