@@ -63,3 +63,6 @@ fastlane/.env*
 # Zenflow local binary artifacts
 .zenflow/**/traces/
 .zenflow/**/screenshots/
+
+# Zenflow local task metadata
+.zenflow/
