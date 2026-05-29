@@ -5,6 +5,18 @@ This file is the short mandatory rule set for coding work in `<AppName>`.
 
 Use `docs/IOS_ARCHITECTURE_REFERENCE.md` as **reference**, not as a mechanical checklist. Use `docs/PRODUCTION_QUALITY_GATES.md` and `docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md` as mandatory quality gates/checklists for implementation, refactor, and review work.
 
+
+## Mandatory Response Header Rule
+Every working, status, readiness, or task-orientation response must start with:
+- model
+- active phase
+- files being inspected/changed
+- next safe step
+- whether a build is needed
+- sandbox/worktree confirmation
+
+Short answers like “готов к новым задачам” are not exempt when they relate to project/task readiness.
+
 ## Core Decision Rule
 Always choose the **simplest correct solution** that matches:
 1. existing project architecture

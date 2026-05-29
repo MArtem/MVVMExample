@@ -10,13 +10,14 @@ Task-local user preferences and hard constraints that apply before general proje
 - UI/design work from screenshots/Figma/PDF/SVG/CSS requires `GPT-5.5`.
 
 ### Response Header
-Every working response must start with:
+Every working/status/readiness response must start with:
 - model
 - active phase
 - files being inspected/changed
 - next safe step
 - whether a build is needed
 - sandbox/worktree confirmation
+- Readiness/status answers such as “готов к новым задачам” are not exempt.
 
 ### Verification / Builds / Tests
 - Do not write or modify tests unless the user explicitly opens a test-writing phase or asks to fix a specific failing test.
