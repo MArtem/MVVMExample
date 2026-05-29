@@ -10,6 +10,7 @@ This repository currently contains:
 - reusable iOS production documentation and rules;
 - project-local reusable skills under `./.codex/skills`;
 - external skill snapshots under `./docs/reusable-baseline/external-environment`;
+- reusable project quality scripts under `./scripts/`;
 - Zenflow task artifacts under `./.zenflow/tasks/mvvmexample-3c80`.
 
 ## Goal
