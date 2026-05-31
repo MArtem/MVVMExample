@@ -1,6 +1,7 @@
 import SwiftUI
+import AppLocalization
 
-struct NewsCardView: View {
+struct NewsCardView: View, Equatable {
     let state: NewsCardViewState
     let onOpen: () -> Void
     let onLike: () -> Void
@@ -13,7 +14,7 @@ struct NewsCardView: View {
                     AsyncImageView(url: state.thumbnailURL, height: 190)
 
                     VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                        Text(state.sourceText.uppercased())
+                        Text(state.sourceDisplayText)
                             .font(AppTypography.caption)
                             .foregroundStyle(AppTheme.actionPrimary)
 
@@ -44,18 +45,18 @@ struct NewsCardView: View {
 
             HStack(spacing: AppSpacing.lg) {
                 Button(action: onLike) {
-                    Label(state.likesText, systemImage: likeIcon)
+                    Label(state.likesText, systemImage: state.likeIconName)
                         .font(AppTypography.bodySmall)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(AppStrings.text("Like article"))
+                .accessibilityLabel(state.likeAccessibilityLabel)
 
                 Button(action: onComments) {
                     Label(state.commentsText, systemImage: "bubble.left")
                         .font(AppTypography.bodySmall)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(AppStrings.text("Comments"))
+                .accessibilityLabel(state.commentsAccessibilityLabel)
 
                 Spacer()
 
@@ -73,14 +74,7 @@ struct NewsCardView: View {
         }
     }
 
-    private var likeIcon: String {
-        switch state.likeState {
-        case .liked:
-            return "hand.thumbsup.fill"
-        case .notLiked, .failed:
-            return "hand.thumbsup"
-        case .updating:
-            return "clock"
-        }
+    static func == (lhs: NewsCardView, rhs: NewsCardView) -> Bool {
+        lhs.state == rhs.state
     }
 }

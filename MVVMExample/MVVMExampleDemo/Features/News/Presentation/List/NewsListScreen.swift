@@ -1,4 +1,5 @@
 import SwiftUI
+import AppLocalization
 
 struct NewsListScreen: View {
     @State private var viewModel: NewsListViewModel
@@ -14,7 +15,9 @@ struct NewsListScreen: View {
             onRefresh: viewModel.refreshRequested,
             onArticleTap: viewModel.articleTapped(id:),
             onLikeTap: viewModel.likeTapped(id:),
-            onCommentsTap: viewModel.commentsTapped(id:)
+            onCommentsTap: viewModel.commentsTapped(id:),
+            onItemAppear: viewModel.loadNextPageIfNeeded(currentItemID:),
+            onRetryLoadNextPageTap: viewModel.retryLoadNextPageTapped
         )
         .navigationTitle(AppStrings.text("News"))
         .background(AppTheme.backgroundBase)

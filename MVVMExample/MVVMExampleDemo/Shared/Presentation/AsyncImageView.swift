@@ -1,36 +1,33 @@
+import AppImageLoading
 import SwiftUI
 
 struct AsyncImageView: View {
     let url: URL?
+    let width: CGFloat?
     let height: CGFloat
 
+    init(url: URL?, width: CGFloat? = nil, height: CGFloat) {
+        self.url = url
+        self.width = width
+        self.height = height
+    }
+
     var body: some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .empty:
-                Rectangle()
-                    .fill(AppTheme.surfaceSecondary)
-                    .overlay(ProgressView())
-
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-
-            case .failure:
-                Rectangle()
-                    .fill(AppTheme.surfaceSecondary)
-                    .overlay {
-                        Image(systemName: "photo")
-                            .foregroundStyle(AppTheme.textTertiary)
-                    }
-
-            @unknown default:
-                Rectangle()
-                    .fill(AppTheme.surfaceSecondary)
-            }
+        CachedRemoteImageView(
+            url: url,
+            targetSize: CGSize(width: width ?? 800, height: height)
+        ) {
+            Rectangle()
+                .fill(AppTheme.surfaceSecondary)
+                .overlay(ProgressView())
+        } failure: {
+            Rectangle()
+                .fill(AppTheme.surfaceSecondary)
+                .overlay {
+                    Image(systemName: "photo")
+                        .foregroundStyle(AppTheme.textTertiary)
+                }
         }
-        .frame(height: height)
-        .clipped()
+        .frame(maxWidth: width == nil ? .infinity : width)
     }
 }

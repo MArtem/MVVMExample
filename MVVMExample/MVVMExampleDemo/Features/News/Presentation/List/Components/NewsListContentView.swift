@@ -2,10 +2,12 @@ import SwiftUI
 
 struct NewsListContentView: View {
     let state: NewsListContentViewState
-    let onRefresh: () -> Void
+    let onRefresh: () async -> Void
     let onArticleTap: (NewsArticle.ID) -> Void
     let onLikeTap: (NewsArticle.ID) -> Void
     let onCommentsTap: (NewsArticle.ID) -> Void
+    let onItemAppear: (NewsArticle.ID) -> Void
+    let onRetryLoadNextPageTap: () -> Void
 
     var body: some View {
         ScrollView {
@@ -27,12 +29,48 @@ struct NewsListContentView: View {
                         onLike: { onLikeTap(card.id) },
                         onComments: { onCommentsTap(card.id) }
                     )
+                    .equatable()
+                    .onAppear {
+                        onItemAppear(card.id)
+                    }
                 }
+
+                paginationFooter
             }
             .padding(AppSpacing.md)
         }
         .refreshable {
-            onRefresh()
+            await onRefresh()
         }
     }
+    @ViewBuilder
+    private var paginationFooter: some View {
+        switch state.pagination.status {
+        case .idle:
+            EmptyView()
+        case .loading:
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .padding(AppSpacing.md)
+        case .error(let message, let retryTitle):
+            VStack(spacing: AppSpacing.sm) {
+                Text(message)
+                    .font(AppTypography.bodySmall)
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                Button(retryTitle, action: onRetryLoadNextPageTap)
+                    .buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(AppSpacing.md)
+        case .endReached(let message):
+            Text(message)
+                .font(AppTypography.bodySmall)
+                .foregroundStyle(AppTheme.textSecondary)
+                .frame(maxWidth: .infinity)
+                .padding(AppSpacing.md)
+        }
+    }
+
 }

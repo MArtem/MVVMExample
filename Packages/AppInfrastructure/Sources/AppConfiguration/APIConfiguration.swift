@@ -8,16 +8,22 @@ public enum AppRuntimeEnvironment: String, Sendable {
 public struct APIConfiguration: Sendable {
     public let environment: AppRuntimeEnvironment
     public let baseURL: URL
+    public let requestTimeout: TimeInterval
     public let allowsDemoCredentials: Bool
+    public let retryPolicy: APIRetryPolicy
 
     public init(
         environment: AppRuntimeEnvironment,
         baseURL: URL,
-        allowsDemoCredentials: Bool
+        requestTimeout: TimeInterval,
+        allowsDemoCredentials: Bool,
+        retryPolicy: APIRetryPolicy
     ) {
         self.environment = environment
         self.baseURL = baseURL
+        self.requestTimeout = requestTimeout
         self.allowsDemoCredentials = allowsDemoCredentials
+        self.retryPolicy = retryPolicy
     }
 
     public static func current(
@@ -36,10 +42,16 @@ public struct APIConfiguration: Sendable {
             .map { $0 == "1" || $0.lowercased() == "true" }
             ?? defaultAllowsDemoCredentials
 
+        let timeout = environment["MVVMEXAMPLE_API_TIMEOUT_SECONDS"]
+            .flatMap(TimeInterval.init)
+            ?? 30
+
         return APIConfiguration(
             environment: allowsDemoCredentials ? .demo : .production,
             baseURL: baseURL,
-            allowsDemoCredentials: allowsDemoCredentials
+            requestTimeout: timeout,
+            allowsDemoCredentials: allowsDemoCredentials,
+            retryPolicy: .idempotentGET(maxRetries: 2)
         )
     }
 }
@@ -57,4 +69,25 @@ public struct DemoCredentials: Equatable, Sendable {
         username: "emilys",
         password: "emilyspass"
     )
+}
+
+
+public struct APIRetryPolicy: Sendable, Equatable {
+    public let maxRetries: Int
+    public let retryDelay: TimeInterval
+    public let retriesIdempotentGETOnly: Bool
+
+    public init(maxRetries: Int, retryDelay: TimeInterval, retriesIdempotentGETOnly: Bool) {
+        self.maxRetries = max(0, maxRetries)
+        self.retryDelay = retryDelay
+        self.retriesIdempotentGETOnly = retriesIdempotentGETOnly
+    }
+
+    public static func idempotentGET(maxRetries: Int, retryDelay: TimeInterval = 0.35) -> APIRetryPolicy {
+        APIRetryPolicy(
+            maxRetries: maxRetries,
+            retryDelay: retryDelay,
+            retriesIdempotentGETOnly: true
+        )
+    }
 }

@@ -11,13 +11,15 @@ let package = Package(
         .library(name: "AppErrors", targets: ["AppErrors"]),
         .library(name: "AppLocalization", targets: ["AppLocalization"]),
         .library(name: "AppConfiguration", targets: ["AppConfiguration"]),
-        .library(name: "AppLogging", targets: ["AppLogging"])
+        .library(name: "AppLogging", targets: ["AppLogging"]),
+        .library(name: "AppImageLoading", targets: ["AppImageLoading"])
     ],
     targets: [
         .target(name: "AppErrors"),
         .target(name: "AppLogging"),
         .target(name: "AppConfiguration", dependencies: ["AppLogging"]),
-        .target(name: "AppLocalization"),
-        .target(name: "AppNetworking", dependencies: ["AppErrors", "AppLogging", "AppConfiguration"])
+        .target(name: "AppLocalization", dependencies: ["AppErrors"]),
+        .target(name: "AppNetworking", dependencies: ["AppErrors", "AppLogging", "AppConfiguration"]),
+        .target(name: "AppImageLoading", dependencies: ["AppErrors"])
     ]
 )

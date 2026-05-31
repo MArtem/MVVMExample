@@ -22,4 +22,6 @@ struct NewsDetailContentViewState: Equatable {
     let likesText: String
     let commentsText: String
     let isFavorite: Bool
+    let isFavoriteUpdating: Bool
+    let favoriteErrorMessage: String?
 }

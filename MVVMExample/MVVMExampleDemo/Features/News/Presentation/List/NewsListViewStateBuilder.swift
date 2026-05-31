@@ -1,3 +1,4 @@
+import AppLocalization
 import Foundation
 
 struct NewsListViewStateBuilder {
@@ -11,8 +12,30 @@ struct NewsListViewStateBuilder {
     func makeContent(from articles: [NewsArticle]) -> NewsListContentViewState {
         NewsListContentViewState(
             cards: articles.map(makeCard),
-            banner: nil
+            banner: nil,
+            pagination: makePaginationIdle()
         )
+    }
+
+    func makePaginationIdle() -> NewsPaginationViewState {
+        NewsPaginationViewState(status: .idle)
+    }
+
+    func makePaginationLoading() -> NewsPaginationViewState {
+        NewsPaginationViewState(status: .loading)
+    }
+
+    func makePaginationError(from error: Error) -> NewsPaginationViewState {
+        NewsPaginationViewState(
+            status: .error(
+                message: AppErrorMapper.userMessage(for: error),
+                retryTitle: AppStrings.text("Retry loading more")
+            )
+        )
+    }
+
+    func makePaginationEndReached() -> NewsPaginationViewState {
+        NewsPaginationViewState(status: .endReached(message: AppStrings.text("You’re all caught up")))
     }
 
     func makeEmpty() -> MessageViewState {
@@ -26,7 +49,7 @@ struct NewsListViewStateBuilder {
     func makeError(from error: Error) -> MessageViewState {
         MessageViewState(
             title: AppStrings.text("Couldn’t load news"),
-            message: error.localizedDescription,
+            message: AppErrorMapper.userMessage(for: error),
             retryTitle: AppStrings.text("Retry")
         )
     }
@@ -39,17 +62,35 @@ struct NewsListViewStateBuilder {
             dateText = AppStrings.text("Recently")
         }
 
+        let likeIconName = Self.likeIconName(for: article.isLiked ? .liked : .notLiked)
+        let commentsText = AppStrings.formatted("%d comments", article.commentsCount)
+
         return NewsCardViewState(
             id: article.id,
             sourceText: article.source,
+            sourceDisplayText: article.source.uppercased(),
             title: article.title,
             excerpt: article.excerpt,
             publishedAtText: dateText,
             thumbnailURL: article.thumbnailURL,
             likesText: "\(article.likesCount)",
-            commentsText: AppStrings.formatted("%d comments", article.commentsCount),
+            commentsText: commentsText,
             likeState: article.isLiked ? .liked : .notLiked,
-            accessibilityLabel: "\(article.source). \(article.title). \(dateText)."
+            likeIconName: likeIconName,
+            accessibilityLabel: "\(article.source). \(article.title). \(dateText).",
+            likeAccessibilityLabel: article.isLiked ? AppStrings.text("Unlike article") : AppStrings.text("Like article"),
+            commentsAccessibilityLabel: commentsText
         )
+    }
+
+    static func likeIconName(for likeState: LikeButtonState) -> String {
+        switch likeState {
+        case .liked:
+            return "hand.thumbsup.fill"
+        case .notLiked, .failed:
+            return "hand.thumbsup"
+        case .updating:
+            return "clock"
+        }
     }
 }

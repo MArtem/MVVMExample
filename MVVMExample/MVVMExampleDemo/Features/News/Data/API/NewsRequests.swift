@@ -1,13 +1,17 @@
 import Foundation
+import AppNetworking
 
 struct ProductsListRequest: APIRequest {
+    let limit: Int
+    let skip: Int
+
     let path = "/products"
     let method: HTTPMethod = .get
 
     var queryItems: [URLQueryItem] {
         [
-            URLQueryItem(name: "limit", value: "30"),
-            URLQueryItem(name: "skip", value: "0")
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "skip", value: "\(skip)")
         ]
     }
 }

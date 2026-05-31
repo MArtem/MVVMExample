@@ -1,4 +1,5 @@
 import SwiftUI
+import AppLocalization
 
 struct NewsDetailContentView: View {
     let state: NewsDetailContentViewState
@@ -9,6 +10,16 @@ struct NewsDetailContentView: View {
             VStack(alignment: .leading, spacing: AppSpacing.md) {
                 AsyncImageView(url: state.imageURL, height: 260)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
+
+                if let favoriteErrorMessage = state.favoriteErrorMessage {
+                    Text(favoriteErrorMessage)
+                        .font(AppTypography.bodySmall)
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(AppSpacing.md)
+                        .background(AppTheme.surfacePrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
+                }
 
                 VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     HStack {
@@ -58,6 +69,7 @@ struct NewsDetailContentView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(state.isFavoriteUpdating)
             }
             .padding(AppSpacing.md)
         }

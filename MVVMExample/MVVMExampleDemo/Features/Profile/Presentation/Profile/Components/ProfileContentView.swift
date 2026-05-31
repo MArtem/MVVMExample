@@ -1,4 +1,5 @@
 import SwiftUI
+import AppLocalization
 
 struct ProfileContentView: View {
     let state: ProfileContentViewState
@@ -7,22 +8,8 @@ struct ProfileContentView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: AppSpacing.md) {
-                AsyncImage(url: state.imageURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    case .empty:
-                        ProgressView()
-                    case .failure:
-                        Image(systemName: "person.crop.circle")
-                            .resizable()
-                            .foregroundStyle(AppTheme.textTertiary)
-                    @unknown default:
-                        EmptyView()
-                    }
-                }
-                .frame(width: 120, height: 120)
-                .clipShape(Circle())
+                AsyncImageView(url: state.imageURL, width: 120, height: 120)
+                    .clipShape(Circle())
                 .padding(.top, AppSpacing.lg)
 
                 Text(state.displayName)

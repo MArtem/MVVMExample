@@ -1,0 +1,83 @@
+import SwiftUI
+import UIKit
+
+public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
+    private let url: URL?
+    private let targetSize: CGSize
+    private let contentMode: ContentMode
+    private let pipeline: RemoteImagePipeline
+    private let placeholder: () -> Placeholder
+    private let failure: () -> Failure
+
+    @Environment(\.displayScale) private var displayScale
+    @State private var image: UIImage?
+    @State private var didFail = false
+
+    public init(
+        url: URL?,
+        targetSize: CGSize,
+        contentMode: ContentMode = .fill,
+        pipeline: RemoteImagePipeline = .shared,
+        @ViewBuilder placeholder: @escaping () -> Placeholder,
+        @ViewBuilder failure: @escaping () -> Failure
+    ) {
+        self.url = url
+        self.targetSize = targetSize
+        self.contentMode = contentMode
+        self.pipeline = pipeline
+        self.placeholder = placeholder
+        self.failure = failure
+    }
+
+    public var body: some View {
+        content
+            .frame(width: targetSize.width, height: targetSize.height)
+            .clipped()
+            .task(id: taskID) {
+                await load()
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let image {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: contentMode)
+        } else if didFail {
+            failure()
+        } else {
+            placeholder()
+        }
+    }
+
+    private var taskID: String {
+        guard let url else { return "nil" }
+        return RemoteImagePipeline.cacheKey(url: url, targetSize: targetSize, scale: displayScale)
+    }
+
+    @MainActor
+    private func load() async {
+        guard let url else {
+            image = nil
+            didFail = true
+            return
+        }
+
+        image = nil
+        didFail = false
+        do {
+            let loaded = try await pipeline.image(
+                from: url,
+                targetSize: targetSize,
+                scale: displayScale
+            )
+            try Task.checkCancellation()
+            image = loaded
+        } catch is CancellationError {
+            return
+        } catch {
+            didFail = true
+        }
+    }
+}

@@ -1,12 +1,15 @@
 import SwiftUI
+import AppLocalization
 
 struct NewsListStateRenderer: View {
     let state: NewsListViewState
     let onRetryTap: () -> Void
-    let onRefresh: () -> Void
+    let onRefresh: () async -> Void
     let onArticleTap: (NewsArticle.ID) -> Void
     let onLikeTap: (NewsArticle.ID) -> Void
     let onCommentsTap: (NewsArticle.ID) -> Void
+    let onItemAppear: (NewsArticle.ID) -> Void
+    let onRetryLoadNextPageTap: () -> Void
 
     var body: some View {
         switch state {
@@ -19,7 +22,9 @@ struct NewsListStateRenderer: View {
                 onRefresh: onRefresh,
                 onArticleTap: onArticleTap,
                 onLikeTap: onLikeTap,
-                onCommentsTap: onCommentsTap
+                onCommentsTap: onCommentsTap,
+                onItemAppear: onItemAppear,
+                onRetryLoadNextPageTap: onRetryLoadNextPageTap
             )
 
         case .refreshing(let content):
@@ -28,7 +33,9 @@ struct NewsListStateRenderer: View {
                 onRefresh: onRefresh,
                 onArticleTap: onArticleTap,
                 onLikeTap: onLikeTap,
-                onCommentsTap: onCommentsTap
+                onCommentsTap: onCommentsTap,
+                onItemAppear: onItemAppear,
+                onRetryLoadNextPageTap: onRetryLoadNextPageTap
             )
             .overlay(alignment: .top) {
                 ProgressView()

@@ -4,18 +4,18 @@ struct MockNewsRepository: NewsRepository {
     var articles: [NewsArticle] = [.fixture]
     var shouldFail = false
 
-    func loadNews() async throws -> [NewsArticle] {
-        try await Task.sleep(for: .milliseconds(250))
+    func loadNews(page: NewsPageRequest) async throws -> [NewsArticle] {
         if shouldFail { throw URLError(.notConnectedToInternet) }
-        return articles
+        let end = min(page.skip + page.limit, articles.count)
+        guard page.skip < end else { return [] }
+        return Array(articles[page.skip..<end])
     }
 
-    func refreshNews() async throws -> [NewsArticle] {
-        try await loadNews()
+    func refreshNews(page: NewsPageRequest) async throws -> [NewsArticle] {
+        try await loadNews(page: page)
     }
 
     func loadArticleDetail(id: NewsArticle.ID) async throws -> NewsArticle {
-        try await Task.sleep(for: .milliseconds(250))
         if shouldFail { throw URLError(.notConnectedToInternet) }
         return articles.first(where: { $0.id == id }) ?? .fixture
     }

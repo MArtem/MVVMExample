@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+import AppConfiguration
+import AppErrors
+import AppLocalization
 
 @MainActor
 @Observable
@@ -68,7 +71,7 @@ final class LoginViewModel {
                 return
             } catch {
                 state.isLoading = false
-                state.errorMessage = error.localizedDescription
+                state.errorMessage = AppErrorMapper.userMessage(for: error)
             }
         }
     }

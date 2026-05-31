@@ -1,4 +1,5 @@
 import SwiftUI
+import AppLocalization
 
 struct ProfileStateRenderer: View {
     let state: ProfileViewState

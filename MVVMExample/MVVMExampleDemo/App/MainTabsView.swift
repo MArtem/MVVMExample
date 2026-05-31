@@ -1,4 +1,5 @@
 import SwiftUI
+import AppLocalization
 
 struct MainTabsView: View {
     @Bindable var coordinator: MainCoordinator

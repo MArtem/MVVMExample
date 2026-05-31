@@ -1,4 +1,7 @@
 import Foundation
+import AppConfiguration
+import AppErrors
+import AppLogging
 
 public final class URLSessionNetworkClient: NetworkClient {
     private let configuration: APIConfiguration
@@ -19,6 +22,21 @@ public final class URLSessionNetworkClient: NetworkClient {
     }
 
     public func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
+        var attempt = 0
+        while true {
+            do {
+                return try await perform(request)
+            } catch {
+                guard shouldRetry(request: request, error: error, attempt: attempt) else {
+                    throw error
+                }
+                attempt += 1
+                try await Task.sleep(for: .seconds(configuration.retryPolicy.retryDelay))
+            }
+        }
+    }
+
+    private func perform<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
         var components = URLComponents(
             url: configuration.baseURL.appendingPathComponent(request.path),
             resolvingAgainstBaseURL: false
@@ -31,6 +49,7 @@ public final class URLSessionNetworkClient: NetworkClient {
 
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
+        urlRequest.timeoutInterval = configuration.requestTimeout
         do {
             urlRequest.httpBody = try request.makeBody()
         } catch {
@@ -41,7 +60,7 @@ public final class URLSessionNetworkClient: NetworkClient {
             urlRequest.setValue(value, forHTTPHeaderField: key)
         }
 
-        logger.log("HTTP \(request.method.rawValue) \(url.absoluteString)")
+        logger.log("HTTP \(request.method.rawValue) \(redactedURLString(url))")
 
         do {
             let (data, response) = try await session.data(for: urlRequest)
@@ -75,6 +94,20 @@ public final class URLSessionNetworkClient: NetworkClient {
         }
     }
 
+    private func shouldRetry(request: NetworkRequest, error: Error, attempt: Int) -> Bool {
+        guard attempt < configuration.retryPolicy.maxRetries else { return false }
+        if configuration.retryPolicy.retriesIdempotentGETOnly && request.method != .get {
+            return false
+        }
+        guard let apiError = error as? AppAPIError else { return false }
+        switch apiError {
+        case .offline, .timeout, .transport, .server:
+            return true
+        case .cancelled, .unauthorized, .forbidden, .encoding, .decoding, .invalidResponse, .invalidURL:
+            return false
+        }
+    }
+
     private func mapStatusCode(_ statusCode: Int, message: String?) -> AppAPIError {
         switch statusCode {
         case 401:
@@ -97,6 +130,20 @@ public final class URLSessionNetworkClient: NetworkClient {
         default:
             return .transport(error.localizedDescription)
         }
+    }
+
+    private func redactedURLString(_ url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return "<redacted-url>"
+        }
+        let sensitiveQueryNames = Set(["token", "access_token", "refresh_token", "password", "api_key", "key", "secret", "authorization"])
+        components.queryItems = components.queryItems?.map { item in
+            guard sensitiveQueryNames.contains(item.name.lowercased()) else { return item }
+            return URLQueryItem(name: item.name, value: "<redacted>")
+        }
+        components.user = nil
+        components.password = nil
+        return components.string ?? "<redacted-url>"
     }
 }
 

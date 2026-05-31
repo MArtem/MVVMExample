@@ -1,4 +1,5 @@
 import Foundation
+import AppLocalization
 
 struct ProfileEditViewState: Equatable {
     var isSaving: Bool = false

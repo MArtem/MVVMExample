@@ -1,20 +1,28 @@
 import Foundation
 import Observation
+import AppErrors
+import AppLocalization
 
 @MainActor
 @Observable
 final class NewsListViewModel {
     private(set) var state: NewsListViewState = .idle
 
+    private let pageSize = 30
+    private let paginationThreshold = 5
     private let repository: NewsRepository
     private let viewStateBuilder: NewsListViewStateBuilder
     private let interactionStore: ArticleInteractionStore
     private weak var router: NewsRouter?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
-    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var loadNextPageTask: Task<Void, Never>?
     @ObservationIgnored private var likeTasks: [NewsArticle.ID: Task<Void, Never>] = [:]
+    private var articles: [NewsArticle] = []
+    private var nextSkip = 0
+    private var canLoadMore = true
     private var loadGeneration = 0
     private var refreshGeneration = 0
+    private var paginationGeneration = 0
 
     init(
         repository: NewsRepository,
@@ -30,7 +38,7 @@ final class NewsListViewModel {
 
     deinit {
         loadTask?.cancel()
-        refreshTask?.cancel()
+        loadNextPageTask?.cancel()
         likeTasks.values.forEach { $0.cancel() }
     }
 
@@ -42,8 +50,8 @@ final class NewsListViewModel {
         load()
     }
 
-    func refreshRequested() {
-        refresh()
+    func refreshRequested() async {
+        await refresh()
     }
 
     func articleTapped(id: NewsArticle.ID) {
@@ -55,7 +63,17 @@ final class NewsListViewModel {
     }
 
     func commentsTapped(id: NewsArticle.ID) {
-        // Comments are visible as counts only in the current demo scope.
+        // Comments are visible as counts only in the current product scope.
+    }
+
+    func loadNextPageIfNeeded(currentItemID: NewsArticle.ID) {
+        guard shouldLoadNextPage(currentItemID: currentItemID) else { return }
+        loadNextPage()
+    }
+
+    func retryLoadNextPageTapped() {
+        guard case .content = state else { return }
+        loadNextPage()
     }
 
     private func loadIfNeeded() {
@@ -65,19 +83,22 @@ final class NewsListViewModel {
 
     private func load() {
         loadTask?.cancel()
+        loadNextPageTask?.cancel()
         loadGeneration += 1
         let generation = loadGeneration
         state = .loading
 
-        loadTask = Task { [repository, interactionStore, viewStateBuilder] in
+        loadTask = Task { [repository, interactionStore, viewStateBuilder, pageSize] in
             do {
-                let articles = try await repository.loadNews()
+                let loadedArticles = try await repository.loadNews(
+                    page: NewsPageRequest(limit: pageSize, skip: 0)
+                )
                 try Task.checkCancellation()
                 guard generation == loadGeneration else { return }
-                let merged = interactionStore.merge(articles)
-                state = merged.isEmpty
-                    ? .empty(viewStateBuilder.makeEmpty())
-                    : .content(viewStateBuilder.makeContent(from: merged))
+                articles = interactionStore.merge(loadedArticles)
+                nextSkip = articles.count
+                canLoadMore = loadedArticles.count == pageSize
+                state = makeStateForCurrentArticles(viewStateBuilder: viewStateBuilder)
             } catch is CancellationError {
                 return
             } catch AppAPIError.cancelled {
@@ -89,37 +110,113 @@ final class NewsListViewModel {
         }
     }
 
-    private func refresh() {
+    private func refresh() async {
         guard case .content(let currentContent) = state else {
             load()
             return
         }
 
-        refreshTask?.cancel()
+        loadNextPageTask?.cancel()
         refreshGeneration += 1
         let generation = refreshGeneration
         state = .refreshing(currentContent)
 
-        refreshTask = Task { [repository, interactionStore, viewStateBuilder] in
+        do {
+            let refreshedArticles = try await repository.refreshNews(
+                page: NewsPageRequest(limit: pageSize, skip: 0)
+            )
+            try Task.checkCancellation()
+            guard generation == refreshGeneration else { return }
+            articles = interactionStore.merge(refreshedArticles)
+            nextSkip = articles.count
+            canLoadMore = refreshedArticles.count == pageSize
+            state = makeStateForCurrentArticles(viewStateBuilder: viewStateBuilder)
+        } catch is CancellationError {
+            return
+        } catch AppAPIError.cancelled {
+            return
+        } catch {
+            guard generation == refreshGeneration else { return }
+            var content = currentContent
+            content.banner = AppStrings.text("Couldn’t refresh. Showing previous content.")
+            state = .content(content)
+        }
+    }
+
+    private func loadNextPage() {
+        guard case .content(let currentContent) = state else { return }
+        guard canLoadMore else { return }
+        guard loadNextPageTask == nil else { return }
+
+        paginationGeneration += 1
+        let generation = paginationGeneration
+        let request = NewsPageRequest(limit: pageSize, skip: nextSkip)
+        var loadingContent = currentContent
+        loadingContent.pagination = viewStateBuilder.makePaginationLoading()
+        loadingContent.banner = nil
+        state = .content(loadingContent)
+
+        loadNextPageTask = Task { [repository, interactionStore, viewStateBuilder] in
+            defer { loadNextPageTask = nil }
             do {
-                let articles = try await repository.refreshNews()
+                let nextPageArticles = try await repository.loadNews(page: request)
                 try Task.checkCancellation()
-                guard generation == refreshGeneration else { return }
-                let merged = interactionStore.merge(articles)
-                state = merged.isEmpty
-                    ? .empty(viewStateBuilder.makeEmpty())
-                    : .content(viewStateBuilder.makeContent(from: merged))
+                guard generation == paginationGeneration else { return }
+
+                let mergedPage = interactionStore.merge(nextPageArticles)
+                articles = mergeExistingArticles(articles, with: mergedPage)
+                nextSkip += nextPageArticles.count
+                canLoadMore = nextPageArticles.count == pageSize
+                state = makeStateForCurrentArticles(viewStateBuilder: viewStateBuilder)
             } catch is CancellationError {
                 return
             } catch AppAPIError.cancelled {
                 return
             } catch {
-                guard generation == refreshGeneration else { return }
-                var content = currentContent
-                content.banner = AppStrings.text("Couldn’t refresh. Showing previous content.")
+                guard generation == paginationGeneration else { return }
+                guard case .content(let latestContent) = state else { return }
+                var content = latestContent
+                content.pagination = viewStateBuilder.makePaginationError(from: error)
                 state = .content(content)
             }
         }
+    }
+
+    private func shouldLoadNextPage(currentItemID: NewsArticle.ID) -> Bool {
+        guard case .content = state else { return false }
+        guard canLoadMore else { return false }
+        guard loadNextPageTask == nil else { return false }
+        guard let index = articles.firstIndex(where: { $0.id == currentItemID }) else { return false }
+        return index >= max(articles.count - paginationThreshold, 0)
+    }
+
+    private func makeStateForCurrentArticles(
+        viewStateBuilder: NewsListViewStateBuilder
+    ) -> NewsListViewState {
+        guard !articles.isEmpty else {
+            return .empty(viewStateBuilder.makeEmpty())
+        }
+
+        var content = viewStateBuilder.makeContent(from: articles)
+        content.pagination = canLoadMore
+            ? viewStateBuilder.makePaginationIdle()
+            : viewStateBuilder.makePaginationEndReached()
+        return .content(content)
+    }
+
+    private func mergeExistingArticles(
+        _ existingArticles: [NewsArticle],
+        with incomingArticles: [NewsArticle]
+    ) -> [NewsArticle] {
+        var mergedArticles = existingArticles
+        var existingIDs = Set(existingArticles.map(\.id))
+
+        for article in incomingArticles where !existingIDs.contains(article.id) {
+            mergedArticles.append(article)
+            existingIDs.insert(article.id)
+        }
+
+        return mergedArticles
     }
 
     private func openDetail(id: Int) {
@@ -165,6 +262,7 @@ final class NewsListViewModel {
                 )
                 try Task.checkCancellation()
                 interactionStore.update(with: updatedArticle)
+                articles = articles.map { $0.id == articleID ? updatedArticle : $0 }
                 let updatedCard = viewStateBuilder.makeCard(from: updatedArticle)
 
                 guard case .content(let latestContent) = state else { return }
@@ -202,6 +300,7 @@ private extension NewsCardViewState {
         NewsCardViewState(
             id: id,
             sourceText: sourceText,
+            sourceDisplayText: sourceDisplayText,
             title: title,
             excerpt: excerpt,
             publishedAtText: publishedAtText,
@@ -209,7 +308,10 @@ private extension NewsCardViewState {
             likesText: likesText,
             commentsText: commentsText,
             likeState: likeState,
-            accessibilityLabel: accessibilityLabel
+            likeIconName: NewsListViewStateBuilder.likeIconName(for: likeState),
+            accessibilityLabel: accessibilityLabel,
+            likeAccessibilityLabel: likeState == .liked ? AppStrings.text("Unlike article") : AppStrings.text("Like article"),
+            commentsAccessibilityLabel: commentsAccessibilityLabel
         )
     }
 }

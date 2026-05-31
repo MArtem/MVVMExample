@@ -9,13 +9,15 @@ struct LiveNewsRepository: NewsRepository {
         self.mapper = mapper
     }
 
-    func loadNews() async throws -> [NewsArticle] {
-        let response: ProductsResponseDTO = try await apiClient.send(ProductsListRequest())
+    func loadNews(page: NewsPageRequest) async throws -> [NewsArticle] {
+        let response: ProductsResponseDTO = try await apiClient.send(
+            ProductsListRequest(limit: page.limit, skip: page.skip)
+        )
         return try response.products.map(mapper.map)
     }
 
-    func refreshNews() async throws -> [NewsArticle] {
-        try await loadNews()
+    func refreshNews(page: NewsPageRequest) async throws -> [NewsArticle] {
+        try await loadNews(page: page)
     }
 
     func loadArticleDetail(id: NewsArticle.ID) async throws -> NewsArticle {

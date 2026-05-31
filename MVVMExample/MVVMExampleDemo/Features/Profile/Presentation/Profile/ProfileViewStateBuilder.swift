@@ -1,4 +1,5 @@
 import Foundation
+import AppLocalization
 
 struct ProfileViewStateBuilder {
     func makeContent(from profile: UserProfile) -> ProfileContentViewState {
@@ -18,7 +19,7 @@ struct ProfileViewStateBuilder {
     func makeError(from error: Error) -> MessageViewState {
         MessageViewState(
             title: AppStrings.text("Couldn’t load profile"),
-            message: error.localizedDescription,
+            message: AppErrorMapper.userMessage(for: error),
             retryTitle: AppStrings.text("Retry")
         )
     }

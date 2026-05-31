@@ -1,5 +1,7 @@
 import Foundation
 import Observation
+import AppErrors
+import AppLocalization
 
 @MainActor
 @Observable
@@ -73,8 +75,18 @@ final class NewsDetailViewModel {
     private func toggleFavorite() {
         guard let article else { return }
         let target = !article.isLiked
+        let previousArticle = article
+        let optimisticArticle = article.replacingLikeState(isLiked: target)
 
         favoriteTask?.cancel()
+        self.article = optimisticArticle
+        state = .content(
+            viewStateBuilder.makeContent(
+                from: optimisticArticle,
+                isFavoriteUpdating: true
+            )
+        )
+
         favoriteTask = Task { [repository, interactionStore, viewStateBuilder] in
             do {
                 let updated = try await repository.toggleLike(articleID: article.id, isLiked: target)
@@ -88,8 +100,42 @@ final class NewsDetailViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
-                state = .error(viewStateBuilder.makeError(from: error))
+                self.article = previousArticle
+                state = .content(
+                    viewStateBuilder.makeContent(
+                        from: previousArticle,
+                        favoriteErrorMessage: AppStrings.text("Couldn’t update favorite. Please try again.")
+                    )
+                )
             }
         }
+    }
+}
+
+private extension NewsArticle {
+    func replacingLikeState(isLiked: Bool) -> NewsArticle {
+        let adjustedLikesCount: Int
+        if isLiked == self.isLiked {
+            adjustedLikesCount = likesCount
+        } else if isLiked {
+            adjustedLikesCount = likesCount + 1
+        } else {
+            adjustedLikesCount = max(likesCount - 1, 0)
+        }
+
+        return NewsArticle(
+            id: id,
+            title: title,
+            excerpt: excerpt,
+            source: source,
+            category: category,
+            rating: rating,
+            thumbnailURL: thumbnailURL,
+            imageURLs: imageURLs,
+            publishedAt: publishedAt,
+            likesCount: adjustedLikesCount,
+            commentsCount: commentsCount,
+            isLiked: isLiked
+        )
     }
 }
