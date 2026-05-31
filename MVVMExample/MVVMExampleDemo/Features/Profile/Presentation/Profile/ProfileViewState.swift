@@ -8,6 +8,8 @@ enum ProfileViewState: Equatable {
 
 struct ProfileContentViewState: Equatable {
     let id: Int
+    let firstName: String
+    let lastName: String
     let displayName: String
     let usernameText: String
     let emailText: String

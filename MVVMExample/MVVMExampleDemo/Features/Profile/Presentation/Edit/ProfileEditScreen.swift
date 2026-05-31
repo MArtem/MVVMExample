@@ -11,10 +11,10 @@ struct ProfileEditScreen: View {
         @Bindable var viewModel = viewModel
 
         Form {
-            Section("Personal") {
-                TextField("First name", text: $viewModel.firstName)
-                TextField("Last name", text: $viewModel.lastName)
-                TextField("Email", text: $viewModel.email)
+            Section(AppStrings.text("Personal")) {
+                TextField(AppStrings.text("First name"), text: $viewModel.firstName)
+                TextField(AppStrings.text("Last name"), text: $viewModel.lastName)
+                TextField(AppStrings.text("Email"), text: $viewModel.email)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
             }
@@ -28,7 +28,7 @@ struct ProfileEditScreen: View {
 
             Section {
                 Button {
-                    viewModel.send(.saveTapped)
+                    viewModel.saveTapped()
                 } label: {
                     HStack {
                         if viewModel.state.isSaving {
@@ -40,11 +40,11 @@ struct ProfileEditScreen: View {
                 .disabled(viewModel.state.isSaving)
             }
         }
-        .navigationTitle("Edit Profile")
+        .navigationTitle(AppStrings.text("Edit Profile"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Cancel") {
-                    viewModel.send(.cancelTapped)
+                Button(AppStrings.text("Cancel")) {
+                    viewModel.cancelTapped()
                 }
             }
         }

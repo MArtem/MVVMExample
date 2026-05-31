@@ -10,12 +10,16 @@ struct NewsListScreen: View {
     var body: some View {
         NewsListStateRenderer(
             state: viewModel.state,
-            onAction: viewModel.send
+            onRetryTap: viewModel.retryTapped,
+            onRefresh: viewModel.refreshRequested,
+            onArticleTap: viewModel.articleTapped(id:),
+            onLikeTap: viewModel.likeTapped(id:),
+            onCommentsTap: viewModel.commentsTapped(id:)
         )
-        .navigationTitle("News")
+        .navigationTitle(AppStrings.text("News"))
         .background(AppTheme.backgroundBase)
         .task {
-            viewModel.send(.appeared)
+            viewModel.appeared()
         }
     }
 }
@@ -25,7 +29,8 @@ struct NewsListScreen: View {
         NewsListScreen(
             viewModel: NewsListViewModel(
                 repository: MockNewsRepository(),
-                router: NewsRouter()
+                router: NewsRouter(),
+                interactionStore: ArticleInteractionStore()
             )
         )
     }

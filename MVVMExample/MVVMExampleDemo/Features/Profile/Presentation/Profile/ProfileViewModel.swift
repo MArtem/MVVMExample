@@ -11,7 +11,8 @@ final class ProfileViewModel {
     private let viewStateBuilder: ProfileViewStateBuilder
     private weak var router: ProfileRouter?
     private let onLogout: () -> Void
-    private var task: Task<Void, Never>?
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    private var loadGeneration = 0
 
     init(
         session: AuthSession,
@@ -27,31 +28,44 @@ final class ProfileViewModel {
         self.onLogout = onLogout
     }
 
-    func send(_ action: ProfileAction) {
-        switch action {
-        case .appeared:
-            load()
-        case .retryTapped:
-            load()
-        case .editTapped:
-            openEdit()
-        case .logoutTapped:
-            onLogout()
-        }
+    deinit {
+        loadTask?.cancel()
+    }
+
+    func appeared() {
+        load()
+    }
+
+    func retryTapped() {
+        load()
+    }
+
+    func editTapped() {
+        openEdit()
+    }
+
+    func logoutTapped() {
+        onLogout()
     }
 
     private func load() {
-        task?.cancel()
+        loadTask?.cancel()
+        loadGeneration += 1
+        let generation = loadGeneration
         state = .loading
 
-        task = Task {
+        loadTask = Task { [repository, session, viewStateBuilder] in
             do {
                 let profile = try await repository.loadCurrentProfile(session: session)
                 try Task.checkCancellation()
+                guard generation == loadGeneration else { return }
                 state = .content(viewStateBuilder.makeContent(from: profile))
             } catch is CancellationError {
                 return
+            } catch AppAPIError.cancelled {
+                return
             } catch {
+                guard generation == loadGeneration else { return }
                 state = .error(viewStateBuilder.makeError(from: error))
             }
         }
@@ -62,8 +76,8 @@ final class ProfileViewModel {
         router?.openEdit(
             ProfileEditRoutePayload(
                 id: content.id,
-                firstName: content.displayName.components(separatedBy: " ").first ?? "",
-                lastName: content.displayName.components(separatedBy: " ").dropFirst().joined(separator: " "),
+                firstName: content.firstName,
+                lastName: content.lastName,
                 email: content.emailText
             )
         )

@@ -7,8 +7,8 @@ struct LoginAPIRequest: APIRequest {
     let path = "/auth/login"
     let method: HTTPMethod = .post
 
-    var body: Data? {
-        JSONBodyEncoder.encode(
+    func makeBody() throws -> Data? {
+        try JSONBodyEncoder.encode(
             LoginRequestDTO(
                 username: username,
                 password: password,

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ProfileContentView: View {
     let state: ProfileContentViewState
-    let onAction: (ProfileAction) -> Void
+    let onEditTap: () -> Void
 
     var body: some View {
         ScrollView {
@@ -33,18 +33,16 @@ struct ProfileContentView: View {
                     .foregroundStyle(AppTheme.textSecondary)
 
                 VStack(alignment: .leading, spacing: AppSpacing.md) {
-                    ProfileInfoRow(title: "Email", value: state.emailText, icon: "envelope")
-                    ProfileInfoRow(title: "Phone", value: state.phoneText, icon: "phone")
-                    ProfileInfoRow(title: "Role", value: state.companyText, icon: "briefcase")
+                    ProfileInfoRow(title: AppStrings.text("Email"), value: state.emailText, icon: "envelope")
+                    ProfileInfoRow(title: AppStrings.text("Phone"), value: state.phoneText, icon: "phone")
+                    ProfileInfoRow(title: AppStrings.text("Role"), value: state.companyText, icon: "briefcase")
                 }
                 .padding(AppSpacing.md)
                 .background(AppTheme.surfacePrimary)
                 .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
 
-                Button {
-                    onAction(.editTapped)
-                } label: {
-                    Label("Edit profile", systemImage: "pencil")
+                Button(action: onEditTap) {
+                    Label(AppStrings.text("Edit profile"), systemImage: "pencil")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)

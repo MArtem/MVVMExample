@@ -9,6 +9,7 @@ struct AppRootView: View {
             LoginScreen(
                 viewModel: LoginViewModel(
                     repository: coordinator.dependencies.authRepository,
+                    demoCredentials: coordinator.dependencies.demoCredentials,
                     onLoginSuccess: { session in
                         coordinator.handleLoginSuccess(session)
                     }

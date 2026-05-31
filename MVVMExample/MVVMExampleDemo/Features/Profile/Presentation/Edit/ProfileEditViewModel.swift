@@ -12,7 +12,7 @@ final class ProfileEditViewModel {
     private let payload: ProfileEditRoutePayload
     private let repository: ProfileRepository
     private weak var router: ProfileRouter?
-    private var task: Task<Void, Never>?
+    @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     init(
         payload: ProfileEditRoutePayload,
@@ -27,19 +27,24 @@ final class ProfileEditViewModel {
         self.email = payload.email
     }
 
-    func send(_ action: ProfileEditAction) {
-        switch action {
-        case .saveTapped:
-            save()
-        case .cancelTapped:
-            router?.pop()
-        case .clearError:
-            state.errorMessage = nil
-        }
+    deinit {
+        saveTask?.cancel()
+    }
+
+    func saveTapped() {
+        save()
+    }
+
+    func cancelTapped() {
+        router?.pop()
+    }
+
+    func clearError() {
+        state.errorMessage = nil
     }
 
     private func save() {
-        task?.cancel()
+        saveTask?.cancel()
         state.isSaving = true
         state.errorMessage = nil
 
@@ -49,14 +54,15 @@ final class ProfileEditViewModel {
             email: email.trimmingCharacters(in: .whitespacesAndNewlines)
         )
 
-        task = Task {
+        saveTask = Task { [repository, payload] in
             do {
-                try await Task.sleep(for: .milliseconds(350))
                 _ = try await repository.updateProfile(id: payload.id, request: request)
                 try Task.checkCancellation()
                 state.isSaving = false
                 router?.pop()
             } catch is CancellationError {
+                return
+            } catch AppAPIError.cancelled {
                 return
             } catch {
                 state.isSaving = false

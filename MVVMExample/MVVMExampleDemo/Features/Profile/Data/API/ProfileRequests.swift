@@ -18,8 +18,8 @@ struct UpdateUserRequest: APIRequest {
     var path: String { "/users/\(id)" }
     let method: HTTPMethod = .patch
 
-    var body: Data? {
-        JSONBodyEncoder.encode(
+    func makeBody() throws -> Data? {
+        try JSONBodyEncoder.encode(
             UpdateProfileDTO(
                 firstName: request.firstName,
                 lastName: request.lastName,

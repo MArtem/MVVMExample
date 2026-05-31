@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import re, sys
+import re
+import sys
+
 root = Path(__file__).resolve().parents[1]
 patterns = [
     ('private key', re.compile(r'-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----')),
@@ -8,6 +10,10 @@ patterns = [
     ('generic token assignment', re.compile(r'(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*["\'][^"\']{16,}["\']')),
 ]
 exclude = {'.git', 'DerivedData', '.zenflow', 'docs/reusable-baseline/external-environment'}
+allowed_demo_literals = (
+    'demo-access-credential-not-a-secret',
+    'demo-refresh-credential-not-a-secret',
+)
 findings=[]
 for path in root.rglob('*'):
     if not path.is_file():
@@ -25,10 +31,10 @@ for path in root.rglob('*'):
         for match in rx.finditer(text):
             literal_match = re.search(r'["\']([^"\']+)["\']\s*$', match.group(0))
             literal = literal_match.group(1) if literal_match else ''
-            # Generated development/demo token templates and environment-variable indirections are not committed secrets.
             if name == 'generic token assignment' and (
                 literal.startswith(('dev-access-', 'dev-refresh-', 'reqres-demo-refresh-'))
                 or literal.startswith('${')
+                or literal in allowed_demo_literals
             ):
                 continue
             line=text[:match.start()].count('\n')+1

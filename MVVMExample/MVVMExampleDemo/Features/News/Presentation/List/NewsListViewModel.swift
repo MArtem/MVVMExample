@@ -8,39 +8,54 @@ final class NewsListViewModel {
 
     private let repository: NewsRepository
     private let viewStateBuilder: NewsListViewStateBuilder
+    private let interactionStore: ArticleInteractionStore
     private weak var router: NewsRouter?
-    private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var refreshTask: Task<Void, Never>?
+    @ObservationIgnored private var likeTasks: [NewsArticle.ID: Task<Void, Never>] = [:]
+    private var loadGeneration = 0
+    private var refreshGeneration = 0
 
     init(
         repository: NewsRepository,
         router: NewsRouter,
+        interactionStore: ArticleInteractionStore,
         viewStateBuilder: NewsListViewStateBuilder = NewsListViewStateBuilder()
     ) {
         self.repository = repository
         self.router = router
+        self.interactionStore = interactionStore
         self.viewStateBuilder = viewStateBuilder
     }
 
-    func send(_ action: NewsListAction) {
-        switch action {
-        case .appeared:
-            loadIfNeeded()
+    deinit {
+        loadTask?.cancel()
+        refreshTask?.cancel()
+        likeTasks.values.forEach { $0.cancel() }
+    }
 
-        case .retryTapped:
-            load()
+    func appeared() {
+        loadIfNeeded()
+    }
 
-        case .refreshRequested:
-            refresh()
+    func retryTapped() {
+        load()
+    }
 
-        case .cardTapped(let id):
-            openDetail(id: id)
+    func refreshRequested() {
+        refresh()
+    }
 
-        case .likeTapped(let id):
-            toggleLike(articleID: id)
+    func articleTapped(id: NewsArticle.ID) {
+        openDetail(id: id)
+    }
 
-        case .commentsTapped:
-            break
-        }
+    func likeTapped(id: NewsArticle.ID) {
+        toggleLike(articleID: id)
+    }
+
+    func commentsTapped(id: NewsArticle.ID) {
+        // Comments are visible as counts only in the current demo scope.
     }
 
     private func loadIfNeeded() {
@@ -50,18 +65,25 @@ final class NewsListViewModel {
 
     private func load() {
         loadTask?.cancel()
+        loadGeneration += 1
+        let generation = loadGeneration
         state = .loading
 
-        loadTask = Task {
+        loadTask = Task { [repository, interactionStore, viewStateBuilder] in
             do {
                 let articles = try await repository.loadNews()
                 try Task.checkCancellation()
-                state = articles.isEmpty
+                guard generation == loadGeneration else { return }
+                let merged = interactionStore.merge(articles)
+                state = merged.isEmpty
                     ? .empty(viewStateBuilder.makeEmpty())
-                    : .content(viewStateBuilder.makeContent(from: articles))
+                    : .content(viewStateBuilder.makeContent(from: merged))
             } catch is CancellationError {
                 return
+            } catch AppAPIError.cancelled {
+                return
             } catch {
+                guard generation == loadGeneration else { return }
                 state = .error(viewStateBuilder.makeError(from: error))
             }
         }
@@ -73,21 +95,28 @@ final class NewsListViewModel {
             return
         }
 
-        loadTask?.cancel()
+        refreshTask?.cancel()
+        refreshGeneration += 1
+        let generation = refreshGeneration
         state = .refreshing(currentContent)
 
-        loadTask = Task {
+        refreshTask = Task { [repository, interactionStore, viewStateBuilder] in
             do {
                 let articles = try await repository.refreshNews()
                 try Task.checkCancellation()
-                state = articles.isEmpty
+                guard generation == refreshGeneration else { return }
+                let merged = interactionStore.merge(articles)
+                state = merged.isEmpty
                     ? .empty(viewStateBuilder.makeEmpty())
-                    : .content(viewStateBuilder.makeContent(from: articles))
+                    : .content(viewStateBuilder.makeContent(from: merged))
             } catch is CancellationError {
                 return
+            } catch AppAPIError.cancelled {
+                return
             } catch {
+                guard generation == refreshGeneration else { return }
                 var content = currentContent
-                content.banner = "Couldn’t refresh. Showing previous content."
+                content.banner = AppStrings.text("Couldn’t refresh. Showing previous content.")
                 state = .content(content)
             }
         }
@@ -118,6 +147,8 @@ final class NewsListViewModel {
             return
         }
 
+        likeTasks[articleID]?.cancel()
+
         var optimisticContent = content
         optimisticContent.cards = content.cards.map { item in
             guard item.id == articleID else { return item }
@@ -125,13 +156,15 @@ final class NewsListViewModel {
         }
         state = .content(optimisticContent)
 
-        Task {
+        likeTasks[articleID] = Task { [repository, interactionStore, viewStateBuilder] in
+            defer { likeTasks[articleID] = nil }
             do {
                 let updatedArticle = try await repository.toggleLike(
                     articleID: articleID,
                     isLiked: targetIsLiked
                 )
                 try Task.checkCancellation()
+                interactionStore.update(with: updatedArticle)
                 let updatedCard = viewStateBuilder.makeCard(from: updatedArticle)
 
                 guard case .content(let latestContent) = state else { return }
@@ -140,13 +173,15 @@ final class NewsListViewModel {
                 state = .content(content)
             } catch is CancellationError {
                 return
+            } catch AppAPIError.cancelled {
+                return
             } catch {
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
                 content.cards = latestContent.cards.map { item in
                     item.id == articleID ? item.replacingLikeState(.failed) : item
                 }
-                content.banner = "Couldn’t update like. Please try again."
+                content.banner = AppStrings.text("Couldn’t update like. Please try again.")
                 state = .content(content)
             }
         }

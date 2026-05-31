@@ -13,6 +13,9 @@ Make SwiftUI/UIKit UI predictable, performant, accessible, and maintainable.
 - Keep empty/loading/error/offline/permission states explicit.
 
 
+## ViewModel API Rule
+ViewModels expose explicit intent methods by default. Do not use `send(_ action:)` or UI action enums as default MVVM boilerplate. Apply `./docs/IOS_MVVM_INTENT_API_STANDARD.md` before adding or reviewing ViewModel public APIs.
+
 ## View Model Ownership Decision Rule
 A SwiftUI view should not receive its own model or view model by default. Start with immutable input state plus explicit callbacks, then promote to a dedicated state owner only when the view has a concrete lifecycle or ownership problem that cannot be handled cleanly by the parent feature state.
 

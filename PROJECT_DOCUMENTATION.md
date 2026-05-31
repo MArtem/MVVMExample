@@ -4,7 +4,7 @@
 Stable onboarding document for `MVVMExample`.
 
 Read this file for:
-- app shape
+- current app shape
 - architecture boundaries
 - runtime baselines
 - documentation entry points
@@ -17,30 +17,50 @@ When starting or resuming work in this worktree, read in this order:
 1. `./docs/README.md`
 2. `./PROJECT_DOCUMENTATION.md`
 3. `./PROJECT_HEALTH.md`
-4. `./docs/CURRENT_USER_OVERRIDES.md`
-5. `./docs/AGENT_RULES.md`
-6. `./docs/WORK_CONTINUITY.md`
-7. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
+4. `./TESTING_INSTRUCTIONS.md`
+5. `./docs/CURRENT_USER_OVERRIDES.md`
+6. `./docs/AGENT_RULES.md`
+7. `./docs/WORK_CONTINUITY.md`
+8. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
 
 For context transfer, include this exact rule:
 **"перечитать весь актуальный набор документации и правил для этого worktree и task-контекста"**.
 
 ## Quick Orientation
-`MVVMExample` is an educational SwiftUI iOS sample app for demonstrating a small MVVM flow.
+`MVVMExample` is a SwiftUI iOS 17+ MVVM demo app with:
+- auth gate and login flow
+- main tab coordinator
+- news list/detail flow backed by DummyJSON-style API data
+- profile viewing/editing flow
+- reusable neutral app infrastructure under `./Packages/AppInfrastructure/`
 
-Replace this section with:
-- main user flows
-- primary modules/features
-- persistence/runtime choices
-- package/shared-code boundaries
-- extension/widget/background capabilities when relevant
+The project is demo/pre-production. Test API usage is allowed only when configured explicitly as demo/debug behavior.
 
 ## Stable Runtime Baselines
 - Deployment target: `iOS 17.0`
-- UI state approach: SwiftUI state first; introduce ViewModels only when the demo feature needs explicit state ownership
-- Persistence: none for the initial bootstrap; demo data should stay deterministic/offline
-- Networking/API: none for the initial bootstrap
-- Architecture constraints: keep the example small, explicit, and educational; no speculative layers
+- UI state approach: SwiftUI + `@Observable` ViewModels where the feature owns async state or navigation intent
+- ViewModel API: explicit intent methods, not default `send(_ action:)`
+- Persistence: in-memory session store for demo mode; production persistence policy is not approved yet
+- Networking/API: environment-owned configuration through neutral app infrastructure
+- Localization: user-facing strings should flow through localization helpers/resources rather than ad-hoc literals
+- Architecture constraints: keep the example small, explicit, educational, and avoid speculative layers
+
+## Top-Level Ownership
+### `./MVVMExample/`
+Owns app target code, assets, SwiftUI composition, app-specific feature contracts, DTO mapping, and demo UI.
+
+### `./Packages/AppInfrastructure/`
+Owns neutral, entity-agnostic reusable infrastructure:
+- `AppNetworking`
+- `AppErrors`
+- `AppLocalization`
+- `AppConfiguration`
+- `AppLogging`
+
+Do not add database, sync, widgets, push, share, media, or AI packages until current project requirements justify them.
+
+### `./docs/` and `./.codex/skills/`
+Own reusable production baseline, prompt presets, skills, and static quality gates.
 
 ## Current Task Overrides
 Current task/user overrides live in `./docs/CURRENT_USER_OVERRIDES.md`.

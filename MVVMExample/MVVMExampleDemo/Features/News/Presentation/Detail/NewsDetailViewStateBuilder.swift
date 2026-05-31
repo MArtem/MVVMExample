@@ -15,19 +15,19 @@ struct NewsDetailViewStateBuilder {
             excerpt: article.excerpt,
             sourceText: article.source,
             categoryText: article.category.capitalized,
-            ratingText: String(format: "Rating %.1f", article.rating),
+            ratingText: AppStrings.formatted("Rating %.1f", article.rating),
             imageURL: article.imageURLs.first ?? article.thumbnailURL,
-            likesText: "\(article.likesCount) likes",
-            commentsText: "\(article.commentsCount) comments",
+            likesText: AppStrings.formatted("%d likes", article.likesCount),
+            commentsText: AppStrings.formatted("%d comments", article.commentsCount),
             isFavorite: article.isLiked
         )
     }
 
     func makeError(from error: Error) -> MessageViewState {
         MessageViewState(
-            title: "Couldn’t load details",
+            title: AppStrings.text("Couldn’t load details"),
             message: error.localizedDescription,
-            retryTitle: "Retry"
+            retryTitle: AppStrings.text("Retry")
         )
     }
 }

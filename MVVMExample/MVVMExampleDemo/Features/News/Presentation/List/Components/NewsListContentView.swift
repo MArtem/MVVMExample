@@ -2,7 +2,10 @@ import SwiftUI
 
 struct NewsListContentView: View {
     let state: NewsListContentViewState
-    let onAction: (NewsListAction) -> Void
+    let onRefresh: () -> Void
+    let onArticleTap: (NewsArticle.ID) -> Void
+    let onLikeTap: (NewsArticle.ID) -> Void
+    let onCommentsTap: (NewsArticle.ID) -> Void
 
     var body: some View {
         ScrollView {
@@ -18,22 +21,18 @@ struct NewsListContentView: View {
                 }
 
                 ForEach(state.cards) { card in
-                    NewsCardView(state: card) { action in
-                        switch action {
-                        case .open:
-                            onAction(.cardTapped(card.id))
-                        case .like:
-                            onAction(.likeTapped(card.id))
-                        case .comments:
-                            onAction(.commentsTapped(card.id))
-                        }
-                    }
+                    NewsCardView(
+                        state: card,
+                        onOpen: { onArticleTap(card.id) },
+                        onLike: { onLikeTap(card.id) },
+                        onComments: { onCommentsTap(card.id) }
+                    )
                 }
             }
             .padding(AppSpacing.md)
         }
         .refreshable {
-            onAction(.refreshRequested)
+            onRefresh()
         }
     }
 }

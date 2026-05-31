@@ -2,7 +2,7 @@ import SwiftUI
 
 struct NewsDetailContentView: View {
     let state: NewsDetailContentViewState
-    let onAction: (NewsDetailAction) -> Void
+    let onFavoriteTap: () -> Void
 
     var body: some View {
         ScrollView {
@@ -50,11 +50,9 @@ struct NewsDetailContentView: View {
                 .background(AppTheme.surfacePrimary)
                 .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
 
-                Button {
-                    onAction(.favoriteTapped)
-                } label: {
+                Button(action: onFavoriteTap) {
                     Label(
-                        state.isFavorite ? "Remove from favorites" : "Add to favorites",
+                        state.isFavorite ? AppStrings.text("Remove from favorites") : AppStrings.text("Add to favorites"),
                         systemImage: state.isFavorite ? "heart.fill" : "heart"
                     )
                     .frame(maxWidth: .infinity)

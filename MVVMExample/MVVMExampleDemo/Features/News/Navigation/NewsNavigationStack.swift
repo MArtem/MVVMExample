@@ -9,7 +9,8 @@ struct NewsNavigationStack: View {
             NewsListScreen(
                 viewModel: NewsListViewModel(
                     repository: dependencies.newsRepository,
-                    router: router
+                    router: router,
+                    interactionStore: dependencies.articleInteractionStore
                 )
             )
             .navigationDestination(for: NewsRoute.self) { route in
@@ -18,7 +19,8 @@ struct NewsNavigationStack: View {
                     NewsDetailScreen(
                         viewModel: NewsDetailViewModel(
                             payload: payload,
-                            repository: dependencies.newsRepository
+                            repository: dependencies.newsRepository,
+                            interactionStore: dependencies.articleInteractionStore
                         )
                     )
                 }

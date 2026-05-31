@@ -1,11 +1,11 @@
 import Foundation
 
+#if DEBUG
 struct MockAuthRepository: AuthRepository {
     func login(username: String, password: String) async throws -> AuthSession {
-        try await Task.sleep(for: .milliseconds(300))
-        return AuthSession(
-            accessToken: "preview-token",
-            refreshToken: "preview-refresh-token",
+        AuthSession(
+            accessToken: "demo-access-credential-not-a-secret",
+            refreshToken: "demo-refresh-credential-not-a-secret",
             user: AppUser(
                 id: 1,
                 username: username,
@@ -17,3 +17,4 @@ struct MockAuthRepository: AuthRepository {
         )
     }
 }
+#endif

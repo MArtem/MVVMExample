@@ -2,35 +2,31 @@ import SwiftUI
 
 struct NewsDetailStateRenderer: View {
     let state: NewsDetailViewState
-    let onAction: (NewsDetailAction) -> Void
+    let onRetryTap: () -> Void
+    let onFavoriteTap: () -> Void
 
     var body: some View {
         switch state {
         case .loading(let placeholder):
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.md) {
-                    AsyncImageView(url: placeholder.thumbnailURL, height: 240)
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
-
-                    Text(placeholder.title)
-                        .font(AppTypography.title)
-
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                }
-                .padding(AppSpacing.md)
+            VStack(spacing: AppSpacing.md) {
+                AsyncImageView(url: placeholder.thumbnailURL, height: 220)
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
+                LoadingStateView(title: AppStrings.text("Loading details..."))
             }
-            .background(AppTheme.backgroundBase)
+            .padding(AppSpacing.md)
 
         case .content(let content):
-            NewsDetailContentView(state: content, onAction: onAction)
+            NewsDetailContentView(
+                state: content,
+                onFavoriteTap: onFavoriteTap
+            )
 
         case .error(let error):
             MessageStateView(
                 title: error.title,
                 message: error.message,
                 buttonTitle: error.retryTitle,
-                onButtonTap: { onAction(.retryTapped) }
+                onButtonTap: onRetryTap
             )
         }
     }

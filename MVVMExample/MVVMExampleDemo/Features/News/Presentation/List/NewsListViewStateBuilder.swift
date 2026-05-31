@@ -17,17 +17,17 @@ struct NewsListViewStateBuilder {
 
     func makeEmpty() -> MessageViewState {
         MessageViewState(
-            title: "No news yet",
-            message: "New cards will appear here when the API returns data.",
-            retryTitle: "Retry"
+            title: AppStrings.text("No news yet"),
+            message: AppStrings.text("New cards will appear here when the API returns data."),
+            retryTitle: AppStrings.text("Retry")
         )
     }
 
     func makeError(from error: Error) -> MessageViewState {
         MessageViewState(
-            title: "Couldn’t load news",
+            title: AppStrings.text("Couldn’t load news"),
             message: error.localizedDescription,
-            retryTitle: "Retry"
+            retryTitle: AppStrings.text("Retry")
         )
     }
 
@@ -36,7 +36,7 @@ struct NewsListViewStateBuilder {
         if let publishedAt = article.publishedAt {
             dateText = relativeDateFormatter.localizedString(for: publishedAt, relativeTo: .now)
         } else {
-            dateText = "Recently"
+            dateText = AppStrings.text("Recently")
         }
 
         return NewsCardViewState(
@@ -47,7 +47,7 @@ struct NewsListViewStateBuilder {
             publishedAtText: dateText,
             thumbnailURL: article.thumbnailURL,
             likesText: "\(article.likesCount)",
-            commentsText: "\(article.commentsCount) comments",
+            commentsText: AppStrings.formatted("%d comments", article.commentsCount),
             likeState: article.isLiked ? .liked : .notLiked,
             accessibilityLabel: "\(article.source). \(article.title). \(dateText)."
         )

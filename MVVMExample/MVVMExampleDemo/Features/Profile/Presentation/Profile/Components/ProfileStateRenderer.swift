@@ -2,22 +2,26 @@ import SwiftUI
 
 struct ProfileStateRenderer: View {
     let state: ProfileViewState
-    let onAction: (ProfileAction) -> Void
+    let onRetryTap: () -> Void
+    let onEditTap: () -> Void
 
     var body: some View {
         switch state {
         case .loading:
-            LoadingStateView(title: "Loading profile...")
+            LoadingStateView(title: AppStrings.text("Loading profile..."))
 
         case .content(let content):
-            ProfileContentView(state: content, onAction: onAction)
+            ProfileContentView(
+                state: content,
+                onEditTap: onEditTap
+            )
 
         case .error(let error):
             MessageStateView(
                 title: error.title,
                 message: error.message,
                 buttonTitle: error.retryTitle,
-                onButtonTap: { onAction(.retryTapped) }
+                onButtonTap: onRetryTap
             )
         }
     }

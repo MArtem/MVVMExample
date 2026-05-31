@@ -28,14 +28,14 @@ struct LoginScreen: View {
             }
 
             VStack(spacing: AppSpacing.md) {
-                TextField("Username", text: $viewModel.username)
+                TextField(AppStrings.text("Username"), text: $viewModel.username)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding()
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
-                SecureField("Password", text: $viewModel.password)
+                SecureField(AppStrings.text("Password"), text: $viewModel.password)
                     .padding()
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
@@ -48,7 +48,7 @@ struct LoginScreen: View {
                 }
 
                 Button {
-                    viewModel.send(.loginTapped)
+                    viewModel.loginTapped()
                 } label: {
                     HStack {
                         if viewModel.state.isLoading {
@@ -62,10 +62,12 @@ struct LoginScreen: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(viewModel.state.isLoading)
 
-                Button("Fill demo credentials") {
-                    viewModel.send(.useDemoCredentialsTapped)
+                if viewModel.state.showsDemoCredentialsButton {
+                    Button(AppStrings.text("Fill demo credentials")) {
+                        viewModel.useDemoCredentialsTapped()
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
 
             Spacer()
@@ -79,6 +81,7 @@ struct LoginScreen: View {
     LoginScreen(
         viewModel: LoginViewModel(
             repository: MockAuthRepository(),
+            demoCredentials: .dummyJSON,
             onLoginSuccess: { _ in }
         )
     )

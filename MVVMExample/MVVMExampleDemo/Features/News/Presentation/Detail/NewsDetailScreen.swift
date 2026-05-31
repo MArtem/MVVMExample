@@ -10,12 +10,13 @@ struct NewsDetailScreen: View {
     var body: some View {
         NewsDetailStateRenderer(
             state: viewModel.state,
-            onAction: viewModel.send
+            onRetryTap: viewModel.retryTapped,
+            onFavoriteTap: viewModel.favoriteTapped
         )
-        .navigationTitle("Details")
+        .navigationTitle(AppStrings.text("Details"))
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            viewModel.send(.appeared)
+            viewModel.appeared()
         }
     }
 }

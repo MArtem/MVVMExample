@@ -16,9 +16,25 @@ final class AppRootCoordinator {
 
     init(dependencies: AppDependencies) {
         self.dependencies = dependencies
+        if let session = dependencies.sessionStore.currentSession {
+            installMainCoordinator(for: session)
+            scene = .main
+        }
     }
 
     func handleLoginSuccess(_ session: AuthSession) {
+        dependencies.sessionStore.save(session)
+        installMainCoordinator(for: session)
+        scene = .main
+    }
+
+    func logout() {
+        dependencies.sessionStore.clear()
+        mainCoordinator = nil
+        scene = .login
+    }
+
+    private func installMainCoordinator(for session: AuthSession) {
         mainCoordinator = MainCoordinator(
             session: session,
             dependencies: dependencies,
@@ -26,11 +42,5 @@ final class AppRootCoordinator {
                 self?.logout()
             }
         )
-        scene = .main
-    }
-
-    func logout() {
-        mainCoordinator = nil
-        scene = .login
     }
 }

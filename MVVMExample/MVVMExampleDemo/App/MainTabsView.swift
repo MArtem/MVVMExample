@@ -10,7 +10,7 @@ struct MainTabsView: View {
                 dependencies: coordinator.dependencies
             )
             .tabItem {
-                Label("News", systemImage: "newspaper")
+                Label(AppStrings.text("News"), systemImage: "newspaper")
             }
             .tag(AppTab.news)
 
@@ -23,7 +23,7 @@ struct MainTabsView: View {
                 }
             )
             .tabItem {
-                Label("Profile", systemImage: "person.crop.circle")
+                Label(AppStrings.text("Profile"), systemImage: "person.crop.circle")
             }
             .tag(AppTab.profile)
         }

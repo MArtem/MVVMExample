@@ -5,6 +5,6 @@ struct ProfileEditViewState: Equatable {
     var errorMessage: String?
 
     var saveButtonTitle: String {
-        isSaving ? "Saving..." : "Save"
+        isSaving ? AppStrings.text("Saving...") : AppStrings.text("Save")
     }
 }

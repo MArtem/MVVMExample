@@ -25,7 +25,7 @@ struct UpdateProductLikeRequest: APIRequest {
     var path: String { "/products/\(id)" }
     let method: HTTPMethod = .patch
 
-    var body: Data? {
-        JSONBodyEncoder.encode(["isLiked": isLiked])
+    func makeBody() throws -> Data? {
+        try JSONBodyEncoder.encode(["isLiked": isLiked])
     }
 }

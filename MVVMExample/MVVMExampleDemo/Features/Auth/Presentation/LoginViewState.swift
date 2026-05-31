@@ -3,8 +3,9 @@ import Foundation
 struct LoginViewState: Equatable {
     var isLoading: Bool = false
     var errorMessage: String?
+    var showsDemoCredentialsButton: Bool = false
 
-    var title: String { "Best MVVM Demo" }
-    var subtitle: String { "Use DummyJSON demo login" }
-    var loginButtonTitle: String { isLoading ? "Signing in..." : "Sign In" }
+    var title: String { AppStrings.text("Best MVVM Demo") }
+    var subtitle: String { AppStrings.text("Use DummyJSON demo login") }
+    var loginButtonTitle: String { isLoading ? AppStrings.text("Signing in...") : AppStrings.text("Sign In") }
 }

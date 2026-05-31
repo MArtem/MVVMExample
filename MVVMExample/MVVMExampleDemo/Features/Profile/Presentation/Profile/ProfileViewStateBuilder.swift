@@ -4,20 +4,22 @@ struct ProfileViewStateBuilder {
     func makeContent(from profile: UserProfile) -> ProfileContentViewState {
         ProfileContentViewState(
             id: profile.id,
+            firstName: profile.firstName,
+            lastName: profile.lastName,
             displayName: profile.displayName,
             usernameText: "@\(profile.username)",
             emailText: profile.email,
-            phoneText: profile.phone ?? "No phone",
-            companyText: profile.companyTitle ?? "No company title",
+            phoneText: profile.phone ?? AppStrings.text("No phone"),
+            companyText: profile.companyTitle ?? AppStrings.text("No company title"),
             imageURL: profile.imageURL
         )
     }
 
     func makeError(from error: Error) -> MessageViewState {
         MessageViewState(
-            title: "Couldn’t load profile",
+            title: AppStrings.text("Couldn’t load profile"),
             message: error.localizedDescription,
-            retryTitle: "Retry"
+            retryTitle: AppStrings.text("Retry")
         )
     }
 }

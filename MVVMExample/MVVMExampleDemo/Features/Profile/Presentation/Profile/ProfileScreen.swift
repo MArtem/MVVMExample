@@ -10,18 +10,19 @@ struct ProfileScreen: View {
     var body: some View {
         ProfileStateRenderer(
             state: viewModel.state,
-            onAction: viewModel.send
+            onRetryTap: viewModel.retryTapped,
+            onEditTap: viewModel.editTapped
         )
-        .navigationTitle("Profile")
+        .navigationTitle(AppStrings.text("Profile"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Logout") {
-                    viewModel.send(.logoutTapped)
+                Button(AppStrings.text("Logout")) {
+                    viewModel.logoutTapped()
                 }
             }
         }
         .task {
-            viewModel.send(.appeared)
+            viewModel.appeared()
         }
     }
 }

@@ -2,31 +2,47 @@ import SwiftUI
 
 struct NewsListStateRenderer: View {
     let state: NewsListViewState
-    let onAction: (NewsListAction) -> Void
+    let onRetryTap: () -> Void
+    let onRefresh: () -> Void
+    let onArticleTap: (NewsArticle.ID) -> Void
+    let onLikeTap: (NewsArticle.ID) -> Void
+    let onCommentsTap: (NewsArticle.ID) -> Void
 
     var body: some View {
         switch state {
         case .idle, .loading:
-            LoadingStateView(title: "Loading news...")
+            LoadingStateView(title: AppStrings.text("Loading news..."))
 
         case .content(let content):
-            NewsListContentView(state: content, onAction: onAction)
+            NewsListContentView(
+                state: content,
+                onRefresh: onRefresh,
+                onArticleTap: onArticleTap,
+                onLikeTap: onLikeTap,
+                onCommentsTap: onCommentsTap
+            )
 
         case .refreshing(let content):
-            NewsListContentView(state: content, onAction: onAction)
-                .overlay(alignment: .top) {
-                    ProgressView()
-                        .padding(AppSpacing.md)
-                        .background(.thinMaterial)
-                        .clipShape(Capsule())
-                }
+            NewsListContentView(
+                state: content,
+                onRefresh: onRefresh,
+                onArticleTap: onArticleTap,
+                onLikeTap: onLikeTap,
+                onCommentsTap: onCommentsTap
+            )
+            .overlay(alignment: .top) {
+                ProgressView()
+                    .padding(AppSpacing.md)
+                    .background(.thinMaterial)
+                    .clipShape(Capsule())
+            }
 
         case .empty(let empty):
             MessageStateView(
                 title: empty.title,
                 message: empty.message,
                 buttonTitle: empty.retryTitle,
-                onButtonTap: { onAction(.retryTapped) }
+                onButtonTap: onRetryTap
             )
 
         case .error(let error):
@@ -34,7 +50,7 @@ struct NewsListStateRenderer: View {
                 title: error.title,
                 message: error.message,
                 buttonTitle: error.retryTitle,
-                onButtonTap: { onAction(.retryTapped) }
+                onButtonTap: onRetryTap
             )
         }
     }
