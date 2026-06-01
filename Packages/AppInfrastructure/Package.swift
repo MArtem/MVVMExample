@@ -20,6 +20,10 @@ let package = Package(
         .target(name: "AppConfiguration", dependencies: ["AppLogging"]),
         .target(name: "AppLocalization", dependencies: ["AppErrors"]),
         .target(name: "AppNetworking", dependencies: ["AppErrors", "AppLogging", "AppConfiguration"]),
-        .target(name: "AppImageLoading", dependencies: ["AppErrors"])
+        .target(name: "AppImageLoading", dependencies: ["AppErrors"]),
+        .testTarget(name: "AppConfigurationTests", dependencies: ["AppConfiguration"]),
+        .testTarget(name: "AppNetworkingTests", dependencies: ["AppNetworking", "AppErrors", "AppConfiguration", "AppLogging"]),
+        .testTarget(name: "AppLocalizationTests", dependencies: ["AppLocalization", "AppErrors"]),
+        .testTarget(name: "AppImageLoadingTests", dependencies: ["AppImageLoading", "AppErrors"])
     ]
 )

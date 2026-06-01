@@ -9,6 +9,17 @@ public enum AppRuntimeEnvironment: String, Sendable {
     case production
 }
 
+public enum APIConfigurationError: LocalizedError, Equatable, Sendable {
+    case invalidBaseURL(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidBaseURL(let value):
+            return "Invalid API base URL: \(value)"
+        }
+    }
+}
+
 /// Immutable network/runtime configuration shared by infrastructure clients.
 ///
 /// Responsibilities:
@@ -39,6 +50,7 @@ public struct APIConfiguration: Sendable {
     /// Builds configuration from process environment with production-safe defaults outside Debug.
     ///
     /// Invalid explicit base URLs fail fast instead of silently falling back to the demo API.
+    /// Tests can exercise URL validation through `makeBaseURL(from:)` without terminating the process.
     ///
     /// External usage:
     /// Called by the app dependency container during startup.
@@ -50,7 +62,12 @@ public struct APIConfiguration: Sendable {
     public static func current(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> APIConfiguration {
-        let baseURL = makeBaseURL(from: environment)
+        let baseURL: URL
+        do {
+            baseURL = try makeBaseURL(from: environment)
+        } catch {
+            preconditionFailure(error.localizedDescription)
+        }
 
         #if DEBUG
         let defaultAllowsDemoCredentials = true
@@ -75,7 +92,7 @@ public struct APIConfiguration: Sendable {
         )
     }
 
-    private static func makeBaseURL(from environment: [String: String]) -> URL {
+    public static func makeBaseURL(from environment: [String: String]) throws -> URL {
         let fallbackDemoURL = URL(string: "https://dummyjson.com")!
         guard let configuredBaseURL = environment["MVVMEXAMPLE_API_BASE_URL"] else {
             return fallbackDemoURL
@@ -87,7 +104,7 @@ public struct APIConfiguration: Sendable {
             ["http", "https"].contains(scheme.lowercased()),
             url.host?.isEmpty == false
         else {
-            preconditionFailure("Invalid MVVMEXAMPLE_API_BASE_URL: \(configuredBaseURL)")
+            throw APIConfigurationError.invalidBaseURL(configuredBaseURL)
         }
 
         return url

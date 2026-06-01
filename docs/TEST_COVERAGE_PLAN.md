@@ -134,9 +134,20 @@ Create and attach an `.xctestplan` to the `MVVMExample` scheme before considerin
 
 Acceptance:
 
-- package tests run through `swift test --package-path ./Packages/AppInfrastructure`;
-- app unit tests run through the Xcode scheme/test plan;
-- UI tests are a separate configuration/lane;
+- package tests run through the iOS package scheme because `AppInfrastructure` contains UIKit-backed iOS code:
+
+```zsh
+cd ./Packages/AppInfrastructure
+xcodebuild test -scheme AppInfrastructure-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' CODE_SIGNING_ALLOWED=NO
+```
+
+- app unit tests run through the Xcode scheme/test plan:
+
+```zsh
+xcodebuild test -project MVVMExample.xcodeproj -scheme MVVMExample -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' CODE_SIGNING_ALLOWED=NO
+```
+
+- UI tests are a separate configuration/lane after `MVVMExampleUITests` exists;
 - local and CI commands cannot silently skip a created test folder because no target references it.
 
 
