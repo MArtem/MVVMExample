@@ -15,6 +15,7 @@ Entry point for active project documentation, production standards, prompt prese
 ## Mandatory Active Documentation Index
 
 ### Project Baseline
+- `./docs/TEST_COVERAGE_PLAN.md`
 - `./PROJECT_DOCUMENTATION.md`
 - `./PROJECT_HEALTH.md`
 - `./TESTING_INSTRUCTIONS.md`
