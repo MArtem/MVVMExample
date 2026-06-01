@@ -31,6 +31,7 @@ struct LoginScreen: View {
 
             VStack(spacing: AppSpacing.md) {
                 TextField(AppStrings.text("Username"), text: $viewModel.username)
+                    .accessibilityIdentifier(AppAccessibilityID.Login.usernameField)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .padding()
@@ -38,12 +39,14 @@ struct LoginScreen: View {
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
                 SecureField(AppStrings.text("Password"), text: $viewModel.password)
+                    .accessibilityIdentifier(AppAccessibilityID.Login.passwordField)
                     .padding()
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
                 if let error = viewModel.state.errorMessage {
                     Text(error)
+                        .accessibilityIdentifier(AppAccessibilityID.Login.errorMessage)
                         .font(AppTypography.bodySmall)
                         .foregroundStyle(AppTheme.destructive)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -62,6 +65,7 @@ struct LoginScreen: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(AppAccessibilityID.Login.signInButton)
                 .disabled(viewModel.state.isLoading)
 
                 if viewModel.state.showsDemoCredentialsButton {
@@ -69,6 +73,7 @@ struct LoginScreen: View {
                         viewModel.useDemoCredentialsTapped()
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier(AppAccessibilityID.Login.fillDemoCredentialsButton)
                 }
             }
 

@@ -42,6 +42,7 @@ struct NewsCardView: View, Equatable {
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier(AppAccessibilityID.News.cardOpenButton(id: state.id))
             .accessibilityLabel(state.accessibilityLabel)
             .accessibilityHint(AppStrings.text("Opens article details"))
 
@@ -53,6 +54,7 @@ struct NewsCardView: View, Equatable {
                         .font(AppTypography.bodySmall)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(AppAccessibilityID.News.cardLikeButton(id: state.id))
                 .accessibilityLabel(state.likeAccessibilityLabel)
 
                 Button(action: onComments) {
@@ -60,6 +62,7 @@ struct NewsCardView: View, Equatable {
                         .font(AppTypography.bodySmall)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier(AppAccessibilityID.News.cardCommentsButton(id: state.id))
                 .accessibilityLabel(state.commentsAccessibilityLabel)
 
                 Spacer()

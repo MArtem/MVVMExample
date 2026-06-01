@@ -45,6 +45,7 @@ struct NewsListContentView: View {
             }
             .padding(AppSpacing.md)
         }
+        .accessibilityIdentifier(AppAccessibilityID.News.list)
         .refreshable {
             await onRefresh()
         }

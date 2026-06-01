@@ -20,6 +20,7 @@ struct ProfileScreen: View {
                 Button(AppStrings.text("Logout")) {
                     viewModel.logoutTapped()
                 }
+                .accessibilityIdentifier(AppAccessibilityID.Profile.logoutButton)
             }
         }
         .task {

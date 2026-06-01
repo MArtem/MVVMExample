@@ -27,6 +27,12 @@ struct AppDependencies {
     /// Important:
     /// Debug builds may enable demo credentials by default; non-Debug builds must opt in explicitly through configuration.
     static func live() -> AppDependencies {
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["MVVMEXAMPLE_UI_TEST_MODE"] == "1" {
+            return uiTesting()
+        }
+        #endif
+
         let configuration = APIConfiguration.current()
         let logger: AppLogger
         #if DEBUG

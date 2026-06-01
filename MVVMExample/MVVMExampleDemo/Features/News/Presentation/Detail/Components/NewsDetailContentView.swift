@@ -69,6 +69,7 @@ struct NewsDetailContentView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(AppAccessibilityID.News.detailFavoriteButton)
                 .disabled(state.isFavoriteUpdating)
             }
             .padding(AppSpacing.md)

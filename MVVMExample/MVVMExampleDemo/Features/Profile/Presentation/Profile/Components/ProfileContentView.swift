@@ -33,6 +33,7 @@ struct ProfileContentView: View {
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier(AppAccessibilityID.Profile.editButton)
             }
             .padding(AppSpacing.md)
         }

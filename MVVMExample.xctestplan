@@ -1,31 +1,38 @@
 {
-  "configurations" : [
+  "configurations": [
     {
-      "id" : "7D3C8A07-7F45-4A30-9B9B-9E7F30D4C111",
-      "name" : "Unit Tests",
-      "options" : {
-
-      }
+      "id": "7D3C8A07-7F45-4A30-9B9B-9E7F30D4C111",
+      "name": "Unit Tests",
+      "options": {}
     }
   ],
-  "defaultOptions" : {
-    "codeCoverage" : false,
-    "targetForVariableExpansion" : {
-      "containerPath" : "container:MVVMExample.xcodeproj",
-      "identifier" : "B6C8419759BE6F64A5E6D521",
-      "name" : "MVVMExample"
+  "defaultOptions": {
+    "codeCoverage": false,
+    "targetForVariableExpansion": {
+      "containerPath": "container:MVVMExample.xcodeproj",
+      "identifier": "B6C8419759BE6F64A5E6D521",
+      "name": "MVVMExample"
     }
   },
-  "testTargets" : [
+  "testTargets": [
     {
-      "enabled" : true,
-      "parallelizable" : true,
-      "target" : {
-        "containerPath" : "container:MVVMExample.xcodeproj",
-        "identifier" : "177120BDB76CBC9039B9FB95",
-        "name" : "MVVMExampleTests"
+      "enabled": true,
+      "parallelizable": true,
+      "target": {
+        "containerPath": "container:MVVMExample.xcodeproj",
+        "identifier": "177120BDB76CBC9039B9FB95",
+        "name": "MVVMExampleTests"
+      }
+    },
+    {
+      "enabled": true,
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:MVVMExample.xcodeproj",
+        "identifier": "7C17E40D544DCA5DEFEA3454",
+        "name": "MVVMExampleUITests"
       }
     }
   ],
-  "version" : 1
+  "version": 1
 }

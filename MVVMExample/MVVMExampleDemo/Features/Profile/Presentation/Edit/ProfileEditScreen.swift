@@ -14,8 +14,11 @@ struct ProfileEditScreen: View {
         Form {
             Section(AppStrings.text("Personal")) {
                 TextField(AppStrings.text("First name"), text: $viewModel.firstName)
+                    .accessibilityIdentifier(AppAccessibilityID.Profile.firstNameField)
                 TextField(AppStrings.text("Last name"), text: $viewModel.lastName)
+                    .accessibilityIdentifier(AppAccessibilityID.Profile.lastNameField)
                 TextField(AppStrings.text("Email"), text: $viewModel.email)
+                    .accessibilityIdentifier(AppAccessibilityID.Profile.emailField)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
             }
@@ -38,6 +41,7 @@ struct ProfileEditScreen: View {
                         Text(viewModel.state.saveButtonTitle)
                     }
                 }
+                .accessibilityIdentifier(AppAccessibilityID.Profile.saveButton)
                 .disabled(viewModel.state.isSaving)
             }
         }
@@ -47,6 +51,7 @@ struct ProfileEditScreen: View {
                 Button(AppStrings.text("Cancel")) {
                     viewModel.cancelTapped()
                 }
+                .accessibilityIdentifier(AppAccessibilityID.Profile.cancelButton)
             }
         }
     }
