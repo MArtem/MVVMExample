@@ -1,6 +1,10 @@
 import Foundation
 
 #if DEBUG
+/// Preview/demo authentication repository.
+///
+/// Important:
+/// This must stay outside production runtime wiring unless explicitly selected by a debug/demo configuration.
 struct MockAuthRepository: AuthRepository {
     func login(username: String, password: String) async throws -> AuthSession {
         AuthSession(

@@ -1,6 +1,10 @@
 import Foundation
 import AppNetworking
 
+/// Products list endpoint request used as the backing API for news cards.
+///
+/// Pagination contract:
+/// `limit` and `skip` must mirror `NewsPageRequest` so ViewModels can apply backpressure without knowing transport details.
 struct ProductsListRequest: APIRequest {
     let limit: Int
     let skip: Int
@@ -22,6 +26,10 @@ struct ProductDetailRequest: APIRequest {
     let method: HTTPMethod = .get
 }
 
+/// Demo API mutation for like/favorite state.
+///
+/// Important:
+/// Real production APIs should define this contract server-side; this request only adapts the current demo backend shape.
 struct UpdateProductLikeRequest: APIRequest {
     let id: Int
     let isLiked: Bool

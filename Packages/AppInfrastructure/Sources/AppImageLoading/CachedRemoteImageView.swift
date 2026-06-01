@@ -1,6 +1,13 @@
 import SwiftUI
 import UIKit
 
+/// SwiftUI image view backed by `RemoteImagePipeline`.
+///
+/// Behavior:
+/// The view keeps a stable placeholder frame, starts loading through `.task(id:)`, and lets SwiftUI cancel work when the row/detail view disappears or changes identity.
+///
+/// Important:
+/// This view owns only transient UI image state; it does not own global cache policy beyond the injected pipeline.
 public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
     private let url: URL?
     private let targetSize: CGSize

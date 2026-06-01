@@ -4,6 +4,10 @@ enum ProfileMappingError: Error {
     case missingID
 }
 
+/// Converts profile transport DTOs into domain models.
+///
+/// Boundary rule:
+/// DTO optionality and backend field shape must be handled here before data reaches ViewModels.
 struct ProfileDTOMapper {
     func map(_ dto: UserProfileDTO) throws -> UserProfile {
         guard let id = dto.id else {

@@ -3,6 +3,16 @@ import AppConfiguration
 import AppErrors
 import AppLogging
 
+/// URLSession-backed implementation of `NetworkClient`.
+///
+/// Responsibilities:
+/// - composes requests against `APIConfiguration.baseURL`;
+/// - applies timeout and retry policy;
+/// - maps transport, HTTP, encoding, and decoding failures to `AppAPIError`;
+/// - logs only redacted request metadata.
+///
+/// Concurrency:
+/// Individual requests are cancellable through Swift concurrency. Cancellation is surfaced as `AppAPIError.cancelled`.
 public final class URLSessionNetworkClient: NetworkClient {
     private let configuration: APIConfiguration
     private let session: URLSession
@@ -21,6 +31,13 @@ public final class URLSessionNetworkClient: NetworkClient {
         self.logger = logger
     }
 
+    /// Sends one typed network request and decodes its response.
+    ///
+    /// Errors:
+    /// Throws `AppAPIError` for known API/transport failures and preserves cancellation semantics.
+    ///
+    /// Side effects:
+    /// May perform bounded retries for idempotent GET requests according to configuration.
     public func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
         var attempt = 0
         while true {
@@ -132,6 +149,7 @@ public final class URLSessionNetworkClient: NetworkClient {
         }
     }
 
+    /// Returns a log-safe URL representation while preserving enough path/query shape for debugging.
     private func redactedURLString(_ url: URL) -> String {
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return "<redacted-url>"

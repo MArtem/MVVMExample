@@ -1,6 +1,12 @@
 import AppImageLoading
 import SwiftUI
 
+/// App-level wrapper around the reusable cached image loader.
+///
+/// Responsibilities:
+/// - applies app design-system placeholder/failure UI;
+/// - keeps caller API small for feature views;
+/// - delegates loading, caching, downsampling, and cancellation to `AppImageLoading`.
 struct AsyncImageView: View {
     let url: URL?
     let width: CGFloat?

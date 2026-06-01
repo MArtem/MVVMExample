@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Composes the news navigation stack and creates screen ViewModels at route boundaries.
 struct NewsNavigationStack: View {
     @Bindable var router: NewsRouter
     let dependencies: AppDependencies

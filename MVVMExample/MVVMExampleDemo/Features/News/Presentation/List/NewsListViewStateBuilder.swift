@@ -1,6 +1,10 @@
 import AppLocalization
 import Foundation
 
+/// Maps domain articles and errors into list presentation state.
+///
+/// Boundary rule:
+/// Formatting and localized user-facing messages are prepared here rather than inside row bodies.
 struct NewsListViewStateBuilder {
     private let relativeDateFormatter: RelativeDateTimeFormatter
 

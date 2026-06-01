@@ -1,5 +1,11 @@
 import SwiftUI
 
+/// Scrollable news-list content surface.
+///
+/// Responsibilities:
+/// - keeps `ForEach` directly inside `LazyVStack` for lazy row creation;
+/// - forwards row visibility to the ViewModel for pagination;
+/// - awaits refresh work so system refresh UI reflects actual loading.
 struct NewsListContentView: View {
     let state: NewsListContentViewState
     let onRefresh: () async -> Void

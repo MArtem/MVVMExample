@@ -1,5 +1,9 @@
 import Foundation
 
+/// Preview/demo news repository with deterministic in-memory data.
+///
+/// Important:
+/// This repository is for previews/demo seams and must not be wired silently into production runtime.
 struct MockNewsRepository: NewsRepository {
     var articles: [NewsArticle] = [.fixture]
     var shouldFail = false

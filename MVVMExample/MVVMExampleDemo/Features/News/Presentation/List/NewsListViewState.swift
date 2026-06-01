@@ -1,5 +1,9 @@
 import Foundation
 
+/// Complete render state for the news list screen.
+///
+/// Invariant:
+/// Full-screen errors are used only when no usable content is available; refresh and pagination failures keep existing content visible.
 enum NewsListViewState: Equatable {
     case idle
     case loading
@@ -26,6 +30,10 @@ struct NewsPaginationViewState: Equatable {
     var status: Status
 }
 
+/// Precomputed row state for a news card.
+///
+/// Performance contract:
+/// Values that require formatting, uppercasing, icon selection, or accessibility text assembly are prepared before SwiftUI row rendering.
 struct NewsCardViewState: Identifiable, Equatable {
     let id: Int
     let sourceText: String

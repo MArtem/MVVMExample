@@ -1,5 +1,6 @@
 import Foundation
 
+/// Converts authentication transport DTOs into an app session domain model.
 struct AuthMapper {
     func map(_ dto: AuthUserDTO) -> AuthSession {
         AuthSession(

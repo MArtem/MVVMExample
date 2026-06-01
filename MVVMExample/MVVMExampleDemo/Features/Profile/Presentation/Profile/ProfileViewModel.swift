@@ -2,6 +2,13 @@ import Foundation
 import Observation
 import AppErrors
 
+/// Owns profile screen state and profile-level user intents.
+///
+/// Ownership:
+/// Created by the profile screen composition layer for the authenticated session.
+///
+/// Behavior:
+/// Loading is cancellable and stale responses are ignored; logout is delegated to the app/session owner.
 @MainActor
 @Observable
 final class ProfileViewModel {
@@ -45,6 +52,10 @@ final class ProfileViewModel {
         openEdit()
     }
 
+    /// Requests logout through the app-level session owner.
+    ///
+    /// Side effects:
+    /// This ViewModel does not clear the session store directly; app coordination owns that transition.
     func logoutTapped() {
         onLogout()
     }

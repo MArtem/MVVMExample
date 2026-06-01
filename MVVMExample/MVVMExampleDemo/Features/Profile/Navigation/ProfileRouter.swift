@@ -1,6 +1,10 @@
 import SwiftUI
 import Observation
 
+/// Navigation owner for the profile feature stack.
+///
+/// Ownership:
+/// Owned by `MainCoordinator` for the authenticated app session.
 @MainActor
 @Observable
 final class ProfileRouter {

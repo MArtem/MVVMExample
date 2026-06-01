@@ -1,6 +1,10 @@
 import SwiftUI
 import AppLocalization
 
+/// Equatable SwiftUI row for the news feed.
+///
+/// Performance contract:
+/// The row receives narrow immutable state and callbacks only; it must not observe the whole list ViewModel or perform expensive formatting in `body`.
 struct NewsCardView: View, Equatable {
     let state: NewsCardViewState
     let onOpen: () -> Void

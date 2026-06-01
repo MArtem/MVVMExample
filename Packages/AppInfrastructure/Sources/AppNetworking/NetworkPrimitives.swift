@@ -8,6 +8,11 @@ public enum NetworkHTTPMethod: String, Sendable {
     case delete = "DELETE"
 }
 
+/// Value contract for one HTTP request understood by `NetworkClient`.
+///
+/// Responsibilities:
+/// - provide path, method, query, headers, and an optional throwing body encoder;
+/// - avoid hiding body-encoding failures.
 public protocol NetworkRequest {
     var path: String { get }
     var method: NetworkHTTPMethod { get }
@@ -22,6 +27,10 @@ public extension NetworkRequest {
     func makeBody() throws -> Data? { nil }
 }
 
+/// Generic async network boundary for typed Decodable responses.
+///
+/// Errors:
+/// Implementations should map known failures to `AppAPIError` and preserve cancellation behavior.
 public protocol NetworkClient {
     func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response
 }

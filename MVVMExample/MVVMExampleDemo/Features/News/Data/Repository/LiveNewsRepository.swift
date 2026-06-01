@@ -1,5 +1,9 @@
 import Foundation
 
+/// Live news repository backed by the configured API client.
+///
+/// Boundary behavior:
+/// Transport DTOs are mapped to domain articles before leaving this type.
 struct LiveNewsRepository: NewsRepository {
     private let apiClient: APIClient
     private let mapper: NewsDTOMapper

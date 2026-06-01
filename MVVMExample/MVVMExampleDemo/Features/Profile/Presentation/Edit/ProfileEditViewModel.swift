@@ -2,6 +2,13 @@ import Foundation
 import Observation
 import AppErrors
 
+/// Owns editable profile form state and save/cancel intents.
+///
+/// Ownership:
+/// Created by the profile edit route for a single edit transaction.
+///
+/// Behavior:
+/// The form preserves first and last names separately and sends trimmed values only when the user saves.
 @MainActor
 @Observable
 final class ProfileEditViewModel {
@@ -32,6 +39,10 @@ final class ProfileEditViewModel {
         saveTask?.cancel()
     }
 
+    /// Saves the current form values through the profile repository.
+    ///
+    /// Concurrency:
+    /// A new save request cancels any in-flight save task owned by this ViewModel.
     func saveTapped() {
         save()
     }

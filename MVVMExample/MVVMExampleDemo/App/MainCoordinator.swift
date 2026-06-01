@@ -1,6 +1,11 @@
 import Foundation
 import Observation
 
+/// Coordinator for authenticated main-tab navigation.
+///
+/// Responsibilities:
+/// - owns tab selection and feature routers;
+/// - resets feature navigation before delegating logout to the app root owner.
 @MainActor
 @Observable
 final class MainCoordinator {

@@ -1,6 +1,13 @@
 import Foundation
 import Observation
 
+/// App-level coordinator that owns the auth gate and main-app scene transition.
+///
+/// Ownership:
+/// Created by the app root view for the process lifetime.
+///
+/// Side effects:
+/// Saves and clears the current session through `SessionStore` and recreates child coordinators on auth transitions.
 @MainActor
 @Observable
 final class AppRootCoordinator {
@@ -22,6 +29,7 @@ final class AppRootCoordinator {
         }
     }
 
+    /// Completes the login transition by storing the session and installing main navigation.
     func handleLoginSuccess(_ session: AuthSession) {
         dependencies.sessionStore.save(session)
         installMainCoordinator(for: session)

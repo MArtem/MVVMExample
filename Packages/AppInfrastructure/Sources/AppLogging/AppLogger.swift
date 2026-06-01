@@ -1,5 +1,9 @@
 import Foundation
 
+/// Minimal logging boundary for reusable infrastructure.
+///
+/// Invariant:
+/// Callers must pass only redacted or redactable metadata; credentials and tokens must never be logged intentionally.
 public protocol AppLogger: Sendable {
     func log(_ message: @autoclosure () -> String)
 }
@@ -9,6 +13,7 @@ public struct NoOpAppLogger: AppLogger {
     public func log(_ message: @autoclosure () -> String) {}
 }
 
+/// Logger adapter that redacts common credential-like fragments before sending messages to the sink.
 public struct RedactingAppLogger: AppLogger {
     private let sink: @Sendable (String) -> Void
 

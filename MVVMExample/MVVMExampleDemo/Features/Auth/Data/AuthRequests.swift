@@ -1,5 +1,9 @@
 import Foundation
 
+/// Login endpoint request.
+///
+/// Security boundary:
+/// Credentials are encoded into the request body and must not be logged by callers.
 struct LoginAPIRequest: APIRequest {
     let username: String
     let password: String

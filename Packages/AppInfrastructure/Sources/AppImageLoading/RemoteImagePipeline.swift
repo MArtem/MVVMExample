@@ -3,6 +3,15 @@ import Foundation
 import ImageIO
 import UIKit
 
+/// Remote image loader that fetches, downsamples, and caches images for SwiftUI surfaces.
+///
+/// Responsibilities:
+/// - keep network and decode work outside `body` evaluation;
+/// - cache by URL and target pixel size;
+/// - downsample before publishing images to UI.
+///
+/// Errors:
+/// Throws `AppAPIError.invalidResponse` for non-2xx responses and decoding errors for invalid image data.
 public struct RemoteImagePipeline: Sendable {
     public static let shared = RemoteImagePipeline()
 
@@ -17,6 +26,13 @@ public struct RemoteImagePipeline: Sendable {
         self.cache = cache
     }
 
+    /// Loads an image for a concrete render size.
+    ///
+    /// External usage:
+    /// Called by reusable remote image views or feature-specific image prefetchers.
+    ///
+    /// Concurrency:
+    /// Cancellation before decode/cache insert stops the load and avoids publishing stale work.
     public func image(from url: URL, targetSize: CGSize, scale: CGFloat) async throws -> UIImage {
         let cacheKey = Self.cacheKey(url: url, targetSize: targetSize, scale: scale)
         if let cached = cache.image(forKey: cacheKey) {

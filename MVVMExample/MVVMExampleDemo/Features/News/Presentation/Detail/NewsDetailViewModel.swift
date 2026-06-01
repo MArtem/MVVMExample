@@ -3,6 +3,13 @@ import Observation
 import AppErrors
 import AppLocalization
 
+/// Owns article-detail state and detail-only user intents.
+///
+/// Ownership:
+/// Created by the detail screen for one route payload.
+///
+/// Behavior:
+/// Initial load can show a full-screen error. Favorite failures preserve visible content, roll back the optimistic state, and surface a non-blocking message.
 @MainActor
 @Observable
 final class NewsDetailViewModel {
@@ -43,6 +50,7 @@ final class NewsDetailViewModel {
         load()
     }
 
+    /// Toggles favorite state with optimistic UI and rollback on failure.
     func favoriteTapped() {
         toggleFavorite()
     }

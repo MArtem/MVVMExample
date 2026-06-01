@@ -5,6 +5,10 @@ enum NewsMappingError: Error {
     case missingTitle
 }
 
+/// Converts product API DTOs into news-domain articles.
+///
+/// Boundary rule:
+/// Backend naming, URL validation, and date parsing stay in this mapper so presentation code receives stable domain values.
 struct NewsDTOMapper {
     func map(_ dto: ProductDTO) throws -> NewsArticle {
         guard let id = dto.id else {

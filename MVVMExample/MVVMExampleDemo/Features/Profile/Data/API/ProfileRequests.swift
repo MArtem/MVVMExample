@@ -1,5 +1,9 @@
 import Foundation
 
+/// Authenticated current-user profile request.
+///
+/// Security boundary:
+/// The bearer token is a transport header and must be redacted by logging infrastructure.
 struct CurrentUserRequest: APIRequest {
     let accessToken: String
 
@@ -11,6 +15,7 @@ struct CurrentUserRequest: APIRequest {
     }
 }
 
+/// Profile update request for editable profile fields currently supported by the app.
 struct UpdateUserRequest: APIRequest {
     let id: Int
     let request: UpdateProfileRequest

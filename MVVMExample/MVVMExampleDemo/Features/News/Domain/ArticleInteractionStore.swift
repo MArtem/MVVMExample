@@ -1,5 +1,12 @@
 import Foundation
 
+/// Shared source of truth for article interaction state that must stay consistent across list and detail.
+///
+/// Ownership:
+/// Created by the app dependency container and shared by news screens for the active app session.
+///
+/// Concurrency:
+/// Main-actor isolated because current interactions are driven by UI intents and immediately reflected in SwiftUI state.
 @MainActor
 final class ArticleInteractionStore {
     private var states: [NewsArticle.ID: ArticleInteractionState] = [:]

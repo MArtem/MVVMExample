@@ -4,6 +4,13 @@ import AppConfiguration
 import AppErrors
 import AppLocalization
 
+/// Owns login presentation state and user intents.
+///
+/// Ownership:
+/// Created by the auth screen composition layer for one login flow.
+///
+/// Behavior:
+/// Login runs in a cancellable task, reports user-safe errors, and calls `onLoginSuccess` only after a non-cancelled session is returned.
 @MainActor
 @Observable
 final class LoginViewModel {
@@ -33,10 +40,18 @@ final class LoginViewModel {
         loginTask?.cancel()
     }
 
+    /// Starts user-requested authentication.
+    ///
+    /// External usage:
+    /// Called from the login button intent.
     func loginTapped() {
         login()
     }
 
+    /// Applies approved demo credentials to the editable form.
+    ///
+    /// Invariant:
+    /// This is available only when the dependency graph provided demo credentials.
     func useDemoCredentialsTapped() {
         guard let demoCredentials else { return }
         username = demoCredentials.username

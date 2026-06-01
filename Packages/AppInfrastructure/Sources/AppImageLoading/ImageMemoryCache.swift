@@ -1,6 +1,13 @@
 import Foundation
 import UIKit
 
+/// Bounded in-memory image cache for already-downsampled UI images.
+///
+/// Thread safety:
+/// `NSCache` is thread-safe for concurrent access. The class is marked `@unchecked Sendable` to expose that runtime guarantee to Swift concurrency.
+///
+/// Invariant:
+/// Store images after downsampling to the intended render size, not original remote dimensions.
 public final class ImageMemoryCache: @unchecked Sendable {
     public static let shared = ImageMemoryCache()
 

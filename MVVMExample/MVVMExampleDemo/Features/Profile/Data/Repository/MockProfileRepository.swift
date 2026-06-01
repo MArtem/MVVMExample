@@ -1,5 +1,9 @@
 import Foundation
 
+/// Preview/demo profile repository with deterministic profile data.
+///
+/// Important:
+/// This repository must not be wired into production runtime without an explicit debug/demo policy.
 struct MockProfileRepository: ProfileRepository {
     func loadCurrentProfile(session: AuthSession) async throws -> UserProfile {
         try await Task.sleep(for: .milliseconds(250))

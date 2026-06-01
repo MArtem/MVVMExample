@@ -1,5 +1,9 @@
 import Foundation
 
+/// Complete render state for article detail.
+///
+/// Invariant:
+/// Interaction failures should use `NewsDetailContentViewState.favoriteErrorMessage` when content is already available.
 enum NewsDetailViewState: Equatable {
     case loading(NewsDetailPlaceholderViewState)
     case content(NewsDetailContentViewState)

@@ -1,5 +1,9 @@
 import Foundation
 
+/// Live profile repository backed by the configured API client.
+///
+/// Side effects:
+/// Performs authenticated profile requests and maps transport DTOs into `UserProfile`.
 struct LiveProfileRepository: ProfileRepository {
     private let apiClient: APIClient
     private let mapper: ProfileDTOMapper

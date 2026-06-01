@@ -1,5 +1,9 @@
 import Foundation
 
+/// Live authentication repository backed by the app API client.
+///
+/// Side effects:
+/// Performs network login and maps the transport response into `AuthSession`.
 struct LiveAuthRepository: AuthRepository {
     private let apiClient: APIClient
     private let mapper: AuthMapper

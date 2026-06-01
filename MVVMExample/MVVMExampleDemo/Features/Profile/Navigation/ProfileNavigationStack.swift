@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Composes the profile navigation stack and creates screen ViewModels at route boundaries.
 struct ProfileNavigationStack: View {
     @Bindable var router: ProfileRouter
     let session: AuthSession

@@ -1,6 +1,11 @@
 import AppErrors
 import Foundation
 
+/// Converts technical errors into stable user-facing localized messages.
+///
+/// Responsibilities:
+/// - hide transport/DTO details from UI;
+/// - keep supportable message categories stable across networking implementations.
 public enum AppErrorMapper {
     public static func userMessage(for error: Error) -> String {
         guard let apiError = error as? AppAPIError else {

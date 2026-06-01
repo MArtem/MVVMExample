@@ -3,6 +3,18 @@ import Observation
 import AppErrors
 import AppLocalization
 
+/// Owns news-list presentation state, pagination, and user intents.
+///
+/// Ownership:
+/// Created by the news list screen for one navigation flow.
+///
+/// Responsibilities:
+/// - performs initial load, pull-to-refresh, pagination, navigation, and like intents;
+/// - keeps pagination errors non-destructive to existing content;
+/// - merges shared article interaction state before rendering cards.
+///
+/// Concurrency:
+/// Uses separate task slots for initial load, pagination, and per-article like mutations so cancellation and stale-result handling stay operation-specific.
 @MainActor
 @Observable
 final class NewsListViewModel {
@@ -42,6 +54,7 @@ final class NewsListViewModel {
         likeTasks.values.forEach { $0.cancel() }
     }
 
+    /// Loads the first page once when the list enters the screen lifecycle.
     func appeared() {
         loadIfNeeded()
     }
@@ -50,6 +63,10 @@ final class NewsListViewModel {
         load()
     }
 
+    /// Refreshes the first page while preserving visible content on failure.
+    ///
+    /// External usage:
+    /// Awaited by SwiftUI `.refreshable` so the system refresh indicator tracks real async work.
     func refreshRequested() async {
         await refresh()
     }
@@ -66,11 +83,16 @@ final class NewsListViewModel {
         // Comments are visible as counts only in the current product scope.
     }
 
+    /// Requests the next page when a visible row approaches the pagination threshold.
+    ///
+    /// External usage:
+    /// Called from row `onAppear`; this method owns backpressure and duplicate-load prevention.
     func loadNextPageIfNeeded(currentItemID: NewsArticle.ID) {
         guard shouldLoadNextPage(currentItemID: currentItemID) else { return }
         loadNextPage()
     }
 
+    /// Retries a failed pagination request without clearing current content.
     func retryLoadNextPageTapped() {
         guard case .content = state else { return }
         loadNextPage()
@@ -190,6 +212,10 @@ final class NewsListViewModel {
         return index >= max(articles.count - paginationThreshold, 0)
     }
 
+    /// Rebuilds content state from the current domain cache.
+    ///
+    /// UI hot-path note:
+    /// Card view states are precomputed here so rows avoid formatting and accessibility string assembly during `body` evaluation.
     private func makeStateForCurrentArticles(
         viewStateBuilder: NewsListViewStateBuilder
     ) -> NewsListViewState {
