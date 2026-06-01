@@ -30,6 +30,12 @@ Every working/status/readiness response must start with:
 - No extra layers, protocols, UseCases, factories, adapters, interfaces, or abstractions unless they solve a concrete current problem.
 - If anything is unclear, ask first.
 
+### Product-Staff Quality Bar
+- Never lower the engineering bar because a project is described as demo, test, sample, prototype, imported, or pre-production; those words may only describe configuration/risk context, not code quality.
+- Treat every authored or reviewed code path as product-staff-level production code: correct ownership, explicit state, clear failure behavior, performance-aware rendering, privacy-safe logging, accessibility, localization, and supportable verification.
+- Do not wait for Instruments/profilers before fixing statically obvious performance or memory issues. Use profiling to prove behavior, compare alternatives, or validate non-obvious risks, not as an excuse to leave avoidable redraws, broad invalidation, main-thread work, unbounded caches, or lifecycle leaks.
+- Maximize quality through the simplest correct design: improve hot paths, state ownership, and error handling without adding decorative protocols, wrappers, factories, use cases, or interfaces.
+
 ### No-Loss Transfer
 - Every new project/task must receive the full reusable non-app-specific baseline accumulated so far.
 - If any reusable documentation, prompt, rule, skill, template, or script cannot be copied or activated, report it as an explicit remaining risk.

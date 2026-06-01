@@ -14,6 +14,13 @@ Always choose the **simplest correct solution** that matches:
 
 Do not add abstractions unless they solve a concrete current problem.
 
+
+## Product-Staff Quality Bar Rule
+- Never lower the engineering bar because a project is described as demo, test, sample, prototype, imported, or pre-production; those words may only describe configuration/risk context, not code quality.
+- Treat every authored or reviewed code path as product-staff-level production code: correct ownership, explicit state, clear failure behavior, performance-aware rendering, privacy-safe logging, accessibility, localization, and supportable verification.
+- Do not wait for Instruments/profilers before fixing statically obvious performance or memory issues. Use profiling to prove behavior, compare alternatives, or validate non-obvious risks, not as an excuse to leave avoidable redraws, broad invalidation, main-thread work, unbounded caches, or lifecycle leaks.
+- Maximize quality through the simplest correct design: improve hot paths, state ownership, and error handling without adding decorative protocols, wrappers, factories, use cases, or interfaces.
+
 ## Context-Reset Bootstrap Rule
 - After a new chat/context reset, re-read the required bootstrap docs **once** before coding.
 - Do not repeatedly re-read the same full set during the same chat unless architecture/rules changed.

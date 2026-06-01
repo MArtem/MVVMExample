@@ -38,6 +38,8 @@ public struct APIConfiguration: Sendable {
 
     /// Builds configuration from process environment with production-safe defaults outside Debug.
     ///
+    /// Invalid explicit base URLs fail fast instead of silently falling back to the demo API.
+    ///
     /// External usage:
     /// Called by the app dependency container during startup.
     ///
@@ -48,8 +50,7 @@ public struct APIConfiguration: Sendable {
     public static func current(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> APIConfiguration {
-        let rawBaseURL = environment["MVVMEXAMPLE_API_BASE_URL"] ?? "https://dummyjson.com"
-        let baseURL = URL(string: rawBaseURL) ?? URL(string: "https://dummyjson.com")!
+        let baseURL = makeBaseURL(from: environment)
 
         #if DEBUG
         let defaultAllowsDemoCredentials = true
@@ -72,6 +73,24 @@ public struct APIConfiguration: Sendable {
             allowsDemoCredentials: allowsDemoCredentials,
             retryPolicy: .idempotentGET(maxRetries: 2)
         )
+    }
+
+    private static func makeBaseURL(from environment: [String: String]) -> URL {
+        let fallbackDemoURL = URL(string: "https://dummyjson.com")!
+        guard let configuredBaseURL = environment["MVVMEXAMPLE_API_BASE_URL"] else {
+            return fallbackDemoURL
+        }
+
+        guard
+            let url = URL(string: configuredBaseURL),
+            let scheme = url.scheme,
+            ["http", "https"].contains(scheme.lowercased()),
+            url.host?.isEmpty == false
+        else {
+            preconditionFailure("Invalid MVVMEXAMPLE_API_BASE_URL: \(configuredBaseURL)")
+        }
+
+        return url
     }
 }
 

@@ -52,6 +52,14 @@ final class ProfileViewModel {
         openEdit()
     }
 
+    /// Applies a profile returned by the edit flow without forcing another network read.
+    ///
+    /// External usage:
+    /// Called by the profile navigation composition after `ProfileEditViewModel` saves successfully.
+    func profileUpdated(_ profile: UserProfile) {
+        state = .content(viewStateBuilder.makeContent(from: profile))
+    }
+
     /// Requests logout through the app-level session owner.
     ///
     /// Side effects:

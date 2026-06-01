@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import AppErrors
+import AppLocalization
 
 /// Owns editable profile form state and save/cancel intents.
 ///
@@ -20,16 +21,19 @@ final class ProfileEditViewModel {
     private let payload: ProfileEditRoutePayload
     private let repository: ProfileRepository
     private weak var router: ProfileRouter?
+    private let onSaveSuccess: (UserProfile) -> Void
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     init(
         payload: ProfileEditRoutePayload,
         repository: ProfileRepository,
-        router: ProfileRouter
+        router: ProfileRouter,
+        onSaveSuccess: @escaping (UserProfile) -> Void
     ) {
         self.payload = payload
         self.repository = repository
         self.router = router
+        self.onSaveSuccess = onSaveSuccess
         self.firstName = payload.firstName
         self.lastName = payload.lastName
         self.email = payload.email
@@ -68,9 +72,10 @@ final class ProfileEditViewModel {
 
         saveTask = Task { [repository, payload] in
             do {
-                _ = try await repository.updateProfile(id: payload.id, request: request)
+                let updatedProfile = try await repository.updateProfile(id: payload.id, request: request)
                 try Task.checkCancellation()
                 state.isSaving = false
+                onSaveSuccess(updatedProfile)
                 router?.pop()
             } catch is CancellationError {
                 return
@@ -78,7 +83,7 @@ final class ProfileEditViewModel {
                 return
             } catch {
                 state.isSaving = false
-                state.errorMessage = error.localizedDescription
+                state.errorMessage = AppErrorMapper.userMessage(for: error)
             }
         }
     }
