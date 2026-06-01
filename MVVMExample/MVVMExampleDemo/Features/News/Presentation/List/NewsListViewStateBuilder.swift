@@ -67,21 +67,21 @@ struct NewsListViewStateBuilder {
         }
 
         let likeIconName = Self.likeIconName(for: article.isLiked ? .liked : .notLiked)
-        let commentsText = AppStrings.formatted("%d comments", article.commentsCount)
+        let commentsText = AppStrings.formatted("Comments %@", AppStrings.localizedNumber(article.commentsCount))
 
         return NewsCardViewState(
             id: article.id,
             sourceText: article.source,
-            sourceDisplayText: article.source.uppercased(),
+            sourceDisplayText: article.source.uppercased(with: .current),
             title: article.title,
             excerpt: article.excerpt,
             publishedAtText: dateText,
             thumbnailURL: article.thumbnailURL,
-            likesText: "\(article.likesCount)",
+            likesText: AppStrings.localizedNumber(article.likesCount),
             commentsText: commentsText,
             likeState: article.isLiked ? .liked : .notLiked,
             likeIconName: likeIconName,
-            accessibilityLabel: "\(article.source). \(article.title). \(dateText).",
+            accessibilityLabel: AppStrings.formatted("%@. %@. %@.", article.source, article.title, dateText),
             likeAccessibilityLabel: article.isLiked ? AppStrings.text("Unlike article") : AppStrings.text("Like article"),
             commentsAccessibilityLabel: commentsText
         )

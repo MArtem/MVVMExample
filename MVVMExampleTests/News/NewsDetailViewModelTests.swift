@@ -31,7 +31,7 @@ struct NewsDetailViewModelTests {
         #expect(content.id == 7)
         #expect(content.title == "Loaded title")
         #expect(content.isFavorite == false)
-        #expect(content.likesText == "10 likes")
+        #expect(content.likesText == "Likes 10")
     }
 
     @Test("Load failure maps to full-screen user-safe error")
@@ -70,7 +70,7 @@ struct NewsDetailViewModelTests {
         }
         #expect(optimistic.isFavorite == true)
         #expect(optimistic.isFavoriteUpdating == true)
-        #expect(optimistic.likesText == "11 likes")
+        #expect(optimistic.likesText == "Likes 11")
 
         await repository.waitForToggleContinuation(at: 0)
         await repository.completeToggle(at: 0, with: .failure(AppAPIError.timeout))
@@ -82,7 +82,7 @@ struct NewsDetailViewModelTests {
         }
         #expect(content.isFavorite == false)
         #expect(content.isFavoriteUpdating == false)
-        #expect(content.likesText == "10 likes")
+        #expect(content.likesText == "Likes 10")
         #expect(content.favoriteErrorMessage == "Couldn’t update favorite. Please try again.")
     }
 }

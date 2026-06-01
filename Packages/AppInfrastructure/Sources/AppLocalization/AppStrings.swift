@@ -10,6 +10,19 @@ public enum AppStrings {
     }
 
     public static func formatted(_ format: String, _ arguments: CVarArg...) -> String {
-        String(format: text(format), arguments: arguments)
+        String(format: text(format), locale: .current, arguments: arguments)
+    }
+
+    public static func localizedNumber(_ value: Int) -> String {
+        NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+    }
+
+    public static func localizedNumber(_ value: Double, minimumFractionDigits: Int = 0, maximumFractionDigits: Int = 1) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = .current
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = minimumFractionDigits
+        formatter.maximumFractionDigits = maximumFractionDigits
+        return formatter.string(from: NSNumber(value: value)) ?? String(format: "%.1f", locale: .current, value)
     }
 }

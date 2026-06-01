@@ -25,8 +25,7 @@ struct ProfileContentView: View {
                     ProfileInfoRow(title: AppStrings.text("Role"), value: state.companyText, icon: "briefcase")
                 }
                 .padding(AppSpacing.md)
-                .background(AppTheme.surfacePrimary)
-                .clipShape(RoundedRectangle(cornerRadius: AppRadius.card))
+                .appAdaptiveCardSurface()
 
                 Button(action: onEditTap) {
                     Label(AppStrings.text("Edit profile"), systemImage: "pencil")

@@ -11,7 +11,10 @@ struct UserProfile: Identifiable, Equatable, Sendable {
     let companyTitle: String?
 
     var displayName: String {
-        "\(firstName) \(lastName)"
+        var components = PersonNameComponents()
+        components.givenName = firstName
+        components.familyName = lastName
+        return PersonNameComponentsFormatter.localizedString(from: components, style: .medium)
     }
 }
 

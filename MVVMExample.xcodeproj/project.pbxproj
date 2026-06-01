@@ -20,6 +20,7 @@
 		5B079A334C42107807329EEB /* AppErrors in Frameworks */ = {isa = PBXBuildFile; productRef = A1BD5AEEE3B369D5B7123C3F /* AppErrors */; };
 		63EAF15D1F36B8AC190C2972 /* AppLogging in Frameworks */ = {isa = PBXBuildFile; productRef = D42930EB29E79861F5E7C4A4 /* AppLogging */; };
 		73AF46720B935F01443F3468 /* ArticleInteractionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F720E23A14194B7C8A144889 /* ArticleInteractionStore.swift */; };
+		A08E24E8FC7B0CE3203874BF /* AppAdaptiveCardSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B2D025309B605C0927CA07 /* AppAdaptiveCardSurface.swift */; };
 		A11B22C33D44E55F66000002 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A11B22C33D44E55F66000001 /* Localizable.xcstrings */; };
 		AC3D76C32FCA368B00A1C459 /* NewsNavigationStack.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC3D76792FCA368B00A1C459 /* NewsNavigationStack.swift */; };
 		AC3D76C42FCA368B00A1C459 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC3D769D2FCA368B00A1C459 /* UserProfile.swift */; };
@@ -208,6 +209,7 @@
 		AC3D76BF2FCA368B00A1C459 /* BestMVVMNavigationDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BestMVVMNavigationDemoApp.swift; sourceTree = "<group>"; };
 		AC3D76C02FCA368B00A1C459 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		AFD430E4F74AD84B89561BFA /* NewsDetailViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NewsDetailViewModelTests.swift; sourceTree = "<group>"; };
+		B1B2D025309B605C0927CA07 /* AppAdaptiveCardSurface.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppAdaptiveCardSurface.swift; sourceTree = "<group>"; };
 		BD874CB2509D202C42781BED /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS14.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		F260BC42D25DC5EFE19F2863 /* MVVMExample.xctestplan */ = {isa = PBXFileReference; includeInIndex = 1; path = MVVMExample.xctestplan; sourceTree = "<group>"; };
 		F720E23A14194B7C8A144889 /* ArticleInteractionStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArticleInteractionStore.swift; sourceTree = "<group>"; };
@@ -349,6 +351,7 @@
 				AC3D76562FCA368B00A1C459 /* AppSpacing.swift */,
 				AC3D76572FCA368B00A1C459 /* AppTheme.swift */,
 				AC3D76582FCA368B00A1C459 /* AppTypography.swift */,
+				B1B2D025309B605C0927CA07 /* AppAdaptiveCardSurface.swift */,
 			);
 			path = DesignSystem;
 			sourceTree = "<group>";
@@ -958,6 +961,7 @@
 				73AF46720B935F01443F3468 /* ArticleInteractionStore.swift in Sources */,
 				027A0F5EB88E0712CBD8B55B /* AppAccessibilityID.swift in Sources */,
 				F5A6B02F97D1050E055438DD /* AppDependencies+UITesting.swift in Sources */,
+				A08E24E8FC7B0CE3203874BF /* AppAdaptiveCardSurface.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

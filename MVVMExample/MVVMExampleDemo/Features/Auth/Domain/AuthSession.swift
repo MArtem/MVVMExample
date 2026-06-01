@@ -15,6 +15,9 @@ struct AppUser: Identifiable, Equatable, Sendable {
     let imageURL: URL?
 
     var displayName: String {
-        "\(firstName) \(lastName)"
+        var components = PersonNameComponents()
+        components.givenName = firstName
+        components.familyName = lastName
+        return PersonNameComponentsFormatter.localizedString(from: components, style: .medium)
     }
 }
