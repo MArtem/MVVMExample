@@ -43,11 +43,48 @@ Keep XCTest for:
 - No live network calls in unit tests.
 - No production credentials, demo tokens, or token-like fixtures that can be mistaken for real secrets.
 
+## Deterministic Async Testing Rules
+
+ViewModel and repository tests must not rely on timing as the primary synchronization mechanism.
+
+Required rules:
+
+- do not use `Task.sleep` or polling loops as the main way to wait for state;
+- use controllable fake repositories that complete via stored continuations or explicit `Result` queues;
+- test cancellation and stale-result behavior by completing async operations in a controlled order;
+- isolate state per test instead of marking suites `.serialized`;
+- use `.serialized` only when an external shared resource cannot be isolated and document why.
+
+These rules apply especially to `NewsListViewModel` pagination, refresh, like/favorite flows, and `ProfileEditViewModel` save behavior.
+
 ## Proposed Test Target Layout
 
 ### Package Tests
 
-Add Swift Package test targets under `./Packages/AppInfrastructure/Tests/`:
+Add Swift Package test targets under `./Packages/AppInfrastructure/Tests/` and wire them in `./Packages/AppInfrastructure/Package.swift`.
+
+Required `.testTarget` setup:
+
+```swift
+.testTarget(
+    name: "AppConfigurationTests",
+    dependencies: ["AppConfiguration"]
+),
+.testTarget(
+    name: "AppNetworkingTests",
+    dependencies: ["AppNetworking", "AppErrors", "AppConfiguration", "AppLogging"]
+),
+.testTarget(
+    name: "AppLocalizationTests",
+    dependencies: ["AppLocalization", "AppErrors"]
+),
+.testTarget(
+    name: "AppImageLoadingTests",
+    dependencies: ["AppImageLoading", "AppErrors"]
+)
+```
+
+Expected folders:
 
 ```text
 ./Packages/AppInfrastructure/Tests/AppConfigurationTests/
@@ -58,11 +95,14 @@ Add Swift Package test targets under `./Packages/AppInfrastructure/Tests/`:
 
 ### App Tests
 
-Add app unit test target:
+Create an actual `MVVMExampleTests` target in `./MVVMExample.xcodeproj`; a folder alone is not sufficient.
 
-```text
-./MVVMExampleTests/
-```
+Required integration:
+
+- create `./MVVMExampleTests/` and add it to the `MVVMExampleTests` target;
+- use `@testable import MVVMExample` from app unit tests;
+- ensure app source visibility is through the test target, not by copying app files into tests;
+- connect the target to the project scheme or `.xctestplan` so CI and local `xcodebuild test` run it.
 
 Recommended folders:
 
@@ -75,11 +115,43 @@ Recommended folders:
 
 ### UI Tests Later
 
-Add only after unit coverage is stable:
+Create a separate `MVVMExampleUITests` target only after unit coverage is stable.
+
+Required integration:
+
+- keep UI tests in `./MVVMExampleUITests/`;
+- do not mix UI automation into the app unit test target;
+- configure the `.xctestplan` so unit and UI tests can run in separate configurations/CI lanes;
+- keep UI tests slower and fewer than unit tests.
 
 ```text
 ./MVVMExampleUITests/
 ```
+
+### Xcode Test Plan
+
+Create and attach an `.xctestplan` to the `MVVMExample` scheme before considering test setup complete.
+
+Acceptance:
+
+- package tests run through `swift test --package-path ./Packages/AppInfrastructure`;
+- app unit tests run through the Xcode scheme/test plan;
+- UI tests are a separate configuration/lane;
+- local and CI commands cannot silently skip a created test folder because no target references it.
+
+
+## Test Support Minimalism Stop Rules
+
+Test support must not become a parallel architecture.
+
+Stop rules:
+
+- no mega `TestAppFactory`;
+- no protocols created only for tests unless the boundary is also correct for runtime;
+- colocate test doubles by feature unless reused three or more times;
+- use `TestSupport` only for genuinely reused helpers;
+- do not change production code only to satisfy tests;
+- production changes for testability are allowed only when they create a correct runtime dependency seam.
 
 ## Coverage Phases
 
@@ -164,20 +236,29 @@ Test cases:
 
 ### `AppImageLoading`
 
+Unit-test the pipeline and cache. Do not deeply unit-test SwiftUI view lifecycle for `CachedRemoteImageView` without a justified UI inspection dependency.
+
 Files:
 
 - `./Packages/AppInfrastructure/Sources/AppImageLoading/ImageMemoryCache.swift`
 - `./Packages/AppInfrastructure/Sources/AppImageLoading/RemoteImagePipeline.swift`
 - `./Packages/AppInfrastructure/Sources/AppImageLoading/CachedRemoteImageView.swift`
 
-Test cases:
+Unit test cases:
 
 1. Cache key includes URL and target pixel size.
 2. Memory cache stores and returns images for exact keys.
 3. Downsampled image respects target dimensions within scale tolerance.
 4. Invalid image data maps to decoding failure.
 5. Non-2xx image response maps to invalid response.
-6. Cancellation prevents stale image publication where testable.
+6. Pipeline cancellation is verified where it can be observed without SwiftUI lifecycle inspection.
+
+Light UI/manual validation later:
+
+1. Placeholder has stable size.
+2. Failure view appears for failed loads.
+3. Loaded image replaces placeholder.
+4. Disappearing/reappearing list rows do not visibly publish stale images.
 
 ## Phase 3 — Domain / Mapping Tests
 
@@ -365,6 +446,13 @@ Flows:
 6. Profile opens edit, saves, and updated values are visible after returning.
 7. Logout returns to login.
 
+Accessibility smoke checks:
+
+1. Login fields and buttons are reachable and labelled.
+2. News card open action does not hide like/comment controls from accessibility traversal.
+3. Profile edit fields and save/cancel buttons are reachable and labelled.
+4. Loading and error states expose understandable labels/messages.
+
 Constraints:
 
 - UI tests should use controlled demo configuration.
@@ -383,6 +471,20 @@ Candidates:
 4. ViewModel like update cost for a large list.
 
 Profiler/Instruments remains required for real scroll-hitch and memory validation; performance tests only catch regressions in deterministic code paths.
+
+Required profiler scenarios before claiming smoothness or leak-free behavior:
+
+1. Scroll news list with cold image cache.
+2. Scroll news list with warm image cache.
+3. Append pagination near bottom.
+4. Rapid like/favorite taps in list and detail.
+5. Open/close profile image and detail image flows repeatedly.
+6. Repeat scroll/navigation loops and check memory growth.
+
+Evidence rule:
+
+- Without a profiler run, completion reports may say only `static/perf-unit clean`.
+- Do not claim `smooth`, `no leaks`, or `memory stable` without Instruments/profiler evidence.
 
 ## CI / Quality Gates
 
