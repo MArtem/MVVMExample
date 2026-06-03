@@ -71,6 +71,47 @@ struct URLSessionNetworkClientTests {
         }
     }
 
+    @Test("GET retry uses injected sleeper and avoids real delay")
+    func getRetryUsesInjectedSleeperAndAvoidsRealDelay() async throws {
+        let baseURL = URL(string: "https://\(UUID().uuidString).example.com")!
+        let requestURL = baseURL.appendingPathComponent("resource")
+        MockURLProtocol.configureSequence(
+            url: requestURL,
+            responses: [
+                .init(statusCode: 500, body: Data(), error: nil),
+                .init(statusCode: 200, body: #"{"name":"fixture"}"#.data(using: .utf8)!, error: nil)
+            ]
+        )
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let sleeper = RetrySleepRecorder()
+
+        let client = URLSessionNetworkClient(
+            configuration: APIConfiguration(
+                environment: .demo,
+                baseURL: baseURL,
+                requestTimeout: 5,
+                allowsDemoCredentials: true,
+                retryPolicy: .idempotentGET(maxRetries: 1, retryDelay: 0.42)
+            ),
+            session: session,
+            logger: NoOpAppLogger(),
+            retrySleeper: { delaySeconds in
+                await sleeper.record(delaySeconds)
+            }
+        )
+
+        let response: ResponseDTO = try await client.send(TestRequest(path: "/resource"))
+
+        #expect(response.name == "fixture")
+        #expect(MockURLProtocol.requestCount(for: requestURL) == 2)
+        let delays = await sleeper.delays
+        #expect(delays == [0.42])
+    }
+
+
     private func makeClient(
         statusCode: Int,
         body: Data,
@@ -126,10 +167,14 @@ private struct TestRequest: NetworkRequest {
 }
 
 private final class MockURLProtocol: URLProtocol {
-    private struct Stub {
+    struct StubResponse {
         let statusCode: Int
         let body: Data
         let error: Error?
+    }
+
+    private struct Stub {
+        let responses: [StubResponse]
         var requestCount: Int
     }
 
@@ -137,8 +182,15 @@ private final class MockURLProtocol: URLProtocol {
     private static var stubs: [URL: Stub] = [:]
 
     static func configure(url: URL, statusCode: Int, body: Data, error: Error?) {
+        configureSequence(
+            url: url,
+            responses: [.init(statusCode: statusCode, body: body, error: error)]
+        )
+    }
+
+    static func configureSequence(url: URL, responses: [StubResponse]) {
         lock.withLock {
-            stubs[url] = Stub(statusCode: statusCode, body: body, error: error, requestCount: 0)
+            stubs[url] = Stub(responses: responses, requestCount: 0)
         }
     }
 
@@ -172,23 +224,34 @@ private final class MockURLProtocol: URLProtocol {
             return
         }
 
-        if let error = stub.error {
+        let responseIndex = min(max(stub.requestCount - 1, 0), stub.responses.count - 1)
+        let stubResponse = stub.responses[responseIndex]
+
+        if let error = stubResponse.error {
             client?.urlProtocol(self, didFailWithError: error)
             return
         }
 
         let response = HTTPURLResponse(
             url: url,
-            statusCode: stub.statusCode,
+            statusCode: stubResponse.statusCode,
             httpVersion: nil,
             headerFields: nil
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: stub.body)
+        client?.urlProtocol(self, didLoad: stubResponse.body)
         client?.urlProtocolDidFinishLoading(self)
     }
 
     override func stopLoading() {}
+}
+
+private actor RetrySleepRecorder {
+    private(set) var delays: [TimeInterval] = []
+
+    func record(_ delay: TimeInterval) {
+        delays.append(delay)
+    }
 }
 
 private extension NSLock {

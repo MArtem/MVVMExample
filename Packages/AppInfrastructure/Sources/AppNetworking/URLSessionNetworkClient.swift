@@ -3,6 +3,9 @@ import AppConfiguration
 import AppErrors
 import AppLogging
 
+/// Performs a retry delay requested by `APIRetryPolicy`.
+public typealias NetworkRetrySleeper = @Sendable (_ delaySeconds: TimeInterval) async throws -> Void
+
 /// URLSession-backed implementation of `NetworkClient`.
 ///
 /// Responsibilities:
@@ -18,17 +21,22 @@ public final class URLSessionNetworkClient: NetworkClient {
     private let session: URLSession
     private let decoder: JSONDecoder
     private let logger: AppLogger
+    private let retrySleeper: NetworkRetrySleeper
 
     public init(
         configuration: APIConfiguration,
         session: URLSession = .shared,
         decoder: JSONDecoder = JSONDecoder(),
-        logger: AppLogger = NoOpAppLogger()
+        logger: AppLogger = NoOpAppLogger(),
+        retrySleeper: @escaping NetworkRetrySleeper = { delaySeconds in
+            try await Task.sleep(nanoseconds: UInt64(max(0, delaySeconds) * 1_000_000_000))
+        }
     ) {
         self.configuration = configuration
         self.session = session
         self.decoder = decoder
         self.logger = logger
+        self.retrySleeper = retrySleeper
     }
 
     /// Sends one typed network request and decodes its response.
@@ -48,7 +56,7 @@ public final class URLSessionNetworkClient: NetworkClient {
                     throw error
                 }
                 attempt += 1
-                try await Task.sleep(for: .seconds(configuration.retryPolicy.retryDelay))
+                try await retrySleeper(configuration.retryPolicy.retryDelay)
             }
         }
     }

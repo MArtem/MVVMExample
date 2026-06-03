@@ -1,5 +1,10 @@
 import SwiftUI
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// SwiftUI image view backed by `RemoteImagePipeline`.
 ///
@@ -17,7 +22,7 @@ public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
     private let failure: () -> Failure
 
     @Environment(\.displayScale) private var displayScale
-    @State private var image: UIImage?
+    @State private var image: AppPlatformImage?
     @State private var didFail = false
 
     public init(
@@ -48,9 +53,15 @@ public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
     @ViewBuilder
     private var content: some View {
         if let image {
+            #if canImport(UIKit)
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: contentMode)
+            #else
+            Image(nsImage: image)
+                .resizable()
+                .aspectRatio(contentMode: contentMode)
+            #endif
         } else if didFail {
             failure()
         } else {

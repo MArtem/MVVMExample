@@ -1,7 +1,12 @@
 import AppErrors
 import Foundation
 import ImageIO
+
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 /// Remote image loader that fetches, downsamples, and caches images for SwiftUI surfaces.
 ///
@@ -33,7 +38,7 @@ public struct RemoteImagePipeline: Sendable {
     ///
     /// Concurrency:
     /// Cancellation before decode/cache insert stops the load and avoids publishing stale work.
-    public func image(from url: URL, targetSize: CGSize, scale: CGFloat) async throws -> UIImage {
+    public func image(from url: URL, targetSize: CGSize, scale: CGFloat) async throws -> AppPlatformImage {
         let cacheKey = Self.cacheKey(url: url, targetSize: targetSize, scale: scale)
         if let cached = cache.image(forKey: cacheKey) {
             return cached
@@ -56,7 +61,7 @@ public struct RemoteImagePipeline: Sendable {
         "\(url.absoluteString)|\(Int(targetSize.width * scale))x\(Int(targetSize.height * scale))"
     }
 
-    private static func downsample(data: Data, targetSize: CGSize, scale: CGFloat) -> UIImage? {
+    private static func downsample(data: Data, targetSize: CGSize, scale: CGFloat) -> AppPlatformImage? {
         let options: [CFString: Any] = [
             kCGImageSourceShouldCache: false
         ]
@@ -75,6 +80,15 @@ public struct RemoteImagePipeline: Sendable {
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions as CFDictionary) else {
             return nil
         }
+
+        #if canImport(UIKit)
         return UIImage(cgImage: cgImage, scale: scale, orientation: .up)
+        #else
+        let pointSize = CGSize(
+            width: CGFloat(cgImage.width) / max(scale, 1),
+            height: CGFloat(cgImage.height) / max(scale, 1)
+        )
+        return AppPlatformImage(cgImage: cgImage, size: pointSize)
+        #endif
     }
 }
