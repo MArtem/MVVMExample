@@ -4,6 +4,9 @@ set -euo pipefail
 readonly PROJECT="MVVMExample.xcodeproj"
 readonly SCHEME="MVVMExample"
 readonly DESTINATION_IOS_26="platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0"
+readonly WORKTREES_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+readonly DERIVED_DATA_PATH="${MVVMEXAMPLE_DERIVED_DATA_PATH:-${WORKTREES_ROOT}/.xcode-derived-data/MVVMExample}"
+readonly CLONED_PACKAGES_PATH="${MVVMEXAMPLE_XCODE_PACKAGE_CACHE:-${WORKTREES_ROOT}/.xcode-package-cache/MVVMExample}"
 
 usage() {
   cat <<'EOF'
@@ -17,7 +20,11 @@ EOF
 }
 
 run_list() {
-  xcodebuild -list -project "${PROJECT}"
+  xcodebuild \
+    -list \
+    -project "${PROJECT}" \
+    -derivedDataPath "${DERIVED_DATA_PATH}" \
+    -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}"
 }
 
 run_build() {
@@ -26,6 +33,8 @@ run_build() {
     -scheme "${SCHEME}" \
     -configuration Debug \
     -destination "${DESTINATION_IOS_26}" \
+    -derivedDataPath "${DERIVED_DATA_PATH}" \
+    -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     CODE_SIGNING_ALLOWED=NO \
     build
 }

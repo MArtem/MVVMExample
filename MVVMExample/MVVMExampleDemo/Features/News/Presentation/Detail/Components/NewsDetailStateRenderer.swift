@@ -1,5 +1,4 @@
 import SwiftUI
-import AppLocalization
 
 struct NewsDetailStateRenderer: View {
     let state: NewsDetailViewState

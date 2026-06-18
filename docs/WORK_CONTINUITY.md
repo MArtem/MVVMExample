@@ -9,6 +9,11 @@ Durable resume checkpoint for `MVVMExample` when chat/task context is lost.
 - Every context-transfer prompt must include:
   **"перечитать весь актуальный набор документации и правил для этого worktree и task-контекста"**.
 
+## Filesystem Sandbox Rule
+- All project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts must stay inside `/Users/Artem/.zenflow/worktrees`.
+- Never use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any other path outside `/Users/Artem/.zenflow/worktrees` for project work.
+- If a command/tool would default outside the worktrees sandbox, override its output paths before running it.
+
 ## Universal Transition Prompt Template
 ```text
 Работаем в проекте `MVVMExample` в worktree:
@@ -26,4 +31,5 @@ Durable resume checkpoint for `MVVMExample` when chat/task context is lost.
 Правило после очистки контекста:
 - перечитать весь актуальный набор документации и правил для этого worktree и task-контекста
 - reusable baseline является накопительным и не должен теряться при переходе между проектами
+- никогда не выходить за файловую границу `/Users/Artem/.zenflow/worktrees`; build/cache/DerivedData/package verification output тоже должны быть внутри этой границы
 ```

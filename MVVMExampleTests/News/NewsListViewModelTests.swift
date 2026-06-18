@@ -1,6 +1,5 @@
 import Foundation
 import Testing
-import AppErrors
 @testable import MVVMExample
 
 @MainActor

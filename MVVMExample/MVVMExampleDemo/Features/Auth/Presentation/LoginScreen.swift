@@ -1,6 +1,4 @@
 import SwiftUI
-import AppConfiguration
-import AppLocalization
 
 struct LoginScreen: View {
     @State private var viewModel: LoginViewModel

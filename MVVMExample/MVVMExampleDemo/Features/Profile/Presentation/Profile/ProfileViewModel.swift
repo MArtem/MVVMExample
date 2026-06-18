@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import AppErrors
 
 /// Owns profile screen state and profile-level user intents.
 ///

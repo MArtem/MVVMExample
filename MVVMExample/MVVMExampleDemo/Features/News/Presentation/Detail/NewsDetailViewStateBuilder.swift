@@ -1,5 +1,4 @@
 import Foundation
-import AppLocalization
 
 /// Maps article domain state and errors into detail presentation state.
 struct NewsDetailViewStateBuilder {

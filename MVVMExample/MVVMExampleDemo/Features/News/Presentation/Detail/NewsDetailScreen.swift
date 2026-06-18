@@ -1,5 +1,4 @@
 import SwiftUI
-import AppLocalization
 
 struct NewsDetailScreen: View {
     @State private var viewModel: NewsDetailViewModel

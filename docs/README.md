@@ -38,4 +38,5 @@ Entry point for active project documentation, production standards, prompt prese
 - `./.codex/skills/`
 
 ### App-Specific Docs
+- `./docs/PACKAGE_USAGE_IN_MVVMEXAMPLE.md`
 Add app-specific docs here after the product shape is known.

@@ -1,4 +1,3 @@
-import AppErrors
 import Foundation
 import ImageIO
 
@@ -16,7 +15,21 @@ import AppKit
 /// - downsample before publishing images to UI.
 ///
 /// Errors:
-/// Throws `AppAPIError.invalidResponse` for non-2xx responses and decoding errors for invalid image data.
+/// Throws `RemoteImagePipelineError.invalidResponse` for non-2xx responses and `RemoteImagePipelineError.decodingFailed` for invalid image data.
+public enum RemoteImagePipelineError: LocalizedError, Equatable, Sendable {
+    case invalidResponse
+    case decodingFailed
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            return "Invalid image response."
+        case .decodingFailed:
+            return "Image decoding failed."
+        }
+    }
+}
+
 public struct RemoteImagePipeline: Sendable {
     public static let shared = RemoteImagePipeline()
 
@@ -46,12 +59,12 @@ public struct RemoteImagePipeline: Sendable {
 
         let (data, response) = try await session.data(from: url)
         guard let httpResponse = response as? HTTPURLResponse, 200..<300 ~= httpResponse.statusCode else {
-            throw AppAPIError.invalidResponse
+            throw RemoteImagePipelineError.invalidResponse
         }
         try Task.checkCancellation()
 
         guard let image = Self.downsample(data: data, targetSize: targetSize, scale: scale) else {
-            throw AppAPIError.decoding("Image decoding failed")
+            throw RemoteImagePipelineError.decodingFailed
         }
         cache.insert(image, forKey: cacheKey)
         return image

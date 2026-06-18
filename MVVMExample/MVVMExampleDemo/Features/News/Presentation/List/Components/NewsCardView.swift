@@ -1,5 +1,4 @@
 import SwiftUI
-import AppLocalization
 
 /// Equatable SwiftUI row for the news feed.
 ///

@@ -23,12 +23,17 @@ Before code, docs, git, or project changes, read:
 7. `./docs/WORK_CONTINUITY.md`
 8. current Zenflow task plan if present
 
+## Filesystem Sandbox
+- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow/worktrees`.
+- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow/worktrees` for project work.
+- If a tool defaults outside the worktrees sandbox, override its output/cache/DerivedData paths before running it.
+
 ## Current Project Mode
 - `MVVMExample` is an imported SwiftUI MVVM demo/pre-production app, not the old clean starter baseline.
 - Do not continue old `TaskDemo` / `TaskDemoViewModel` / behavior-test plans.
 - The app may use DummyJSON/test API and demo credentials only under explicit debug/demo policy.
 - Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
-- Reusable neutral infrastructure belongs under `./Packages/AppInfrastructure/` and must use generic `App*` naming, not project/vendor-specific branding such as `Tchop*`.
+- Reusable neutral infrastructure belongs under `./Packages/<AppPackage>/` and must use generic `App*` naming, not project/vendor-specific branding such as `Tchop*`.
 
 
 ## Product-Staff Quality Bar Rule

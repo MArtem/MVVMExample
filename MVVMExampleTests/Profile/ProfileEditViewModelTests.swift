@@ -1,6 +1,4 @@
 import Testing
-import AppErrors
-import AppLocalization
 @testable import MVVMExample
 
 @MainActor

@@ -18,7 +18,7 @@ patterns = [
     ('default ViewModel send(_ action:) API', re.compile(r'func\s+send\s*\(\s*_\s+action\s*:')),
     ('UI action enum boilerplate', re.compile(r'enum\s+\w+Action\s*:\s*Equatable')),
 ]
-network_boundary = re.compile(r'(Infrastructure/Networking|Packages/AppInfrastructure/Sources/AppNetworking|Data/API)')
+network_boundary = re.compile(r'(Infrastructure/Networking|Packages/AppNetworking/Sources/AppNetworking|Data/API)')
 try_optional = re.compile(r'try\?')
 findings=[]
 for path in root.rglob('*.swift'):

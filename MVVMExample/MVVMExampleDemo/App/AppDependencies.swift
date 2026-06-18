@@ -1,6 +1,4 @@
 import Foundation
-import AppConfiguration
-import AppLogging
 
 /// Runtime dependency graph for the app target.
 ///
@@ -42,8 +40,9 @@ struct AppDependencies {
         #endif
 
         let apiClient = URLSessionAPIClient(
-            configuration: configuration,
-            logger: logger
+            configuration: configuration.networkClientConfiguration,
+            logger: { logger.log($0) },
+            errorMapping: .appAPIError
         )
 
         return AppDependencies(

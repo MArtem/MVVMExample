@@ -1,6 +1,4 @@
 import Foundation
-import AppConfiguration
-import AppLogging
 
 #if DEBUG
 extension AppDependencies {
@@ -17,8 +15,9 @@ extension AppDependencies {
         )
         let logger = NoOpAppLogger()
         let apiClient = URLSessionAPIClient(
-            configuration: configuration,
-            logger: logger
+            configuration: configuration.networkClientConfiguration,
+            logger: { logger.log($0) },
+            errorMapping: .appAPIError
         )
 
         return AppDependencies(

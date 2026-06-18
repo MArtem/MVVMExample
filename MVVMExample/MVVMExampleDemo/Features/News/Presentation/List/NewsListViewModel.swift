@@ -1,7 +1,5 @@
 import Foundation
 import Observation
-import AppErrors
-import AppLocalization
 
 /// Owns news-list presentation state, pagination, and user intents.
 ///

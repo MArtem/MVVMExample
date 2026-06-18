@@ -1,7 +1,5 @@
 import Foundation
 import Observation
-import AppErrors
-import AppLocalization
 
 /// Owns editable profile form state and save/cancel intents.
 ///

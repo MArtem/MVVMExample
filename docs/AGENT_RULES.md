@@ -14,6 +14,12 @@ Always choose the **simplest correct solution** that matches:
 
 Do not add abstractions unless they solve a concrete current problem.
 
+## Filesystem Sandbox Rule
+- All project work must stay inside `/Users/Artem/.zenflow/worktrees`.
+- Never write build artifacts, package caches, Xcode DerivedData, cloned package state, logs, temporary package verification output, or project traces outside `/Users/Artem/.zenflow/worktrees`.
+- Before running tools that normally use global caches or DerivedData, override their output/cache paths to `/Users/Artem/.zenflow/worktrees/...`.
+- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any other external location for project work.
+
 
 ## Product-Staff Quality Bar Rule
 - Never lower the engineering bar because a project is described as demo, test, sample, prototype, imported, or pre-production; those words may only describe configuration/risk context, not code quality.

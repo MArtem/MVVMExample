@@ -1,5 +1,4 @@
 import Foundation
-import AppNetworking
 
 /// Products list endpoint request used as the backing API for news cards.
 ///

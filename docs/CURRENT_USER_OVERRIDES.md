@@ -19,6 +19,11 @@ Every working/status/readiness response must start with:
 - sandbox/worktree confirmation
 - Readiness/status answers such as “готов к новым задачам” are not exempt.
 
+### Filesystem Sandbox
+- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow/worktrees`.
+- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow/worktrees` for project work.
+- If a tool defaults outside the worktrees sandbox, override its output/cache/DerivedData paths before running it.
+
 ### Verification / Builds / Tests
 - Do not write or modify tests unless the user explicitly opens a test-writing phase or asks to fix a specific failing test.
 - Do not run builds/tests/simulator UI/Instruments unless explicitly requested or already approved for the current block.

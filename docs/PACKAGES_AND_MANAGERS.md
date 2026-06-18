@@ -195,9 +195,9 @@ When reusing these packages elsewhere:
 
 
 ## Neutral Reuse For New Projects
-`AppInfrastructure` contains reusable mechanics, but unrelated new projects should not inherit `Tchop*` naming by default. When bootstrapping a generic/new project, promote only currently needed mechanics into neutral package names such as:
+`Standalone `App*` packages contain reusable mechanics, but unrelated new projects should not inherit `Tchop*` naming by default. When bootstrapping a generic/new project, promote only currently needed mechanics into neutral package names such as:
 
-- `AppInfrastructure`
+- standalone `App*` packages
 - `AppNetworking`
 - `AppErrors`
 - `AppLocalization`

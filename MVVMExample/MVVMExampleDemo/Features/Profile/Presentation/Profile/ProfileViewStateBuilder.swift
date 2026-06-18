@@ -1,5 +1,4 @@
 import Foundation
-import AppLocalization
 
 /// Maps profile domain models and errors into profile presentation state.
 struct ProfileViewStateBuilder {

@@ -10,7 +10,7 @@ Use it to decide:
 - what risks are known
 
 ## Root Rule
-Reusable, entity-agnostic mechanics should live in `./Packages/AppInfrastructure/` or shared docs/skills. App-specific demo behavior, UI composition, feature contracts, and DummyJSON mapping stay in the app layer.
+This project currently keeps only minimal app-local infrastructure support under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport` to avoid duplicating reusable package folders. Reusable package source is maintained in the TchopApp package vault; app-specific demo behavior, UI composition, feature contracts, and DummyJSON mapping stay in the app layer.
 
 ## Current Project Shape
 - App target: `MVVMExample`
@@ -18,7 +18,7 @@ Reusable, entity-agnostic mechanics should live in `./Packages/AppInfrastructure
 - Deployment target: iOS 17.0
 - App mode: demo/pre-production
 - Session persistence: in-memory demo store only
-- Networking: neutral `AppInfrastructure` configuration/client/error/logging direction
+- Networking: app-local configuration/client/error/logging support copied from the reusable baseline
 - Core goal: educational MVVM demonstration with production-minded boundaries
 
 ## Demo/Test API Policy
@@ -45,18 +45,17 @@ Must not own:
 - reusable generic networking/error/logging/config/localization mechanics
 - speculative infrastructure unrelated to current requirements
 
-### `./Packages/AppInfrastructure/`
-Owns:
-- neutral reusable networking primitives
-- typed error taxonomy
-- configuration primitives
-- redacted logging hooks
-- localization helpers
+### `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`
+Owns minimal local infrastructure primitives copied from the reusable baseline:
+- request primitives, URLSession execution, retries, and cancellation-aware network calls;
+- typed app/API error taxonomy;
+- runtime environment, API base URL, retry policy, demo credential gates, and demo session storage;
+- localized lookup and formatting helpers;
+- logging and redaction primitives;
+- controlled remote image loading and cache behavior;
+- Liquid Glass availability/fallback mechanics.
 
-Must not own:
-- app-specific feature behavior
-- product-specific DTOs
-- database/sync/widgets/push/share/media/AI until required
+Must not own app-specific feature behavior, product-specific DTOs, navigation, or screen composition.
 
 ## Current Known Risks
 - Build must be rerun after package/project changes.
@@ -74,3 +73,7 @@ xcodebuild -list -project MVVMExample.xcodeproj
 # build, when Swift/package/project code changes
 xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
 ```
+
+
+### Local Liquid Glass support
+`./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/AppGlassUI/` owns Liquid Glass availability and fallback chrome mechanics. App code owns semantic colors, layout, and feature-specific visual policy.

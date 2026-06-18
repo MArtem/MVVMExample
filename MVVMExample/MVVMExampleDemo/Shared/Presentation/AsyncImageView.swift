@@ -1,4 +1,3 @@
-import AppImageLoading
 import SwiftUI
 
 /// App-level wrapper around the reusable cached image loader.

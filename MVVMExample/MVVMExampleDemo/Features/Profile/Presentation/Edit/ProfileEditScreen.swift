@@ -1,5 +1,4 @@
 import SwiftUI
-import AppLocalization
 
 struct ProfileEditScreen: View {
     @State private var viewModel: ProfileEditViewModel

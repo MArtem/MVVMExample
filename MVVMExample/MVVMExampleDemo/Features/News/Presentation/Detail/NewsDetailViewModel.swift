@@ -1,7 +1,5 @@
 import Foundation
 import Observation
-import AppErrors
-import AppLocalization
 
 /// Owns article-detail state and detail-only user intents.
 ///

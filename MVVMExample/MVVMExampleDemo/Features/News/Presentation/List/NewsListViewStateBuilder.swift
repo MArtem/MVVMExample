@@ -1,4 +1,3 @@
-import AppLocalization
 import Foundation
 
 /// Maps domain articles and errors into list presentation state.

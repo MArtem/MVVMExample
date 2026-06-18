@@ -12,7 +12,7 @@ Current project inspection shows:
 - App target exists: `MVVMExample`.
 - No app test target is currently present in `MVVMExample.xcodeproj`.
 - No `.xctestplan` file is currently present.
-- Local package schemes exist for `AppInfrastructure` modules.
+- Local package schemes exist for standalone `App*` packages modules.
 
 Before implementation, create test targets deliberately rather than mixing tests into the app target.
 
@@ -61,7 +61,7 @@ These rules apply especially to `NewsListViewModel` pagination, refresh, like/fa
 
 ### Package Tests
 
-Add Swift Package test targets under `./Packages/AppInfrastructure/Tests/` and wire them in `./Packages/AppInfrastructure/Package.swift`.
+Package tests are not active in this worktree because local package folders were removed. Infrastructure behavior should be covered through app/unit tests when the user explicitly opens a test-writing phase.
 
 Required `.testTarget` setup:
 
@@ -87,10 +87,10 @@ Required `.testTarget` setup:
 Expected folders:
 
 ```text
-./Packages/AppInfrastructure/Tests/AppConfigurationTests/
-./Packages/AppInfrastructure/Tests/AppNetworkingTests/
-./Packages/AppInfrastructure/Tests/AppLocalizationTests/
-./Packages/AppInfrastructure/Tests/AppImageLoadingTests/
+./Packages/<AppPackage>/Tests/AppConfigurationTests/
+./Packages/<AppPackage>/Tests/AppNetworkingTests/
+./Packages/<AppPackage>/Tests/AppLocalizationTests/
+./Packages/<AppPackage>/Tests/AppImageLoadingTests/
 ```
 
 ### App Tests
@@ -134,11 +134,12 @@ Create and attach an `.xctestplan` to the `MVVMExample` scheme before considerin
 
 Acceptance:
 
-- package tests run through the iOS package scheme because `AppInfrastructure` contains UIKit-backed iOS code:
+- package tests run through the iOS package scheme because standalone `App*` packages contains UIKit-backed iOS code:
 
 ```zsh
-cd ./Packages/AppInfrastructure
-xcodebuild test -scheme AppInfrastructure-Package -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' CODE_SIGNING_ALLOWED=NO
+for pkg in AppErrors AppLogging AppConfiguration AppLocalization AppNetworking AppImageLoading AppGlassUI; do
+  ./Packages/$pkg/Scripts/verify_package.sh
+done
 ```
 
 - app unit tests run through the Xcode scheme/test plan:
@@ -190,7 +191,7 @@ Acceptance:
 - Empty or smoke tests run successfully.
 - Tests do not require live network or simulator UI.
 
-## Phase 2 — AppInfrastructure Unit Tests
+## Phase 2 — Standalone Package Unit Tests
 
 Goal: cover reusable infrastructure contracts first because app features depend on them.
 
@@ -198,8 +199,8 @@ Goal: cover reusable infrastructure contracts first because app features depend 
 
 Files:
 
-- `./Packages/AppInfrastructure/Sources/AppConfiguration/APIConfiguration.swift`
-- `./Packages/AppInfrastructure/Sources/AppConfiguration/SessionStore.swift`
+- `./Packages/<AppPackage>/Sources/AppConfiguration/APIConfiguration.swift`
+- `./Packages/<AppPackage>/Sources/AppConfiguration/SessionStore.swift`
 
 Test cases:
 
@@ -214,9 +215,9 @@ Test cases:
 
 Files:
 
-- `./Packages/AppInfrastructure/Sources/AppNetworking/URLSessionNetworkClient.swift`
-- `./Packages/AppInfrastructure/Sources/AppNetworking/JSONRequestBodyEncoder.swift`
-- `./Packages/AppInfrastructure/Sources/AppNetworking/NetworkPrimitives.swift`
+- `./Packages/<AppPackage>/Sources/AppNetworking/URLSessionNetworkClient.swift`
+- `./Packages/<AppPackage>/Sources/AppNetworking/JSONRequestBodyEncoder.swift`
+- `./Packages/<AppPackage>/Sources/AppNetworking/NetworkPrimitives.swift`
 
 Test cases:
 
@@ -236,8 +237,8 @@ Test cases:
 
 Files:
 
-- `./Packages/AppInfrastructure/Sources/AppLocalization/AppErrorMapper.swift`
-- `./Packages/AppInfrastructure/Sources/AppLocalization/AppStrings.swift`
+- `./Packages/<AppPackage>/Sources/AppLocalization/AppErrorMapper.swift`
+- `./Packages/<AppPackage>/Sources/AppLocalization/AppStrings.swift`
 
 Test cases:
 
@@ -251,9 +252,9 @@ Unit-test the pipeline and cache. Do not deeply unit-test SwiftUI view lifecycle
 
 Files:
 
-- `./Packages/AppInfrastructure/Sources/AppImageLoading/ImageMemoryCache.swift`
-- `./Packages/AppInfrastructure/Sources/AppImageLoading/RemoteImagePipeline.swift`
-- `./Packages/AppInfrastructure/Sources/AppImageLoading/CachedRemoteImageView.swift`
+- `./Packages/<AppPackage>/Sources/AppImageLoading/ImageMemoryCache.swift`
+- `./Packages/<AppPackage>/Sources/AppImageLoading/RemoteImagePipeline.swift`
+- `./Packages/<AppPackage>/Sources/AppImageLoading/CachedRemoteImageView.swift`
 
 Unit test cases:
 
@@ -506,7 +507,7 @@ Recommended order once tests exist:
 ./scripts/run_static_quality_gates.sh
 
 # package tests
-swift test --package-path ./Packages/AppInfrastructure
+# Package folders are not present in this worktree. Use app/Xcode verification instead.
 
 # app unit tests
 xcodebuild test \
@@ -520,7 +521,7 @@ UI tests should be separate from unit tests and may run in a slower CI lane.
 ## Initial Priority Order
 
 1. Create test targets/test plan.
-2. AppInfrastructure configuration/network/error/image tests.
+2. standalone package configuration/network/error/image tests.
 3. Profile edit/save regression tests for the latest findings.
 4. News list pagination/refresh/like ViewModel tests.
 5. Detail favorite rollback tests.

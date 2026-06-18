@@ -9,7 +9,7 @@
 - Profile view/edit flow
 - DummyJSON-style test API integration
 - In-memory demo session store
-- Neutral `AppInfrastructure` package direction
+- Minimal app-local infrastructure copied from the reusable baseline
 
 ## Architecture Rules
 
@@ -17,7 +17,7 @@
 - Generic `send(_ action:)` ViewModel dispatch is not default project style.
 - UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
 - App-specific feature behavior stays in `./MVVMExample/`.
-- Reusable, entity-agnostic infrastructure belongs in `./Packages/AppInfrastructure/`.
+- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
 
 ## Demo/Test API Policy
 

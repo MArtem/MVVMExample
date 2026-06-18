@@ -3,7 +3,7 @@ import Foundation
 /// Stable API/network error taxonomy used across app infrastructure.
 ///
 /// Boundary rule:
-/// Technical details can be logged, but UI should map these cases through `AppErrorMapper` instead of showing raw `localizedDescription`.
+/// Technical details can be logged, but UI should map these cases through a host-app error mapper instead of showing raw `localizedDescription`.
 public enum AppAPIError: LocalizedError, Equatable {
     case invalidURL
     case invalidResponse

@@ -41,7 +41,7 @@ Stop and fix or escalate before continuing if any of these appear:
 Check:
 
 - App-specific product policy stays in `MVVMExample`.
-- Reusable, entity-agnostic mechanics belong in `Packages/AppInfrastructure`.
+- Reusable, entity-agnostic mechanics belong in `Packages/<AppPackage>`.
 - DTO/domain/UI models are not collapsed unless the type is truly local and trivial.
 - View code does not own business rules, persistence policy, retry policy, or backend mapping.
 - View models expose explicit state and explicit intent methods; generic `send(_ action:)` / UI action-enum dispatch is forbidden as the default MVVM API unless explicitly approved and documented as reducer/state-machine architecture.
