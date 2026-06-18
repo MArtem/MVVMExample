@@ -5,24 +5,26 @@ Task-local user preferences and hard constraints that apply before general proje
 
 ## Active Overrides
 
-### Model
-- Use and report `GPT-5.5` unless the user explicitly changes the model.
-- UI/design work from screenshots/Figma/PDF/SVG/CSS requires `GPT-5.5`.
+### Model Routing
+- Apply `./docs/MODEL_ROUTING_RULE.md`; do not use the old `GPT-5.5 for all work` rule.
+- `GPT-5.4` is allowed only for approved low-risk execution where architecture and ownership are already decided.
+- `GPT-5.5` is required for planning, architecture, persistence, concurrency, navigation, state ownership, public APIs, package/app boundaries, security/privacy, data-loss/sync, performance-sensitive work, Xcode/app runtime integration, and high-risk final review.
+- UI/design work from screenshots/Figma/PDF/SVG/CSS remains `GPT-5.5` unless explicitly relaxed.
 
 ### Response Header
 Every working/status/readiness response must start with:
-- model
-- active phase
-- files being inspected/changed
-- next safe step
-- whether a build is needed
-- sandbox/worktree confirmation
+- **Модель:** current model
+- **Фаза:** current phase
+- **Файлы:** files being inspected/changed, or `none`
+- **Следующий безопасный шаг:** next safe step
+- **Build/tests:** whether build/tests are needed and why
+- **Sandbox:** confirmation that work stays inside `/Users/Artem/.zenflow`
 - Readiness/status answers such as “готов к новым задачам” are not exempt.
 
 ### Filesystem Sandbox
-- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow/worktrees`.
-- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow/worktrees` for project work.
-- If a tool defaults outside the worktrees sandbox, override its output/cache/DerivedData paths before running it.
+- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow`.
+- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow` for project work.
+- If a tool defaults outside the Zenflow sandbox, override its output/cache/DerivedData paths before running it.
 
 ### Verification / Builds / Tests
 - Do not write or modify tests unless the user explicitly opens a test-writing phase or asks to fix a specific failing test.
@@ -54,3 +56,10 @@ Every working/status/readiness response must start with:
 
 ## Notes
 If this file conflicts with a newer explicit user instruction in chat, the newer instruction wins.
+
+
+### Documentation Vault Ownership
+- Durable reusable docs/rules/prompts/skills/templates/scripts must be synchronized with `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/reusable/`.
+- MVVMExample-specific docs must be synchronized with `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/apps/MVVMExample/`.
+- Do not change TchopApp-specific docs from MVVMExample tasks unless explicitly requested.
+- Do not commit or push without explicit user approval.

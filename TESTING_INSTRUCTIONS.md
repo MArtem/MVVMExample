@@ -29,8 +29,12 @@ Active verification policy for `MVVMExample`.
 git diff --check
 
 # project structure
-xcodebuild -list -project MVVMExample.xcodeproj
+xcodebuild -list -project MVVMExample.xcodeproj -derivedDataPath /Users/Artem/.zenflow/worktrees/.xcode-derived-data/MVVMExample -clonedSourcePackagesDirPath /Users/Artem/.zenflow/worktrees/.xcode-package-cache/MVVMExample
 
 # build, when approved/needed
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath /Users/Artem/.zenflow/worktrees/.xcode-derived-data/MVVMExample -clonedSourcePackagesDirPath /Users/Artem/.zenflow/worktrees/.xcode-package-cache/MVVMExample CODE_SIGNING_ALLOWED=NO build
 ```
+
+
+## Sandbox Requirement
+All build/test artifacts, DerivedData, cloned package state, logs, and temporary outputs must stay under `/Users/Artem/.zenflow`. Do not use `/Users/Artem/Library`, `/tmp`, or global SwiftPM/Xcode caches.

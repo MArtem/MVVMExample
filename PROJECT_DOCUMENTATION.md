@@ -21,7 +21,9 @@ When starting or resuming work in this worktree, read in this order:
 5. `./docs/CURRENT_USER_OVERRIDES.md`
 6. `./docs/AGENT_RULES.md`
 7. `./docs/WORK_CONTINUITY.md`
-8. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
+8. `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
+9. `./docs/MODEL_ROUTING_RULE.md`
+10. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
 
 For context transfer, include this exact rule:
 **"перечитать весь актуальный набор документации и правил для этого worktree и task-контекста"**.
@@ -41,7 +43,7 @@ The project is demo/pre-production. Test API usage is allowed only when configur
 - UI state approach: SwiftUI + `@Observable` ViewModels where the feature owns async state or navigation intent
 - ViewModel API: explicit intent methods, not default `send(_ action:)`
 - Persistence: in-memory session store for demo mode; production persistence policy is not approved yet
-- Networking/API: environment-owned configuration through standalone neutral packages
+- Networking/API: environment-owned configuration through app-local `LocalSupport` primitives copied from the reusable baseline
 - Localization: user-facing strings should flow through localization helpers/resources rather than ad-hoc literals
 - Architecture constraints: keep the example small, explicit, educational, and avoid speculative layers
 
@@ -59,7 +61,7 @@ Owns the minimal app-local copies of infrastructure mechanics currently needed b
 - remote image loading/cache primitives
 - Liquid Glass availability/fallback helpers
 
-This project intentionally does not keep standalone package folders locally. Reusable package source is preserved in the TchopApp `./PackagesForReuse` vault and can be copied into a project later when package-mode adoption is explicitly desired.
+This project intentionally does not keep standalone package folders locally. Reusable rules and source context are tracked through the central documentation vault at `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault`; package-mode adoption requires explicit user approval before recreating `./Packages`.
 
 ### `./docs/` and `./.codex/skills/`
 Own reusable production baseline, prompt presets, skills, and static quality gates.
@@ -74,3 +76,9 @@ Current task/user overrides live in `./docs/CURRENT_USER_OVERRIDES.md`.
 
 ### Local Liquid Glass support
 `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/AppGlassUI/` owns the local Liquid Glass availability/fallback helper. App code still owns `AppTheme`, surface placement, and interaction/accessibility semantics.
+
+
+## Documentation Vault Ownership
+- Reusable/cross-project docs: `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/reusable/`
+- MVVMExample app-specific docs: `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/apps/MVVMExample/`
+- Cross-app context must be read through `documentation-vault/apps/<AppName>/`; do not copy TchopApp-specific rules into MVVMExample docs.

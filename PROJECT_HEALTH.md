@@ -10,7 +10,7 @@ Use it to decide:
 - what risks are known
 
 ## Root Rule
-This project currently keeps only minimal app-local infrastructure support under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport` to avoid duplicating reusable package folders. Reusable package source is maintained in the TchopApp package vault; app-specific demo behavior, UI composition, feature contracts, and DummyJSON mapping stay in the app layer.
+This project currently keeps only minimal app-local infrastructure support under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport` to avoid duplicating reusable package folders. Reusable/cross-app rules and source context are maintained in `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault`; app-specific demo behavior, UI composition, feature contracts, and DummyJSON mapping stay in the app layer.
 
 ## Current Project Shape
 - App target: `MVVMExample`
@@ -71,9 +71,13 @@ git diff --check
 xcodebuild -list -project MVVMExample.xcodeproj
 
 # build, when Swift/package/project code changes
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /Users/Artem/.zenflow/worktrees/.xcode-derived-data/MVVMExample -clonedSourcePackagesDirPath /Users/Artem/.zenflow/worktrees/.xcode-package-cache/MVVMExample CODE_SIGNING_ALLOWED=NO build
 ```
 
 
 ### Local Liquid Glass support
 `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/AppGlassUI/` owns Liquid Glass availability and fallback chrome mechanics. App code owns semantic colors, layout, and feature-specific visual policy.
+
+
+## Documentation Vault Risk
+Durable MVVMExample documentation must be synchronized with `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/apps/MVVMExample/`. Reusable documentation updates must also be synchronized with `documentation-vault/reusable/`.

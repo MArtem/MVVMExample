@@ -8,7 +8,7 @@
 ./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/
 ```
 
-This avoids duplicating the reusable package source already maintained by the TchopApp `./PackagesForReuse` vault.
+This avoids duplicating reusable package source in this app worktree. Reusable and cross-app source context is tracked through `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/reusable/`.
 
 ## Local Support Areas
 
@@ -22,7 +22,7 @@ This avoids duplicating the reusable package source already maintained by the Tc
 
 ## Future Package Adoption
 
-If this project later needs true SwiftPM package mode, copy the relevant package from TchopApp `./PackagesForReuse` into this worktree and wire only that package into Xcode. Until then, do not recreate `./Packages` here.
+If this project later needs true SwiftPM package mode, use the reusable documentation vault as source context and require explicit user approval before copying/wiring packages into this worktree. Until then, do not recreate `./Packages` here.
 
 ## Stop Rules
 

@@ -4,11 +4,11 @@
 Every working, status, readiness, confirmation, task-orientation, planning, or clarification response must start with:
 
 - **Модель:** current model
-- **Active phase:** current phase
-- **Файлы смотришь/меняешь:** files being inspected/changed, or `none` if no files
+- **Фаза:** current phase
+- **Файлы:** files being inspected/changed, or `none` if no files
 - **Следующий безопасный шаг:** next safe step
-- **Нужна ли сборка:** yes/no and why
-- **Sandbox:** active worktree/sandbox confirmation
+- **Build/tests:** whether build/tests are needed and why
+- **Sandbox:** confirmation that all project work stays inside `/Users/Artem/.zenflow`
 
 Short answers such as “готов”, “да, всё ясно”, “готов к новым задачам”, or “можешь присылать” are not exempt.
 
@@ -21,19 +21,29 @@ Before code, docs, git, or project changes, read:
 5. `./docs/CURRENT_USER_OVERRIDES.md`
 6. `./docs/AGENT_RULES.md`
 7. `./docs/WORK_CONTINUITY.md`
-8. current Zenflow task plan if present
+8. `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
+9. `./docs/MODEL_ROUTING_RULE.md`
+10. current Zenflow task plan if present
 
 ## Filesystem Sandbox
-- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow/worktrees`.
-- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow/worktrees` for project work.
-- If a tool defaults outside the worktrees sandbox, override its output/cache/DerivedData paths before running it.
+- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow`.
+- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow` for project work.
+- If a tool defaults outside the Zenflow sandbox, override its output/cache/DerivedData paths before running it.
+
+
+## Model Routing
+- Apply `./docs/MODEL_ROUTING_RULE.md` before code, docs, git, or project changes.
+- Use `GPT-5.5` for planning, architecture, persistence, concurrency, navigation, state ownership, public APIs, package/app boundaries, security/privacy, data-loss/sync, performance-sensitive work, Xcode/app runtime integration, and high-risk final review.
+- Use `GPT-5.4` only for approved low-risk execution where architecture and ownership are already decided.
+- Before editing, classify the task as required by `./docs/MODEL_ROUTING_RULE.md`.
 
 ## Current Project Mode
 - `MVVMExample` is an imported SwiftUI MVVM demo/pre-production app, not the old clean starter baseline.
 - Do not continue old `TaskDemo` / `TaskDemoViewModel` / behavior-test plans.
 - The app may use DummyJSON/test API and demo credentials only under explicit debug/demo policy.
 - Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
-- Reusable neutral infrastructure belongs under `./Packages/<AppPackage>/` and must use generic `App*` naming, not project/vendor-specific branding such as `Tchop*`.
+- This worktree intentionally uses app-local infrastructure under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/`; do not reintroduce `./Packages/AppInfrastructure` unless the user explicitly approves package-mode adoption again.
+- Reusable/cross-app source context belongs in `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault`, separated into `reusable/` and `apps/<AppName>/`.
 
 
 ## Product-Staff Quality Bar Rule

@@ -9,7 +9,9 @@ Entry point for active project documentation, production standards, prompt prese
 3. `./docs/CURRENT_USER_OVERRIDES.md`
 4. `./docs/AGENT_RULES.md`
 5. `./docs/WORK_CONTINUITY.md`
-6. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
+6. `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
+7. `./docs/MODEL_ROUTING_RULE.md`
+8. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
 7. scope-specific docs from this index
 
 ## Mandatory Active Documentation Index
@@ -22,6 +24,8 @@ Entry point for active project documentation, production standards, prompt prese
 - `./docs/AGENT_RULES.md`
 - `./docs/WORK_CONTINUITY.md`
 - `./docs/CURRENT_USER_OVERRIDES.md`
+- `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
+- `./docs/MODEL_ROUTING_RULE.md`
 
 ### Reusable Production Standards
 - `./docs/IOS_PRODUCTION_FRAMEWORK.md`
@@ -40,3 +44,10 @@ Entry point for active project documentation, production standards, prompt prese
 ### App-Specific Docs
 - `./docs/PACKAGE_USAGE_IN_MVVMEXAMPLE.md`
 Add app-specific docs here after the product shape is known.
+
+
+### Documentation Vault
+- Central git-backed vault: `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault`
+- Reusable rules/prompts/templates/scripts belong under `documentation-vault/reusable/`.
+- MVVMExample-specific durable docs belong under `documentation-vault/apps/MVVMExample/`.
+- Do not copy TchopApp-specific docs into MVVMExample docs; read cross-app context through `documentation-vault/apps/<AppName>/`.

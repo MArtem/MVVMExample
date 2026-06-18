@@ -10,11 +10,11 @@ They extend the active documentation set with reusable workflows for feature gen
 Before applying any prompt here, apply the current project/task rules first:
 
 1. Read the active docs/rules from `../README.md` when bootstrapping or when documentation state is refreshed.
-2. For this worktree/task, use `GPT-5.5` unless the user explicitly changes the model again.
+2. For this worktree/task, apply `./docs/MODEL_ROUTING_RULE.md`; do not use the old GPT-5.5-for-all rule.
 3. Do not add speculative UI, logic, tests, layers, protocols, UseCases, factories, or adapters.
 4. Tests are not written or run by default. Use test prompts only when the user explicitly asks for tests, test review, flaky-test diagnosis, or when a separately justified verification strategy requires it.
 5. Repository protocols, ViewState, and extra layers are allowed only when they protect a real boundary or solve a concrete current problem. UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate; use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
-6. SwiftUI design work from screenshots/Figma/PDF/CSS uses `GPT-5.5` and must stay pixel-focused.
+6. SwiftUI design work from screenshots/Figma/PDF/CSS uses `GPT-5.5` unless the user explicitly relaxes that requirement, and must stay pixel-focused.
 7. Verification commands follow `../../TESTING_INSTRUCTIONS.md`; do not run builds/tests unless the user asks or the current agreed verification policy allows it.
 8. Preserve `MVVMExample` conventions, design tokens, localization, SwiftData-first persistence, and feed/composer card contract.
 
@@ -74,6 +74,6 @@ Before applying any prompt here, apply the current project/task rules first:
 
 - Several prompts recommend generating tests as part of feature work. In this project, tests remain opt-in unless the user explicitly asks.
 - Several prompts mention repository protocols and Action enums as defaults. In this project, repository protocols are allowed only at real seams, and UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate. Use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
-- The imported model-routing material said to use the cheapest reliable model. Current task override is stricter: use `GPT-5.5` until the user explicitly changes it.
+- Apply the active `./docs/MODEL_ROUTING_RULE.md`; GPT-5.4 is allowed only for approved low-risk execution, while GPT-5.5 remains required for planning/high-risk work.
 - The prompts are generic iOS production templates. Existing `MVVMExample` architecture, task rules, feed/composer contract, localization, design tokens, and verification policy are higher priority.
 - Evidence-based completion prompt is mandatory before claiming work is done when verification is non-trivial.

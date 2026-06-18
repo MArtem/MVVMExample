@@ -5,6 +5,10 @@ This file is the short mandatory rule set for coding work in `MVVMExample`.
 
 Use `docs/IOS_ARCHITECTURE_REFERENCE.md` as **reference**, not as a mechanical checklist. Use `docs/PRODUCTION_QUALITY_GATES.md` and `docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md` as mandatory quality gates/checklists for implementation, refactor, and review work.
 
+## Model Routing Rule
+- Apply `./docs/MODEL_ROUTING_RULE.md` before non-trivial code, docs, git, or project changes.
+- Classify tasks before editing. Use `GPT-5.5` for planning/high-risk work and `GPT-5.4` only for approved low-risk execution.
+
 ## Core Decision Rule
 Always choose the **simplest correct solution** that matches:
 1. existing project architecture
@@ -15,9 +19,9 @@ Always choose the **simplest correct solution** that matches:
 Do not add abstractions unless they solve a concrete current problem.
 
 ## Filesystem Sandbox Rule
-- All project work must stay inside `/Users/Artem/.zenflow/worktrees`.
-- Never write build artifacts, package caches, Xcode DerivedData, cloned package state, logs, temporary package verification output, or project traces outside `/Users/Artem/.zenflow/worktrees`.
-- Before running tools that normally use global caches or DerivedData, override their output/cache paths to `/Users/Artem/.zenflow/worktrees/...`.
+- All project work must stay inside `/Users/Artem/.zenflow`.
+- Never write build artifacts, package caches, Xcode DerivedData, cloned package state, logs, temporary package verification output, or project traces outside `/Users/Artem/.zenflow`.
+- Before running tools that normally use global caches or DerivedData, override their output/cache paths to `/Users/Artem/.zenflow/...`.
 - Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any other external location for project work.
 
 

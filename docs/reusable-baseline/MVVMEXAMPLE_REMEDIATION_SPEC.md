@@ -1,3 +1,15 @@
+# Deprecated Historical Spec
+
+This file is retained only as historical context for the earlier package-boundary remediation phase. It is not the active MVVMExample architecture rule.
+
+Current active decision:
+- `MVVMExample` does not keep local Swift Package folders.
+- Approved infrastructure lives under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/`.
+- Do not reintroduce `./Packages/AppInfrastructure` unless the user explicitly approves package-mode adoption again.
+- Current rules are `./AGENTS.md`, `./docs/MODEL_ROUTING_RULE.md`, `./PROJECT_DOCUMENTATION.md`, `./PROJECT_HEALTH.md`, and `./docs/PACKAGE_USAGE_IN_MVVMEXAMPLE.md`.
+
+---
+
 # MVVMExample Remediation Spec
 
 ## Purpose

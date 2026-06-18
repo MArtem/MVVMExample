@@ -67,7 +67,7 @@ Every meaningful change must be checked against these areas.
 ### Architecture And Abstractions
 - No speculative layers, protocols, factories, adapters, managers, UseCases, services, or per-view models without one concrete current problem.
 - App-specific product policy stays in `./MVVMExample`.
-- Reusable entity-agnostic mechanics belong in `./Packages/<AppPackage>`.
+- Reusable or app-local entity-agnostic mechanics must follow the approved project ownership; in MVVMExample, current app-local support belongs in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
 - Package APIs should be used directly when they already fit; do not wrap them decoratively.
 - Use `./docs/IOS_UI_STATE_RENDERING_STANDARD.md` as the decision gate before adding a dedicated model/view model to any view.
 

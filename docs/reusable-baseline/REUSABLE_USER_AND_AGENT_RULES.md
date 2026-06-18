@@ -3,19 +3,29 @@
 ## Purpose
 Portable non-app-specific rules extracted from the current worktree preferences. Use this as the starting baseline for a new iOS project before app-specific rules exist.
 
-## Model Rule
-- Use and report `GPT-5.5` unless the user explicitly changes the model.
-- UI/design work from screenshots, Figma, PDF, SVG, CSS, or visual references must use `GPT-5.5`.
+## Model Routing Rule
+- Apply `./docs/MODEL_ROUTING_RULE.md` after project-specific overrides are loaded.
+- Use `GPT-5.4` for approved-plan, routine, low-risk implementation where architecture and ownership are already decided.
+- Use `GPT-5.5` for planning, architecture, persistence, concurrency, navigation, state ownership, public APIs, module/package boundaries, security/privacy, data-loss/sync, performance-sensitive decisions, package adoption, app runtime/Xcode integration, and high-risk final reviews.
+- Before editing code or documentation, classify the task as `GPT-5.5 Planning Required`, `GPT-5.4 Execution Only`, `GPT-5.4 Execution + GPT-5.5 Final Review`, or `GPT-5.5 Full Task Required`, with 3–5 bullets.
+- UI/design work from screenshots, Figma, PDF, SVG, CSS, visual references, or pixel-perfect comparison must use `GPT-5.5` unless the user explicitly relaxes that requirement.
 
 ## Working Response Header
 Every working response should start with:
-- model
-- active phase
-- files being inspected/changed
-- next safe step
-- whether a build is needed
-- sandbox/worktree confirmation
+- **Модель:** current model
+- **Фаза:** current phase
+- **Файлы:** files being inspected/changed, or `none`
+- **Следующий безопасный шаг:** next safe step
+- **Build/tests:** whether build/tests are needed and why
+- **Sandbox:** confirmation that work stays inside the active Zenflow sandbox
 - Readiness/status answers such as “готов к новым задачам” are not exempt.
+
+## Filesystem Sandbox Rule
+- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside the active Zenflow sandbox.
+- For Artem's local environment, the hard boundary is `/Users/Artem/.zenflow`.
+- Never use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any other path outside the active Zenflow sandbox for project work.
+- If a tool defaults outside the Zenflow sandbox, override its output/cache/DerivedData paths before running it.
+- The only allowed external filesystem action is deleting previously created project traces outside the sandbox when the user explicitly requests cleanup.
 
 ## MVVM ViewModel API Rule
 - ViewModels expose explicit intent methods by default.
@@ -27,6 +37,21 @@ Every working response should start with:
 - Do not add speculative UI, speculative business logic, decorative wrappers, or extra abstractions.
 - Prefer the simplest correct implementation that preserves runtime correctness, UX, and maintainability.
 - New protocols, factories, adapters, use cases, services, per-view models, or managers require one concrete current problem.
+
+
+## Product-Staff Quality Bar
+- Never lower the engineering bar because a project is described as demo, test, sample, prototype, imported, or pre-production; those words may only describe configuration/risk context, not code quality.
+- Treat every authored or reviewed code path as product-staff-level production code: correct ownership, explicit state, clear failure behavior, performance-aware rendering, privacy-safe logging, accessibility, localization, and supportable verification.
+- Do not wait for Instruments/profilers before fixing statically obvious performance or memory issues. Use profiling to prove behavior, compare alternatives, or validate non-obvious risks, not as an excuse to leave avoidable redraws, broad invalidation, main-thread work, unbounded caches, or lifecycle leaks.
+- Maximize quality through the simplest correct design: improve hot paths, state ownership, and error handling without adding decorative protocols, wrappers, factories, use cases, or interfaces.
+
+
+## Audit / Planning Scope Rule
+- When the user asks to review, audit, inspect a project/code area, evaluate requirements, or plan a task, provide the fullest unbiased high-quality analysis available, even for very small code.
+- Do not silently simplify, defer, dismiss, or complicate scope on the user's behalf. The assistant must surface the full relevant concern set and let the user decide what to execute.
+- Always prioritize findings and recommendations as `must do now`, `should do next`, `later / only if needed`, and `do not do / overengineering for this scope` where applicable.
+- If a concern is intentionally not investigated, state it as an explicit remaining risk; never imply it is irrelevant because the project is small, early, demo-like, or because the assistant judged it unnecessary.
+- During implementation, only execute the scope the user approved, but keep unexecuted review/planning concerns visible as remaining risks or backlog candidates.
 
 ## Testing And Verification Defaults
 - Do not write or modify tests unless the user explicitly opens a test-writing phase or asks to fix a specific failing test.
