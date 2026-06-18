@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F60718293A4B5C /* InfrastructureSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */; };
 		C4F3A391D952F421E2E90474 /* APIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153F7E99C93C7E8DFA65FF7B /* APIConfiguration.swift */; };
 		3D3FA0221683AA8DAEB136CB /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A417123381D3707D7AC8CE9 /* SessionStore.swift */; };
 		3458746BC90D282B559429AB /* AppAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27E656D996193F5444E29C40 /* AppAPIError.swift */; };
@@ -130,6 +131,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B1D7F9A28B8E41EF9F3D0001 /* MVVMExampleUI.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = MVVMExampleUI.xctestplan; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfrastructureSupportTests.swift; sourceTree = "<group>"; };
 		153F7E99C93C7E8DFA65FF7B /* APIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIConfiguration.swift; sourceTree = "<group>"; };
 		5A417123381D3707D7AC8CE9 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		27E656D996193F5444E29C40 /* AppAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAPIError.swift; sourceTree = "<group>"; };
@@ -271,12 +274,22 @@
 			isa = PBXGroup;
 			children = (
 				3972C837981E75F303A8B98B /* MVVMExampleSmokeTests.swift */,
+				A1B2C3D4E5F60718293A4B5E /* Infrastructure */,
 				4C27A54B1C1FA3F2E13DC5ED /* Profile */,
 				C78AB61F17E78806203E55EA /* News */,
 				56A910C47556AE9C79387194 /* Auth */,
 			);
 			name = MVVMExampleTests;
 			path = MVVMExampleTests;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4B5E /* Infrastructure */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */,
+			);
+			name = Infrastructure;
+			path = Infrastructure;
 			sourceTree = "<group>";
 		};
 		1523E59A577ECCC23E74791D /* iOS */ = {
@@ -332,6 +345,7 @@
 				4BE77D164565352F7FCCDCCF /* Packages */,
 				07A8129D465A6CE5DCB047EB /* MVVMExampleTests */,
 				F260BC42D25DC5EFE19F2863 /* MVVMExample.xctestplan */,
+				B1D7F9A28B8E41EF9F3D0001 /* MVVMExampleUI.xctestplan */,
 				D92C72233422E9C0AD5C31FF /* MVVMExampleUITests */,
 			);
 			sourceTree = "<group>";
@@ -1069,6 +1083,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F60718293A4B5C /* InfrastructureSupportTests.swift in Sources */,
 				B8C0CE896445844E887816E5 /* MVVMExampleSmokeTests.swift in Sources */,
 				49FCED3DAEE5BBC87F2F6131 /* ProfileEditViewModelTests.swift in Sources */,
 				00E6825C299D1E7AC2D3C76D /* NewsListViewModelTests.swift in Sources */,

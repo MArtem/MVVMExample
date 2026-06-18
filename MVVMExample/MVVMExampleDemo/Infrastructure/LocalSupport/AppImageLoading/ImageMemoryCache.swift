@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 /// Bounded in-memory image cache for already-downsampled UI images.
 ///
 /// Thread safety:
@@ -7,26 +11,48 @@ import Foundation
 ///
 /// Invariant:
 /// Store images after downsampling to the intended render size, not original remote dimensions.
-public final class ImageMemoryCache: @unchecked Sendable {
-    public static let shared = ImageMemoryCache()
+final class ImageMemoryCache: @unchecked Sendable {
+    static let shared = ImageMemoryCache()
 
     private let cache = NSCache<NSString, AppPlatformImage>()
 
-    public init(countLimit: Int = 200, totalCostLimit: Int = 48 * 1024 * 1024) {
+    #if canImport(UIKit)
+    private var memoryWarningObserver: NSObjectProtocol?
+    #endif
+
+    init(countLimit: Int = 200, totalCostLimit: Int = 48 * 1024 * 1024) {
         cache.countLimit = countLimit
         cache.totalCostLimit = totalCostLimit
+
+        #if canImport(UIKit)
+        memoryWarningObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.removeAll()
+        }
+        #endif
     }
 
-    public func image(forKey key: String) -> AppPlatformImage? {
+    deinit {
+        #if canImport(UIKit)
+        if let memoryWarningObserver {
+            NotificationCenter.default.removeObserver(memoryWarningObserver)
+        }
+        #endif
+    }
+
+    func image(forKey key: String) -> AppPlatformImage? {
         cache.object(forKey: key as NSString)
     }
 
-    public func insert(_ image: AppPlatformImage, forKey key: String) {
+    func insert(_ image: AppPlatformImage, forKey key: String) {
         let cost = Self.estimatedCost(for: image)
         cache.setObject(image, forKey: key as NSString, cost: cost)
     }
 
-    public func removeAll() {
+    func removeAll() {
         cache.removeAllObjects()
     }
 

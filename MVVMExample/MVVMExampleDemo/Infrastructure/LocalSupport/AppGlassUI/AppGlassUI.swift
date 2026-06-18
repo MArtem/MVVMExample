@@ -5,16 +5,16 @@ import SwiftUI
 /// Responsibilities:
 /// - use native `GlassEffectContainer` on iOS versions that provide it;
 /// - preserve the original view hierarchy on older OS versions and non-iOS platforms;
-/// - keep app-specific color/token decisions outside the package.
+/// - keep app-specific color/token decisions outside this helper.
 ///
 /// Ownership:
-/// Created directly by host SwiftUI composition where related glass chrome elements should share a visual group.
-public struct AppGlassContainer<Content: View>: View {
+/// Created directly by SwiftUI composition where related glass chrome elements should share a visual group.
+struct AppGlassContainer<Content: View>: View {
     private let spacing: CGFloat?
     private let content: () -> Content
 
     /// Creates a glass container that falls back to a plain view hierarchy where native Liquid Glass is unavailable.
-    public init(
+    init(
         spacing: CGFloat? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
@@ -23,7 +23,7 @@ public struct AppGlassContainer<Content: View>: View {
     }
 
     /// Builds either native grouped glass chrome or the unchanged host content tree.
-    public var body: some View {
+    var body: some View {
         #if os(iOS)
         if #available(iOS 26.0, *) {
             GlassEffectContainer(spacing: spacing) {
@@ -40,19 +40,19 @@ public struct AppGlassContainer<Content: View>: View {
 
 /// Platform-neutral style input for glass-backed chrome surfaces.
 ///
-/// The package owns availability/fallback mechanics. Host apps own semantic token resolution and pass concrete colors.
-public struct AppGlassChromeStyle: Sendable {
-    public let glassTint: Color?
-    public let glassStroke: Color?
-    public let fallbackBackground: Color
-    public let fallbackShadowColor: Color
-    public let fallbackShadowRadius: CGFloat
-    public let fallbackShadowX: CGFloat
-    public let fallbackShadowY: CGFloat
-    public let interactive: Bool
+/// LocalSupport owns availability/fallback mechanics. App design-system code owns semantic token resolution and passes concrete colors.
+struct AppGlassChromeStyle: Sendable {
+    let glassTint: Color?
+    let glassStroke: Color?
+    let fallbackBackground: Color
+    let fallbackShadowColor: Color
+    let fallbackShadowRadius: CGFloat
+    let fallbackShadowX: CGFloat
+    let fallbackShadowY: CGFloat
+    let interactive: Bool
 
     /// Creates a chrome style for one host-owned visual role.
-    public init(
+    init(
         glassTint: Color? = nil,
         glassStroke: Color? = nil,
         fallbackBackground: Color,
@@ -120,7 +120,7 @@ private struct AppGlassChromeModifier<ChromeShape: Shape>: ViewModifier {
     }
 }
 
-public extension View {
+extension View {
     /// Styles a chrome surface with native Liquid Glass on supported iOS versions and a caller-supplied fallback elsewhere.
     ///
     /// External usage:

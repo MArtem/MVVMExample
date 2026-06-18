@@ -2,10 +2,10 @@ import Foundation
 
 typealias APIError = AppAPIError
 
-/// App-owned bridge from reusable API configuration to standalone networking configuration.
+/// App-owned bridge from runtime API configuration to app-local networking configuration.
 ///
 /// Rationale:
-/// `AppNetworking` must remain a single-folder standalone package, so product/runtime configuration is adapted at the app boundary.
+/// Product/runtime configuration is adapted at this app boundary so feature repositories depend on one local `APIClient` contract.
 extension APIConfiguration {
     var networkClientConfiguration: NetworkClientConfiguration {
         NetworkClientConfiguration(
@@ -26,7 +26,7 @@ private extension APIRetryPolicy {
     }
 }
 
-/// App-owned bridge from standalone network failures to the app error taxonomy.
+/// App-owned bridge from network failures to the app error taxonomy.
 ///
 /// External usage:
 /// Inject into `URLSessionNetworkClient` during app dependency composition so feature ViewModels continue to receive `AppAPIError`.

@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Boundary rule:
 /// Technical details can be logged, but UI should map these cases through a host-app error mapper instead of showing raw `localizedDescription`.
-public enum AppAPIError: LocalizedError, Equatable {
+enum AppAPIError: LocalizedError, Equatable {
     case invalidURL
     case invalidResponse
     case offline
@@ -17,7 +17,7 @@ public enum AppAPIError: LocalizedError, Equatable {
     case decoding(String)
     case transport(String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .invalidURL:
             return "Invalid URL."

@@ -4,10 +4,10 @@ import Foundation
 import UIKit
 
 /// Platform image type used by image-loading infrastructure on iOS-family platforms.
-public typealias AppPlatformImage = UIImage
+typealias AppPlatformImage = UIImage
 #elseif canImport(AppKit)
 import AppKit
 
 /// Platform image type used by image-loading infrastructure on macOS package tests.
-public typealias AppPlatformImage = NSImage
+typealias AppPlatformImage = NSImage
 #endif

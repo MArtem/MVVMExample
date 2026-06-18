@@ -1,7 +1,7 @@
 import Foundation
 
 /// Performs a retry delay requested by `NetworkRetryPolicy`.
-public typealias NetworkRetrySleeper = @Sendable (_ delaySeconds: TimeInterval) async throws -> Void
+typealias NetworkRetrySleeper = @Sendable (_ delaySeconds: TimeInterval) async throws -> Void
 
 /// URLSession-backed implementation of `NetworkClient`.
 ///
@@ -13,7 +13,7 @@ public typealias NetworkRetrySleeper = @Sendable (_ delaySeconds: TimeInterval) 
 ///
 /// Concurrency:
 /// Individual requests are cancellable through Swift concurrency. Cancellation is surfaced through the configured error mapper.
-public final class URLSessionNetworkClient: NetworkClient {
+final class URLSessionNetworkClient: NetworkClient {
     private let configuration: NetworkClientConfiguration
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -21,7 +21,7 @@ public final class URLSessionNetworkClient: NetworkClient {
     private let errorMapping: NetworkErrorMapping
     private let retrySleeper: NetworkRetrySleeper
 
-    public init(
+    init(
         configuration: NetworkClientConfiguration,
         session: URLSession = .shared,
         decoder: JSONDecoder = JSONDecoder(),
@@ -46,7 +46,7 @@ public final class URLSessionNetworkClient: NetworkClient {
     ///
     /// Side effects:
     /// May perform bounded retries for idempotent GET requests according to configuration.
-    public func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
+    func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
         var attempt = 0
         while true {
             do {

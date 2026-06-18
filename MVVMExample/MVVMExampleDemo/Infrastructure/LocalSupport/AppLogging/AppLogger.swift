@@ -1,31 +1,31 @@
 import Foundation
 
-/// Minimal logging boundary for reusable infrastructure.
+/// Minimal logging boundary for app-local infrastructure.
 ///
 /// Invariant:
 /// Callers must pass only redacted or redactable metadata; credentials and tokens must never be logged intentionally.
-public protocol AppLogger: Sendable {
+protocol AppLogger: Sendable {
     func log(_ message: @autoclosure () -> String)
 }
 
-public struct NoOpAppLogger: AppLogger {
-    public init() {}
-    public func log(_ message: @autoclosure () -> String) {}
+struct NoOpAppLogger: AppLogger {
+    init() {}
+    func log(_ message: @autoclosure () -> String) {}
 }
 
 /// Logger adapter that redacts common credential-like fragments before sending messages to the sink.
-public struct RedactingAppLogger: AppLogger {
+struct RedactingAppLogger: AppLogger {
     private let sink: @Sendable (String) -> Void
 
-    public init(sink: @escaping @Sendable (String) -> Void) {
+    init(sink: @escaping @Sendable (String) -> Void) {
         self.sink = sink
     }
 
-    public func log(_ message: @autoclosure () -> String) {
+    func log(_ message: @autoclosure () -> String) {
         sink(Self.redact(message()))
     }
 
-    public static func redact(_ value: String) -> String {
+    static func redact(_ value: String) -> String {
         var result = value
         let sensitiveKeys = ["authorization", "accessToken", "refreshToken", "password", "token"]
         for key in sensitiveKeys {

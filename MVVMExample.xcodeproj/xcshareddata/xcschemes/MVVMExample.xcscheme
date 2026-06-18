@@ -34,6 +34,9 @@
             reference = "container:MVVMExample.xctestplan"
             default = "YES">
          </TestPlanReference>
+         <TestPlanReference
+            reference = "container:MVVMExampleUI.xctestplan">
+         </TestPlanReference>
       </TestPlans>
       <Testables>
          <TestableReference

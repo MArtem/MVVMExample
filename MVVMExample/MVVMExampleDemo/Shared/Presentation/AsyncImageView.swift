@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// App-level wrapper around the reusable cached image loader.
+/// App-level wrapper around the LocalSupport cached image loader.
 ///
 /// Responsibilities:
 /// - applies app design-system placeholder/failure UI;
 /// - keeps caller API small for feature views;
-/// - delegates loading, caching, downsampling, and cancellation to `AppImageLoading`.
+/// - delegates loading, caching, downsampling, and cancellation to LocalSupport image primitives.
 struct AsyncImageView: View {
     let url: URL?
     let width: CGFloat?

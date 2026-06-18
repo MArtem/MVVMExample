@@ -13,7 +13,7 @@ import AppKit
 ///
 /// Important:
 /// This view owns only transient UI image state; it does not own global cache policy beyond the injected pipeline.
-public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
+struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
     private let url: URL?
     private let targetSize: CGSize
     private let contentMode: ContentMode
@@ -25,7 +25,7 @@ public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
     @State private var image: AppPlatformImage?
     @State private var didFail = false
 
-    public init(
+    init(
         url: URL?,
         targetSize: CGSize,
         contentMode: ContentMode = .fill,
@@ -41,7 +41,7 @@ public struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
         self.failure = failure
     }
 
-    public var body: some View {
+    var body: some View {
         content
             .frame(width: targetSize.width, height: targetSize.height)
             .clipped()

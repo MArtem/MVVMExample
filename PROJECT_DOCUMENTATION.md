@@ -66,6 +66,13 @@ This project intentionally does not keep standalone package folders locally. Reu
 ### `./docs/` and `./.codex/skills/`
 Own reusable production baseline, prompt presets, skills, and static quality gates.
 
+
+## Test And Release Readiness
+- Fast deterministic unit tests live in `./MVVMExample.xctestplan`.
+- UI accessibility smoke tests live in `./MVVMExampleUI.xctestplan` and are not part of the default unit lane.
+- `./scripts/verify.sh` owns the supported local verification commands and keeps DerivedData/package cache output inside `/Users/Artem/.zenflow`.
+- The app is not release-ready until a separate release phase establishes signing, bundle identity, privacy manifest, analytics/crash routing, and rollout/rollback policy.
+
 ## Current Task Overrides
 Current task/user overrides live in `./docs/CURRENT_USER_OVERRIDES.md`.
 

@@ -16,11 +16,11 @@ import AppKit
 ///
 /// Errors:
 /// Throws `RemoteImagePipelineError.invalidResponse` for non-2xx responses and `RemoteImagePipelineError.decodingFailed` for invalid image data.
-public enum RemoteImagePipelineError: LocalizedError, Equatable, Sendable {
+enum RemoteImagePipelineError: LocalizedError, Equatable, Sendable {
     case invalidResponse
     case decodingFailed
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .invalidResponse:
             return "Invalid image response."
@@ -30,28 +30,45 @@ public enum RemoteImagePipelineError: LocalizedError, Equatable, Sendable {
     }
 }
 
-public struct RemoteImagePipeline: Sendable {
-    public static let shared = RemoteImagePipeline()
+struct RemoteImagePipeline: Sendable {
+    static let shared = RemoteImagePipeline()
 
     private let session: URLSession
     private let cache: ImageMemoryCache
 
-    public init(
-        session: URLSession = .shared,
+    init(
+        session: URLSession = URLSession(configuration: Self.defaultSessionConfiguration()),
         cache: ImageMemoryCache = .shared
     ) {
         self.session = session
         self.cache = cache
     }
 
+    /// Creates the default image session policy.
+    ///
+    /// The pipeline uses bounded memory/disk URL cache behavior instead of relying on
+    /// `URLSession.shared`, which makes cache ownership explicit for feed images.
+    static func defaultSessionConfiguration() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = URLCache(
+            memoryCapacity: 16 * 1024 * 1024,
+            diskCapacity: 96 * 1024 * 1024,
+            diskPath: "MVVMExampleRemoteImageURLCache"
+        )
+        configuration.requestCachePolicy = .returnCacheDataElseLoad
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
+        return configuration
+    }
+
     /// Loads an image for a concrete render size.
     ///
     /// External usage:
-    /// Called by reusable remote image views or feature-specific image prefetchers.
+    /// Called by app-local remote image views or feature-specific image prefetchers.
     ///
     /// Concurrency:
     /// Cancellation before decode/cache insert stops the load and avoids publishing stale work.
-    public func image(from url: URL, targetSize: CGSize, scale: CGFloat) async throws -> AppPlatformImage {
+    func image(from url: URL, targetSize: CGSize, scale: CGFloat) async throws -> AppPlatformImage {
         let cacheKey = Self.cacheKey(url: url, targetSize: targetSize, scale: scale)
         if let cached = cache.image(forKey: cacheKey) {
             return cached
@@ -70,7 +87,7 @@ public struct RemoteImagePipeline: Sendable {
         return image
     }
 
-    public static func cacheKey(url: URL, targetSize: CGSize, scale: CGFloat) -> String {
+    static func cacheKey(url: URL, targetSize: CGSize, scale: CGFloat) -> String {
         "\(url.absoluteString)|\(Int(targetSize.width * scale))x\(Int(targetSize.height * scale))"
     }
 

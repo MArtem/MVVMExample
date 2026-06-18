@@ -1,8 +1,8 @@
 {
   "configurations": [
     {
-      "id": "7D3C8A07-7F45-4A30-9B9B-9E7F30D4C111",
-      "name": "Unit Tests",
+      "id": "B1D7F9A2-8B8E-41EF-9F3D-UI0000000001",
+      "name": "UI Accessibility Smoke Tests",
       "options": {}
     }
   ],
@@ -17,11 +17,11 @@
   "testTargets": [
     {
       "enabled": true,
-      "parallelizable": true,
+      "parallelizable": false,
       "target": {
         "containerPath": "container:MVVMExample.xcodeproj",
-        "identifier": "177120BDB76CBC9039B9FB95",
-        "name": "MVVMExampleTests"
+        "identifier": "7C17E40D544DCA5DEFEA3454",
+        "name": "MVVMExampleUITests"
       }
     }
   ],

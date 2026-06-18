@@ -4,20 +4,20 @@ import Foundation
 ///
 /// Rationale:
 /// Call sites provide a default string key while the app target supplies real localization resources through `Localizable.xcstrings`.
-public enum AppStrings {
-    public static func text(_ keyAndDefaultValue: String) -> String {
+enum AppStrings {
+    static func text(_ keyAndDefaultValue: String) -> String {
         NSLocalizedString(keyAndDefaultValue, comment: "")
     }
 
-    public static func formatted(_ format: String, _ arguments: CVarArg...) -> String {
+    static func formatted(_ format: String, _ arguments: CVarArg...) -> String {
         String(format: text(format), locale: .current, arguments: arguments)
     }
 
-    public static func localizedNumber(_ value: Int) -> String {
+    static func localizedNumber(_ value: Int) -> String {
         NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
     }
 
-    public static func localizedNumber(_ value: Double, minimumFractionDigits: Int = 0, maximumFractionDigits: Int = 1) -> String {
+    static func localizedNumber(_ value: Double, minimumFractionDigits: Int = 0, maximumFractionDigits: Int = 1) -> String {
         let formatter = NumberFormatter()
         formatter.locale = .current
         formatter.numberStyle = .decimal

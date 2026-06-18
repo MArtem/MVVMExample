@@ -1,19 +1,22 @@
 import Foundation
 
-/// Runtime mode used by reusable infrastructure to distinguish demo-safe behavior from production behavior.
+/// Runtime mode used by app-local infrastructure to distinguish demo-safe behavior from production behavior.
 ///
 /// Invariant:
 /// Production runtime must not silently enable demo credentials, fake sessions, or test-only fallbacks.
-public enum AppRuntimeEnvironment: String, Sendable {
+enum AppRuntimeEnvironment: String, Sendable {
     case demo
     case production
 }
 
-public enum APIConfigurationError: LocalizedError, Equatable, Sendable {
+enum APIConfigurationError: LocalizedError, Equatable, Sendable {
+    case missingProductionBaseURL
     case invalidBaseURL(String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
+        case .missingProductionBaseURL:
+            return "MVVMEXAMPLE_API_BASE_URL is required when demo API fallback is disabled."
         case .invalidBaseURL(let value):
             return "Invalid API base URL: \(value)"
         }
@@ -26,14 +29,14 @@ public enum APIConfigurationError: LocalizedError, Equatable, Sendable {
 /// - owns base URL, timeout, retry, and demo-credential policy;
 /// - reads process environment at composition time;
 /// - does not own feature-specific API paths, DTOs, or credentials entered by users.
-public struct APIConfiguration: Sendable {
-    public let environment: AppRuntimeEnvironment
-    public let baseURL: URL
-    public let requestTimeout: TimeInterval
-    public let allowsDemoCredentials: Bool
-    public let retryPolicy: APIRetryPolicy
+struct APIConfiguration: Sendable {
+    let environment: AppRuntimeEnvironment
+    let baseURL: URL
+    let requestTimeout: TimeInterval
+    let allowsDemoCredentials: Bool
+    let retryPolicy: APIRetryPolicy
 
-    public init(
+    init(
         environment: AppRuntimeEnvironment,
         baseURL: URL,
         requestTimeout: TimeInterval,
@@ -59,16 +62,21 @@ public struct APIConfiguration: Sendable {
     /// - `MVVMEXAMPLE_API_BASE_URL`
     /// - `MVVMEXAMPLE_API_TIMEOUT_SECONDS`
     /// - `MVVMEXAMPLE_ALLOW_DEMO_CREDENTIALS`
-    public static func current(
+    static func current(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> APIConfiguration {
-        let baseURL: URL
         do {
-            baseURL = try makeBaseURL(from: environment)
+            return try make(environment: environment)
         } catch {
             preconditionFailure(error.localizedDescription)
         }
+    }
 
+    /// Builds configuration from injected environment values for deterministic tests and app composition.
+    ///
+    /// Missing API base URL is allowed only when demo credentials are allowed. In non-Debug
+    /// builds the default is production-safe and requires an explicit valid base URL.
+    static func make(environment: [String: String]) throws -> APIConfiguration {
         #if DEBUG
         let defaultAllowsDemoCredentials = true
         #else
@@ -78,6 +86,11 @@ public struct APIConfiguration: Sendable {
         let allowsDemoCredentials = environment["MVVMEXAMPLE_ALLOW_DEMO_CREDENTIALS"]
             .map { $0 == "1" || $0.lowercased() == "true" }
             ?? defaultAllowsDemoCredentials
+
+        let baseURL = try makeBaseURL(
+            from: environment,
+            allowsDemoFallback: allowsDemoCredentials
+        )
 
         let timeout = environment["MVVMEXAMPLE_API_TIMEOUT_SECONDS"]
             .flatMap(TimeInterval.init)
@@ -92,9 +105,15 @@ public struct APIConfiguration: Sendable {
         )
     }
 
-    public static func makeBaseURL(from environment: [String: String]) throws -> URL {
+    static func makeBaseURL(
+        from environment: [String: String],
+        allowsDemoFallback: Bool = true
+    ) throws -> URL {
         let fallbackDemoURL = URL(string: "https://dummyjson.com")!
         guard let configuredBaseURL = environment["MVVMEXAMPLE_API_BASE_URL"] else {
+            guard allowsDemoFallback else {
+                throw APIConfigurationError.missingProductionBaseURL
+            }
             return fallbackDemoURL
         }
 
@@ -115,16 +134,16 @@ public struct APIConfiguration: Sendable {
 ///
 /// Invariant:
 /// These credentials are valid only when `APIConfiguration.allowsDemoCredentials` is true.
-public struct DemoCredentials: Equatable, Sendable {
-    public let username: String
-    public let password: String
+struct DemoCredentials: Equatable, Sendable {
+    let username: String
+    let password: String
 
-    public init(username: String, password: String) {
+    init(username: String, password: String) {
         self.username = username
         self.password = password
     }
 
-    public static let dummyJSON = DemoCredentials(
+    static let dummyJSON = DemoCredentials(
         username: "emilys",
         password: "emilyspass"
     )
@@ -135,18 +154,18 @@ public struct DemoCredentials: Equatable, Sendable {
 ///
 /// Rationale:
 /// The default policy is limited to idempotent GET requests so user mutations are not retried implicitly.
-public struct APIRetryPolicy: Sendable, Equatable {
-    public let maxRetries: Int
-    public let retryDelay: TimeInterval
-    public let retriesIdempotentGETOnly: Bool
+struct APIRetryPolicy: Sendable, Equatable {
+    let maxRetries: Int
+    let retryDelay: TimeInterval
+    let retriesIdempotentGETOnly: Bool
 
-    public init(maxRetries: Int, retryDelay: TimeInterval, retriesIdempotentGETOnly: Bool) {
+    init(maxRetries: Int, retryDelay: TimeInterval, retriesIdempotentGETOnly: Bool) {
         self.maxRetries = max(0, maxRetries)
         self.retryDelay = retryDelay
         self.retriesIdempotentGETOnly = retriesIdempotentGETOnly
     }
 
-    public static func idempotentGET(maxRetries: Int, retryDelay: TimeInterval = 0.35) -> APIRetryPolicy {
+    static func idempotentGET(maxRetries: Int, retryDelay: TimeInterval = 0.35) -> APIRetryPolicy {
         APIRetryPolicy(
             maxRetries: maxRetries,
             retryDelay: retryDelay,

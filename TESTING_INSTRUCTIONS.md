@@ -8,6 +8,11 @@ Active verification policy for `MVVMExample`.
 - Do not run builds/tests/simulator UI/Instruments by default unless explicitly requested or already approved for the current implementation block.
 - Use the cheapest verification path that proves the requested behavior.
 
+## Current Approved Test Layout
+- `./MVVMExample.xctestplan` is the fast unit-test lane and contains `MVVMExampleTests` only.
+- `./MVVMExampleUI.xctestplan` is the explicit UI accessibility smoke lane and contains `MVVMExampleUITests` only.
+- UI tests are intentionally separate from the default unit lane because they require simulator execution and are slower/flakier than deterministic unit tests.
+
 ## Verification Levels
 ### Absent
 - no build
@@ -25,16 +30,24 @@ Active verification policy for `MVVMExample`.
 
 ## Project Commands
 ```zsh
-# static
-git diff --check
+# static gates
+./scripts/verify.sh static
 
 # project structure
-xcodebuild -list -project MVVMExample.xcodeproj -derivedDataPath /Users/Artem/.zenflow/worktrees/.xcode-derived-data/MVVMExample -clonedSourcePackagesDirPath /Users/Artem/.zenflow/worktrees/.xcode-package-cache/MVVMExample
+./scripts/verify.sh list
 
 # build, when approved/needed
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' -derivedDataPath /Users/Artem/.zenflow/worktrees/.xcode-derived-data/MVVMExample -clonedSourcePackagesDirPath /Users/Artem/.zenflow/worktrees/.xcode-package-cache/MVVMExample CODE_SIGNING_ALLOWED=NO build
-```
+./scripts/verify.sh build
 
+# deterministic unit tests, when approved/needed
+./scripts/verify.sh test-unit
+
+# UI accessibility smoke tests, only when explicitly approved/needed
+./scripts/verify.sh test-ui
+
+# static + list + build + unit tests; UI remains explicit
+./scripts/verify.sh all
+```
 
 ## Sandbox Requirement
 All build/test artifacts, DerivedData, cloned package state, logs, and temporary outputs must stay under `/Users/Artem/.zenflow`. Do not use `/Users/Artem/Library`, `/tmp`, or global SwiftPM/Xcode caches.

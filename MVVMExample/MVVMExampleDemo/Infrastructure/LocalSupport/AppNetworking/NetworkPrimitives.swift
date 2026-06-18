@@ -1,6 +1,6 @@
 import Foundation
 
-public enum NetworkHTTPMethod: String, Sendable {
+enum NetworkHTTPMethod: String, Sendable {
     case get = "GET"
     case post = "POST"
     case put = "PUT"
@@ -11,19 +11,19 @@ public enum NetworkHTTPMethod: String, Sendable {
 /// Retry contract for `URLSessionNetworkClient`.
 ///
 /// Boundary rule:
-/// The package owns retry mechanics, while host apps decide which concrete errors are retryable through `NetworkErrorMapping`.
-public struct NetworkRetryPolicy: Sendable, Equatable {
-    public let maxRetries: Int
-    public let retryDelay: TimeInterval
-    public let retriesIdempotentGETOnly: Bool
+/// LocalSupport owns retry mechanics, while app composition decides which concrete errors are retryable through `NetworkErrorMapping`.
+struct NetworkRetryPolicy: Sendable, Equatable {
+    let maxRetries: Int
+    let retryDelay: TimeInterval
+    let retriesIdempotentGETOnly: Bool
 
-    public init(maxRetries: Int, retryDelay: TimeInterval, retriesIdempotentGETOnly: Bool) {
+    init(maxRetries: Int, retryDelay: TimeInterval, retriesIdempotentGETOnly: Bool) {
         self.maxRetries = max(0, maxRetries)
         self.retryDelay = retryDelay
         self.retriesIdempotentGETOnly = retriesIdempotentGETOnly
     }
 
-    public static func idempotentGET(maxRetries: Int, retryDelay: TimeInterval = 0.35) -> NetworkRetryPolicy {
+    static func idempotentGET(maxRetries: Int, retryDelay: TimeInterval = 0.35) -> NetworkRetryPolicy {
         NetworkRetryPolicy(
             maxRetries: maxRetries,
             retryDelay: retryDelay,
@@ -32,26 +32,26 @@ public struct NetworkRetryPolicy: Sendable, Equatable {
     }
 }
 
-/// Standalone network runtime configuration.
+/// App-local network runtime configuration.
 ///
 /// Ownership:
-/// Host apps construct this value from their environment/configuration package. `AppNetworking` intentionally does not depend on app configuration modules.
-public struct NetworkClientConfiguration: Sendable, Equatable {
-    public let baseURL: URL
-    public let requestTimeout: TimeInterval
-    public let retryPolicy: NetworkRetryPolicy
+/// App composition constructs this value from `APIConfiguration`; network primitives stay independent from feature-specific DTOs and routes.
+struct NetworkClientConfiguration: Sendable, Equatable {
+    let baseURL: URL
+    let requestTimeout: TimeInterval
+    let retryPolicy: NetworkRetryPolicy
 
-    public init(baseURL: URL, requestTimeout: TimeInterval, retryPolicy: NetworkRetryPolicy) {
+    init(baseURL: URL, requestTimeout: TimeInterval, retryPolicy: NetworkRetryPolicy) {
         self.baseURL = baseURL
         self.requestTimeout = requestTimeout
         self.retryPolicy = retryPolicy
     }
 }
 
-/// Package-local network error taxonomy used when no host-app mapper is supplied.
+/// LocalSupport network error taxonomy used when no app-specific mapper is supplied.
 ///
-/// Host apps that own a richer domain error can inject `NetworkErrorMapping` and keep this type at the package boundary.
-public enum NetworkClientError: LocalizedError, Equatable, Sendable {
+/// App composition can inject `NetworkErrorMapping` to keep UI-facing errors in the app error taxonomy.
+enum NetworkClientError: LocalizedError, Equatable, Sendable {
     case invalidURL
     case invalidResponse
     case offline
@@ -64,7 +64,7 @@ public enum NetworkClientError: LocalizedError, Equatable, Sendable {
     case decoding(String)
     case transport(String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .invalidURL:
             return "Invalid URL."
@@ -92,24 +92,24 @@ public enum NetworkClientError: LocalizedError, Equatable, Sendable {
     }
 }
 
-/// Error composition hook that keeps `AppNetworking` standalone while allowing app-owned error types.
+/// Error composition hook that keeps networking mechanics decoupled from app-owned UI error mapping.
 ///
 /// External usage:
-/// Apps that have their own error taxonomy create one mapper at composition time and inject it into `URLSessionNetworkClient`.
-public struct NetworkErrorMapping: Sendable {
-    public let invalidURL: @Sendable () -> any Error
-    public let invalidResponse: @Sendable () -> any Error
-    public let unauthorized: @Sendable (_ message: String?) -> any Error
-    public let forbidden: @Sendable (_ message: String?) -> any Error
-    public let server: @Sendable (_ statusCode: Int, _ message: String?) -> any Error
-    public let encoding: @Sendable (_ message: String) -> any Error
-    public let decoding: @Sendable (_ message: String) -> any Error
-    public let cancelled: @Sendable () -> any Error
-    public let urlError: @Sendable (_ error: URLError) -> any Error
-    public let transport: @Sendable (_ message: String) -> any Error
-    public let shouldRetry: @Sendable (_ error: any Error) -> Bool
+/// The app creates one mapper at composition time and injects it into `URLSessionNetworkClient`.
+struct NetworkErrorMapping: Sendable {
+    let invalidURL: @Sendable () -> any Error
+    let invalidResponse: @Sendable () -> any Error
+    let unauthorized: @Sendable (_ message: String?) -> any Error
+    let forbidden: @Sendable (_ message: String?) -> any Error
+    let server: @Sendable (_ statusCode: Int, _ message: String?) -> any Error
+    let encoding: @Sendable (_ message: String) -> any Error
+    let decoding: @Sendable (_ message: String) -> any Error
+    let cancelled: @Sendable () -> any Error
+    let urlError: @Sendable (_ error: URLError) -> any Error
+    let transport: @Sendable (_ message: String) -> any Error
+    let shouldRetry: @Sendable (_ error: any Error) -> Bool
 
-    public init(
+    init(
         invalidURL: @escaping @Sendable () -> any Error,
         invalidResponse: @escaping @Sendable () -> any Error,
         unauthorized: @escaping @Sendable (_ message: String?) -> any Error,
@@ -135,7 +135,7 @@ public struct NetworkErrorMapping: Sendable {
         self.shouldRetry = shouldRetry
     }
 
-    public static let networkClientError = NetworkErrorMapping(
+    static let networkClientError = NetworkErrorMapping(
         invalidURL: { NetworkClientError.invalidURL },
         invalidResponse: { NetworkClientError.invalidResponse },
         unauthorized: { NetworkClientError.unauthorized($0) },
@@ -174,7 +174,7 @@ public struct NetworkErrorMapping: Sendable {
 /// Responsibilities:
 /// - provide path, method, query, headers, and an optional throwing body encoder;
 /// - avoid hiding body-encoding failures.
-public protocol NetworkRequest {
+protocol NetworkRequest {
     var path: String { get }
     var method: NetworkHTTPMethod { get }
     var queryItems: [URLQueryItem] { get }
@@ -182,7 +182,7 @@ public protocol NetworkRequest {
     func makeBody() throws -> Data?
 }
 
-public extension NetworkRequest {
+extension NetworkRequest {
     var queryItems: [URLQueryItem] { [] }
     var headers: [String: String] { [:] }
     func makeBody() throws -> Data? { nil }
@@ -192,6 +192,6 @@ public extension NetworkRequest {
 ///
 /// Errors:
 /// Implementations preserve cancellation behavior and either throw `NetworkClientError` or host-app errors supplied through `NetworkErrorMapping`.
-public protocol NetworkClient {
+protocol NetworkClient {
     func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response
 }

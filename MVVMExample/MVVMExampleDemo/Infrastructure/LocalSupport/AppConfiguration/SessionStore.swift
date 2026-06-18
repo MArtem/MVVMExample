@@ -5,7 +5,7 @@ import Foundation
 /// Concurrency:
 /// Main-actor isolated because current app session changes drive SwiftUI navigation state.
 @MainActor
-public protocol SessionStore<Session>: AnyObject {
+protocol SessionStore<Session>: AnyObject {
     associatedtype Session
     var currentSession: Session? { get }
     func save(_ session: Session)
@@ -20,18 +20,18 @@ public protocol SessionStore<Session>: AnyObject {
 /// Important:
 /// This store intentionally does not survive relaunch; production persistence requires a separate approved policy.
 @MainActor
-public final class InMemorySessionStore<Session>: SessionStore {
-    public private(set) var currentSession: Session?
+final class InMemorySessionStore<Session>: SessionStore {
+    private(set) var currentSession: Session?
 
-    public init(initialSession: Session? = nil) {
+    init(initialSession: Session? = nil) {
         self.currentSession = initialSession
     }
 
-    public func save(_ session: Session) {
+    func save(_ session: Session) {
         currentSession = session
     }
 
-    public func clear() {
+    func clear() {
         currentSession = nil
     }
 }
