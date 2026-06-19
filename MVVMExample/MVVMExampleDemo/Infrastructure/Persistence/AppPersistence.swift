@@ -8,7 +8,8 @@ import SwiftData
 enum AppPersistence {
     static let schema = Schema([
         PersistedArticleInteraction.self,
-        PersistedUserProfile.self
+        PersistedUserProfile.self,
+        PersistedPendingMutation.self
     ])
 
     @MainActor
@@ -18,6 +19,56 @@ enum AppPersistence {
             isStoredInMemoryOnly: inMemory
         )
         return try ModelContainer(for: schema, configurations: [configuration])
+    }
+}
+
+@Model
+final class PersistedPendingMutation {
+    @Attribute(.unique) var key: String
+    var userID: Int
+    var kind: String
+    var payloadData: Data
+    var retryCount: Int
+    var createdAt: Date
+    var updatedAt: Date
+    var lastAttemptAt: Date?
+    var lastErrorDescription: String?
+
+    init(
+        key: String,
+        userID: Int,
+        kind: String,
+        payloadData: Data,
+        retryCount: Int = 0,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        lastAttemptAt: Date? = nil,
+        lastErrorDescription: String? = nil
+    ) {
+        self.key = key
+        self.userID = userID
+        self.kind = kind
+        self.payloadData = payloadData
+        self.retryCount = retryCount
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.lastAttemptAt = lastAttemptAt
+        self.lastErrorDescription = lastErrorDescription
+    }
+
+    static func articleLikeKey(userID: Int, articleID: Int) -> String {
+        "articleLike:\(userID):\(articleID)"
+    }
+
+    static func profileUpdateKey(userID: Int, profileID: Int) -> String {
+        "profileUpdate:\(userID):\(profileID)"
+    }
+
+    func isDue(now: Date) -> Bool {
+        guard let lastAttemptAt else { return true }
+        let cappedRetryCount = min(retryCount, 6)
+        let retryDelay = min(pow(2.0, Double(cappedRetryCount)) * 5.0, 300.0)
+        return now.timeIntervalSince(lastAttemptAt) >= retryDelay
     }
 }
 

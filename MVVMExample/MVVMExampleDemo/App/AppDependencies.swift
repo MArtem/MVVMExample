@@ -19,6 +19,7 @@ struct AppDependencies {
     let profileRepository: ProfileRepository
     let sessionStore: any SessionStore<AuthSession>
     let articleInteractionStore: ArticleInteractionStore
+    let pendingMutationSyncService: PendingMutationSyncService
     let modelContainer: ModelContainer
     let demoCredentials: DemoCredentials?
 
@@ -53,20 +54,36 @@ struct AppDependencies {
             preconditionFailure("Failed to create SwiftData model container: \(error)")
         }
         let modelContext = ModelContext(modelContainer)
+        let pendingMutationStore = PendingMutationStore(modelContext: modelContext)
         let profileLocalStore = ProfileLocalStore(modelContext: modelContext)
-        let articleInteractionStore = ArticleInteractionStore(modelContext: modelContext)
+        let articleInteractionStore = ArticleInteractionStore(
+            modelContext: modelContext,
+            pendingMutationStore: pendingMutationStore
+        )
+        let newsRepository = LiveNewsRepository(apiClient: apiClient)
+        let profileRemoteRepository = LiveProfileRepository(apiClient: apiClient)
+        let profileRepository = OfflineProfileRepository(
+            remote: profileRemoteRepository,
+            localStore: profileLocalStore,
+            pendingMutationStore: pendingMutationStore
+        )
+        let pendingMutationSyncService = PendingMutationSyncService(
+            pendingStore: pendingMutationStore,
+            newsRepository: newsRepository,
+            profileRepository: profileRemoteRepository,
+            profileLocalStore: profileLocalStore,
+            articleInteractionStore: articleInteractionStore
+        )
 
         return AppDependencies(
             configuration: configuration,
             apiClient: apiClient,
             authRepository: LiveAuthRepository(apiClient: apiClient),
-            newsRepository: LiveNewsRepository(apiClient: apiClient),
-            profileRepository: OfflineProfileRepository(
-                remote: LiveProfileRepository(apiClient: apiClient),
-                localStore: profileLocalStore
-            ),
+            newsRepository: newsRepository,
+            profileRepository: profileRepository,
             sessionStore: KeychainSessionStore(),
             articleInteractionStore: articleInteractionStore,
+            pendingMutationSyncService: pendingMutationSyncService,
             modelContainer: modelContainer,
             demoCredentials: configuration.allowsDemoCredentials ? .dummyJSON : nil
         )

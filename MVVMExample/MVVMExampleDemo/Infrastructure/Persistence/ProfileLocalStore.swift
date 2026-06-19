@@ -60,10 +60,16 @@ final class ProfileLocalStore {
 struct OfflineProfileRepository: ProfileRepository {
     private let remote: ProfileRepository
     private let localStore: ProfileLocalStore
+    private let pendingMutationStore: PendingMutationStore
 
-    init(remote: ProfileRepository, localStore: ProfileLocalStore) {
+    init(
+        remote: ProfileRepository,
+        localStore: ProfileLocalStore,
+        pendingMutationStore: PendingMutationStore
+    ) {
         self.remote = remote
         self.localStore = localStore
+        self.pendingMutationStore = pendingMutationStore
     }
 
     func loadCurrentProfile(session: AuthSession) async throws -> UserProfile {
@@ -82,9 +88,11 @@ struct OfflineProfileRepository: ProfileRepository {
         do {
             let updated = try await remote.updateProfile(id: id, request: request)
             await localStore.save(updated)
+            await pendingMutationStore.clearProfileUpdate(userID: id, profileID: id)
             return updated
         } catch {
             if let localProfile = await localStore.saveLocalUpdate(id: id, request: request) {
+                await pendingMutationStore.enqueueProfileUpdate(userID: id, profileID: id, request: request)
                 return localProfile
             }
             throw error

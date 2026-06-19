@@ -28,15 +28,31 @@ extension AppDependencies {
             preconditionFailure("Failed to create in-memory SwiftData model container: \(error)")
         }
         let modelContext = ModelContext(modelContainer)
+        let pendingMutationStore = PendingMutationStore(modelContext: modelContext)
+        let articleInteractionStore = ArticleInteractionStore(
+            modelContext: modelContext,
+            pendingMutationStore: pendingMutationStore
+        )
+        let newsRepository = UITestNewsRepository()
+        let profileRepository = UITestProfileRepository()
+        let profileLocalStore = ProfileLocalStore(modelContext: modelContext)
+        let pendingMutationSyncService = PendingMutationSyncService(
+            pendingStore: pendingMutationStore,
+            newsRepository: newsRepository,
+            profileRepository: profileRepository,
+            profileLocalStore: profileLocalStore,
+            articleInteractionStore: articleInteractionStore
+        )
 
         return AppDependencies(
             configuration: configuration,
             apiClient: apiClient,
             authRepository: MockAuthRepository(),
-            newsRepository: UITestNewsRepository(),
-            profileRepository: UITestProfileRepository(),
+            newsRepository: newsRepository,
+            profileRepository: profileRepository,
             sessionStore: InMemorySessionStore<AuthSession>(),
-            articleInteractionStore: ArticleInteractionStore(modelContext: modelContext),
+            articleInteractionStore: articleInteractionStore,
+            pendingMutationSyncService: pendingMutationSyncService,
             modelContainer: modelContainer,
             demoCredentials: .dummyJSON
         )

@@ -294,6 +294,7 @@ final class NewsListViewModel {
                 )
                 try Task.checkCancellation()
                 interactionStore.update(with: updatedArticle)
+                interactionStore.clearPendingLike(articleID: articleID)
                 articles = articles.map { $0.id == articleID ? updatedArticle : $0 }
                 let updatedCard = viewStateBuilder.makeCard(from: updatedArticle)
 
@@ -309,6 +310,7 @@ final class NewsListViewModel {
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
                 if let optimisticArticle {
+                    interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
                     let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
                     content.cards = latestContent.cards.map { item in
                         item.id == articleID ? localCard : item

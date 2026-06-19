@@ -12,10 +12,12 @@ import SwiftData
 final class ArticleInteractionStore {
     private var states: [NewsArticle.ID: ArticleInteractionState] = [:]
     private let modelContext: ModelContext?
+    private let pendingMutationStore: PendingMutationStore?
     private var currentUserID: Int?
 
-    init(modelContext: ModelContext? = nil) {
+    init(modelContext: ModelContext? = nil, pendingMutationStore: PendingMutationStore? = nil) {
         self.modelContext = modelContext
+        self.pendingMutationStore = pendingMutationStore
     }
 
     func activateUser(id userID: Int) {
@@ -52,6 +54,20 @@ final class ArticleInteractionStore {
             isLiked: article.isLiked,
             likesCount: article.likesCount
         )
+    }
+
+    func enqueuePendingLike(articleID: NewsArticle.ID, isLiked: Bool) {
+        guard let currentUserID else { return }
+        pendingMutationStore?.enqueueArticleLike(
+            userID: currentUserID,
+            articleID: articleID,
+            isLiked: isLiked
+        )
+    }
+
+    func clearPendingLike(articleID: NewsArticle.ID) {
+        guard let currentUserID else { return }
+        pendingMutationStore?.clearArticleLike(userID: currentUserID, articleID: articleID)
     }
 
     private func loadPersistedStates(for userID: Int) -> [NewsArticle.ID: ArticleInteractionState] {

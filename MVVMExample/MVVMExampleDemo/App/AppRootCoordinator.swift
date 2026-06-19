@@ -25,6 +25,7 @@ final class AppRootCoordinator {
         self.dependencies = dependencies
         if let session = dependencies.sessionStore.currentSession {
             dependencies.articleInteractionStore.activateUser(id: session.user.id)
+            dependencies.pendingMutationSyncService.syncPendingMutations(for: session.user.id)
             installMainCoordinator(for: session)
             scene = .main
         }
@@ -34,11 +35,13 @@ final class AppRootCoordinator {
     func handleLoginSuccess(_ session: AuthSession) {
         dependencies.sessionStore.save(session)
         dependencies.articleInteractionStore.activateUser(id: session.user.id)
+        dependencies.pendingMutationSyncService.syncPendingMutations(for: session.user.id)
         installMainCoordinator(for: session)
         scene = .main
     }
 
     func logout() {
+        dependencies.pendingMutationSyncService.cancel()
         dependencies.sessionStore.clear()
         dependencies.articleInteractionStore.clearActiveUser()
         mainCoordinator = nil
