@@ -71,8 +71,7 @@ struct AppDependencies {
             pendingStore: pendingMutationStore,
             newsRepository: newsRepository,
             profileRepository: profileRemoteRepository,
-            profileLocalStore: profileLocalStore,
-            articleInteractionStore: articleInteractionStore
+            profileLocalStore: profileLocalStore
         )
 
         return AppDependencies(

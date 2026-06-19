@@ -40,8 +40,7 @@ extension AppDependencies {
             pendingStore: pendingMutationStore,
             newsRepository: newsRepository,
             profileRepository: profileRepository,
-            profileLocalStore: profileLocalStore,
-            articleInteractionStore: articleInteractionStore
+            profileLocalStore: profileLocalStore
         )
 
         return AppDependencies(

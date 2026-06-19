@@ -281,6 +281,7 @@ final class NewsListViewModel {
     private func toggleLike(articleID: Int) {
         guard case .content(let content) = state else { return }
         guard let card = content.cards.first(where: { $0.id == articleID }) else { return }
+        guard likeTasks[articleID] == nil else { return }
 
         let targetIsLiked: Bool
         switch card.likeState {
@@ -291,8 +292,6 @@ final class NewsListViewModel {
         case .updating:
             return
         }
-
-        likeTasks[articleID]?.cancel()
 
         let optimisticArticle = articles
             .first(where: { $0.id == articleID })?
@@ -305,7 +304,8 @@ final class NewsListViewModel {
         var optimisticContent = content
         optimisticContent.cards = content.cards.map { item in
             guard item.id == articleID else { return item }
-            return item.replacingLikeState(.updating)
+            guard let optimisticArticle else { return item.replacingLikeState(.updating) }
+            return viewStateBuilder.makeCard(from: optimisticArticle)
         }
         state = .content(optimisticContent)
 
@@ -317,10 +317,11 @@ final class NewsListViewModel {
                     isLiked: targetIsLiked
                 )
                 try Task.checkCancellation()
-                interactionStore.update(with: updatedArticle)
+                let acknowledgedArticle = optimisticArticle ?? updatedArticle
+                interactionStore.update(with: acknowledgedArticle)
                 interactionStore.clearPendingLike(articleID: articleID)
-                articles = articles.map { $0.id == articleID ? updatedArticle : $0 }
-                let updatedCard = viewStateBuilder.makeCard(from: updatedArticle)
+                articles = articles.map { $0.id == articleID ? acknowledgedArticle : $0 }
+                let updatedCard = viewStateBuilder.makeCard(from: acknowledgedArticle)
 
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent

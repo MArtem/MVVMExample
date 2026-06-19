@@ -137,7 +137,6 @@ final class PendingMutationSyncService {
     private let newsRepository: NewsRepository
     private let profileRepository: ProfileRepository
     private let profileLocalStore: ProfileLocalStore
-    private let articleInteractionStore: ArticleInteractionStore
 
     private var syncTask: Task<Void, Never>?
 
@@ -145,19 +144,17 @@ final class PendingMutationSyncService {
         pendingStore: PendingMutationStore,
         newsRepository: NewsRepository,
         profileRepository: ProfileRepository,
-        profileLocalStore: ProfileLocalStore,
-        articleInteractionStore: ArticleInteractionStore
+        profileLocalStore: ProfileLocalStore
     ) {
         self.pendingStore = pendingStore
         self.newsRepository = newsRepository
         self.profileRepository = profileRepository
         self.profileLocalStore = profileLocalStore
-        self.articleInteractionStore = articleInteractionStore
     }
 
     func syncPendingMutations(for userID: Int) {
         syncTask?.cancel()
-        syncTask = Task { [pendingStore, newsRepository, profileRepository, profileLocalStore, articleInteractionStore] in
+        syncTask = Task { [pendingStore, newsRepository, profileRepository, profileLocalStore] in
             for mutation in pendingStore.dueMutations(for: userID) {
                 do {
                     try Task.checkCancellation()
@@ -168,11 +165,10 @@ final class PendingMutationSyncService {
                             pendingStore.markFailure(mutation, error: PendingMutationSyncError.invalidPayload)
                             continue
                         }
-                        let updated = try await newsRepository.toggleLike(
+                        _ = try await newsRepository.toggleLike(
                             articleID: payload.articleID,
                             isLiked: payload.isLiked
                         )
-                        articleInteractionStore.update(with: updated)
                         pendingStore.clearArticleLike(userID: userID, articleID: payload.articleID)
 
                     case PendingMutationKind.profileUpdate:

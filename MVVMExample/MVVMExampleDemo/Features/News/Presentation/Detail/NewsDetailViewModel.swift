@@ -80,26 +80,22 @@ final class NewsDetailViewModel {
 
     private func toggleFavorite() {
         guard let article else { return }
+        guard favoriteTask == nil else { return }
         let target = !article.isLiked
         let optimisticArticle = article.replacingLikeState(isLiked: target)
 
-        favoriteTask?.cancel()
         self.article = optimisticArticle
         interactionStore.update(with: optimisticArticle)
-        state = .content(
-            viewStateBuilder.makeContent(
-                from: optimisticArticle,
-                isFavoriteUpdating: true
-            )
-        )
+        state = .content(viewStateBuilder.makeContent(from: optimisticArticle))
 
         favoriteTask = Task { [repository, interactionStore, viewStateBuilder] in
+            defer { favoriteTask = nil }
             do {
-                let updated = try await repository.toggleLike(articleID: article.id, isLiked: target)
+                _ = try await repository.toggleLike(articleID: article.id, isLiked: target)
                 try Task.checkCancellation()
-                interactionStore.update(with: updated)
+                interactionStore.update(with: optimisticArticle)
                 interactionStore.clearPendingLike(articleID: article.id)
-                let merged = interactionStore.merge(updated)
+                let merged = interactionStore.merge(optimisticArticle)
                 self.article = merged
                 state = .content(viewStateBuilder.makeContent(from: merged))
             } catch is CancellationError {
