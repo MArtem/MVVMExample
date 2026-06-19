@@ -270,6 +270,14 @@ final class NewsListViewModel {
 
         likeTasks[articleID]?.cancel()
 
+        let optimisticArticle = articles
+            .first(where: { $0.id == articleID })?
+            .replacingLikeState(isLiked: targetIsLiked)
+        if let optimisticArticle {
+            interactionStore.update(with: optimisticArticle)
+            articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
+        }
+
         var optimisticContent = content
         optimisticContent.cards = content.cards.map { item in
             guard item.id == articleID else { return item }
@@ -300,10 +308,17 @@ final class NewsListViewModel {
             } catch {
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
-                content.cards = latestContent.cards.map { item in
-                    item.id == articleID ? item.replacingLikeState(.failed) : item
+                if let optimisticArticle {
+                    let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
+                    content.cards = latestContent.cards.map { item in
+                        item.id == articleID ? localCard : item
+                    }
+                } else {
+                    content.cards = latestContent.cards.map { item in
+                        item.id == articleID ? item.replacingLikeState(.failed) : item
+                    }
+                    content.banner = AppStrings.text("Couldn’t update like. Please try again.")
                 }
-                content.banner = AppStrings.text("Couldn’t update like. Please try again.")
                 state = .content(content)
             }
         }
@@ -336,6 +351,34 @@ private extension NewsCardViewState {
             accessibilityLabel: accessibilityLabel,
             likeAccessibilityLabel: likeState == .liked ? AppStrings.text("Unlike article") : AppStrings.text("Like article"),
             commentsAccessibilityLabel: commentsAccessibilityLabel
+        )
+    }
+}
+
+private extension NewsArticle {
+    func replacingLikeState(isLiked: Bool) -> NewsArticle {
+        let adjustedLikesCount: Int
+        if isLiked == self.isLiked {
+            adjustedLikesCount = likesCount
+        } else if isLiked {
+            adjustedLikesCount = likesCount + 1
+        } else {
+            adjustedLikesCount = max(likesCount - 1, 0)
+        }
+
+        return NewsArticle(
+            id: id,
+            title: title,
+            excerpt: excerpt,
+            source: source,
+            category: category,
+            rating: rating,
+            thumbnailURL: thumbnailURL,
+            imageURLs: imageURLs,
+            publishedAt: publishedAt,
+            likesCount: adjustedLikesCount,
+            commentsCount: commentsCount,
+            isLiked: isLiked
         )
     }
 }

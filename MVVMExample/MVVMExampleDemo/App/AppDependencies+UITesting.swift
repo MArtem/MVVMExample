@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 #if DEBUG
 extension AppDependencies {
@@ -20,6 +21,14 @@ extension AppDependencies {
             errorMapping: .appAPIError
         )
 
+        let modelContainer: ModelContainer
+        do {
+            modelContainer = try AppPersistence.makeModelContainer(inMemory: true)
+        } catch {
+            preconditionFailure("Failed to create in-memory SwiftData model container: \(error)")
+        }
+        let modelContext = ModelContext(modelContainer)
+
         return AppDependencies(
             configuration: configuration,
             apiClient: apiClient,
@@ -27,7 +36,8 @@ extension AppDependencies {
             newsRepository: UITestNewsRepository(),
             profileRepository: UITestProfileRepository(),
             sessionStore: InMemorySessionStore<AuthSession>(),
-            articleInteractionStore: ArticleInteractionStore(),
+            articleInteractionStore: ArticleInteractionStore(modelContext: modelContext),
+            modelContainer: modelContainer,
             demoCredentials: .dummyJSON
         )
     }

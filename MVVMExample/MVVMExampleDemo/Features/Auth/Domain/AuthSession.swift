@@ -1,12 +1,12 @@
 import Foundation
 
-struct AuthSession: Equatable, Sendable {
+struct AuthSession: Codable, Equatable, Sendable {
     let accessToken: String
     let refreshToken: String
     let user: AppUser
 }
 
-struct AppUser: Identifiable, Equatable, Sendable {
+struct AppUser: Codable, Identifiable, Equatable, Sendable {
     let id: Int
     let username: String
     let email: String

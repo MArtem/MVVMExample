@@ -12,13 +12,13 @@ protocol SessionStore<Session>: AnyObject {
     func clear()
 }
 
-/// Demo/runtime session store with no persistence.
+/// Runtime session store with no persistence.
 ///
 /// Ownership:
 /// Created by the app dependency container and shared by app-level coordination.
 ///
 /// Important:
-/// This store intentionally does not survive relaunch; production persistence requires a separate approved policy.
+/// This store is still useful for tests and deterministic UI-test runs where Keychain persistence would leak state between executions.
 @MainActor
 final class InMemorySessionStore<Session>: SessionStore {
     private(set) var currentSession: Session?

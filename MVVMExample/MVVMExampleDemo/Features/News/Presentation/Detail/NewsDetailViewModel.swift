@@ -81,11 +81,11 @@ final class NewsDetailViewModel {
     private func toggleFavorite() {
         guard let article else { return }
         let target = !article.isLiked
-        let previousArticle = article
         let optimisticArticle = article.replacingLikeState(isLiked: target)
 
         favoriteTask?.cancel()
         self.article = optimisticArticle
+        interactionStore.update(with: optimisticArticle)
         state = .content(
             viewStateBuilder.makeContent(
                 from: optimisticArticle,
@@ -106,13 +106,8 @@ final class NewsDetailViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
-                self.article = previousArticle
-                state = .content(
-                    viewStateBuilder.makeContent(
-                        from: previousArticle,
-                        favoriteErrorMessage: AppStrings.text("Couldn’t update favorite. Please try again.")
-                    )
-                )
+                self.article = optimisticArticle
+                state = .content(viewStateBuilder.makeContent(from: optimisticArticle))
             }
         }
     }

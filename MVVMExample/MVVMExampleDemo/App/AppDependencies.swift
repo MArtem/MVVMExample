@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 /// Runtime dependency graph for the app target.
 ///
@@ -16,8 +17,9 @@ struct AppDependencies {
     let authRepository: AuthRepository
     let newsRepository: NewsRepository
     let profileRepository: ProfileRepository
-    let sessionStore: InMemorySessionStore<AuthSession>
+    let sessionStore: any SessionStore<AuthSession>
     let articleInteractionStore: ArticleInteractionStore
+    let modelContainer: ModelContainer
     let demoCredentials: DemoCredentials?
 
     /// Creates the production-shaped dependency graph for the current process environment.
@@ -44,15 +46,28 @@ struct AppDependencies {
             logger: { logger.log($0) },
             errorMapping: .appAPIError
         )
+        let modelContainer: ModelContainer
+        do {
+            modelContainer = try AppPersistence.makeModelContainer()
+        } catch {
+            preconditionFailure("Failed to create SwiftData model container: \(error)")
+        }
+        let modelContext = ModelContext(modelContainer)
+        let profileLocalStore = ProfileLocalStore(modelContext: modelContext)
+        let articleInteractionStore = ArticleInteractionStore(modelContext: modelContext)
 
         return AppDependencies(
             configuration: configuration,
             apiClient: apiClient,
             authRepository: LiveAuthRepository(apiClient: apiClient),
             newsRepository: LiveNewsRepository(apiClient: apiClient),
-            profileRepository: LiveProfileRepository(apiClient: apiClient),
-            sessionStore: InMemorySessionStore<AuthSession>(),
-            articleInteractionStore: ArticleInteractionStore(),
+            profileRepository: OfflineProfileRepository(
+                remote: LiveProfileRepository(apiClient: apiClient),
+                localStore: profileLocalStore
+            ),
+            sessionStore: KeychainSessionStore(),
+            articleInteractionStore: articleInteractionStore,
+            modelContainer: modelContainer,
             demoCredentials: configuration.allowsDemoCredentials ? .dummyJSON : nil
         )
     }

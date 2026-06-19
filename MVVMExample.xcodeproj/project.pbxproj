@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B7A100000000000000000011 /* AppPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000001 /* AppPersistence.swift */; };
+		B7A100000000000000000012 /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000002 /* KeychainSessionStore.swift */; };
+		B7A100000000000000000013 /* ProfileLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000003 /* ProfileLocalStore.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* InfrastructureSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */; };
 		C4F3A391D952F421E2E90474 /* APIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153F7E99C93C7E8DFA65FF7B /* APIConfiguration.swift */; };
 		3D3FA0221683AA8DAEB136CB /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A417123381D3707D7AC8CE9 /* SessionStore.swift */; };
@@ -131,6 +134,9 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		B7A100000000000000000001 /* AppPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPersistence.swift; sourceTree = "<group>"; };
+		B7A100000000000000000002 /* KeychainSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSessionStore.swift; sourceTree = "<group>"; };
+		B7A100000000000000000003 /* ProfileLocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLocalStore.swift; sourceTree = "<group>"; };
 		B1D7F9A28B8E41EF9F3D0001 /* MVVMExampleUI.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = MVVMExampleUI.xctestplan; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfrastructureSupportTests.swift; sourceTree = "<group>"; };
 		153F7E99C93C7E8DFA65FF7B /* APIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIConfiguration.swift; sourceTree = "<group>"; };
@@ -705,6 +711,7 @@
 			children = (
 				017537ECAFC68F7038E8E031 /* LocalSupport */,
 				AC3D76B82FCA368B00A1C459 /* Networking */,
+				B7A100000000000000000020 /* Persistence */,
 			);
 			path = Infrastructure;
 			sourceTree = "<group>";
@@ -859,6 +866,16 @@
 				47C57FF786DE6BCDB9E32EEB /* AppNetworking */,
 			);
 			path = LocalSupport;
+			sourceTree = "<group>";
+		};
+		B7A100000000000000000020 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				B7A100000000000000000001 /* AppPersistence.swift */,
+				B7A100000000000000000002 /* KeychainSessionStore.swift */,
+				B7A100000000000000000003 /* ProfileLocalStore.swift */,
+			);
+			path = Persistence;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1033,6 +1050,9 @@
 				AC3D76E32FCA368B00A1C459 /* ProfileEditScreen.swift in Sources */,
 				AC3D76E42FCA368B00A1C459 /* AuthRepository.swift in Sources */,
 				AC3D76E52FCA368B00A1C459 /* APIRequest.swift in Sources */,
+				B7A100000000000000000011 /* AppPersistence.swift in Sources */,
+				B7A100000000000000000012 /* KeychainSessionStore.swift in Sources */,
+				B7A100000000000000000013 /* ProfileLocalStore.swift in Sources */,
 				AC3D76E72FCA368B00A1C459 /* AppDependencies.swift in Sources */,
 				AC3D76E82FCA368B00A1C459 /* NewsListViewModel.swift in Sources */,
 				AC3D76E92FCA368B00A1C459 /* NewsDetailContentView.swift in Sources */,

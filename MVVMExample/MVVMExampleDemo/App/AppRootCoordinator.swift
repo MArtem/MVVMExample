@@ -24,6 +24,7 @@ final class AppRootCoordinator {
     init(dependencies: AppDependencies) {
         self.dependencies = dependencies
         if let session = dependencies.sessionStore.currentSession {
+            dependencies.articleInteractionStore.activateUser(id: session.user.id)
             installMainCoordinator(for: session)
             scene = .main
         }
@@ -32,12 +33,14 @@ final class AppRootCoordinator {
     /// Completes the login transition by storing the session and installing main navigation.
     func handleLoginSuccess(_ session: AuthSession) {
         dependencies.sessionStore.save(session)
+        dependencies.articleInteractionStore.activateUser(id: session.user.id)
         installMainCoordinator(for: session)
         scene = .main
     }
 
     func logout() {
         dependencies.sessionStore.clear()
+        dependencies.articleInteractionStore.clearActiveUser()
         mainCoordinator = nil
         scene = .login
     }
