@@ -10,6 +10,8 @@
 		PF0000000000000000000015 /* AppRootCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000006 /* AppRootCoordinatorTests.swift */; };
 		PF0000000000000000000016 /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000007 /* SessionStoreTests.swift */; };
 		PF0000000000000000000017 /* NavigationCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000009 /* NavigationCoordinatorTests.swift */; };
+		PF0000000000000000000018 /* ViewStateBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF000000000000000000000A /* ViewStateBuilderTests.swift */; };
+		PF0000000000000000000019 /* PerformanceRegressionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF000000000000000000000B /* PerformanceRegressionTests.swift */; };
 		B7A100000000000000000014 /* PendingMutationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000004 /* PendingMutationStore.swift */; };
 		B7A100000000000000000011 /* AppPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000001 /* AppPersistence.swift */; };
 		B7A100000000000000000012 /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000002 /* KeychainSessionStore.swift */; };
@@ -145,6 +147,8 @@
 		PF0000000000000000000006 /* AppRootCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRootCoordinatorTests.swift; sourceTree = "<group>"; };
 		PF0000000000000000000007 /* SessionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		PF0000000000000000000009 /* NavigationCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NavigationCoordinatorTests.swift; sourceTree = "<group>"; };
+		PF000000000000000000000A /* ViewStateBuilderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewStateBuilderTests.swift; sourceTree = "<group>"; };
+		PF000000000000000000000B /* PerformanceRegressionTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PerformanceRegressionTests.swift; sourceTree = "<group>"; };
 		B7A100000000000000000004 /* PendingMutationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingMutationStore.swift; sourceTree = "<group>"; };
 		B7A100000000000000000001 /* AppPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPersistence.swift; sourceTree = "<group>"; };
 		B7A100000000000000000002 /* KeychainSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSessionStore.swift; sourceTree = "<group>"; };
@@ -296,6 +300,8 @@
 			isa = PBXGroup;
 			children = (
 				PF0000000000000000000008 /* App */,
+				PF000000000000000000000C /* Presentation */,
+				PF000000000000000000000D /* Performance */,
 				3972C837981E75F303A8B98B /* MVVMExampleSmokeTests.swift */,
 				PF0000000000000000000005 /* TestSupport */,
 				A1B2C3D4E5F60718293A4B5E /* Infrastructure */,
@@ -315,6 +321,24 @@
 			);
 			name = App;
 			path = App;
+			sourceTree = "<group>";
+		};
+		PF000000000000000000000C /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				PF000000000000000000000A /* ViewStateBuilderTests.swift */,
+			);
+			name = Presentation;
+			path = Presentation;
+			sourceTree = "<group>";
+		};
+		PF000000000000000000000D /* Performance */ = {
+			isa = PBXGroup;
+			children = (
+				PF000000000000000000000B /* PerformanceRegressionTests.swift */,
+			);
+			name = Performance;
+			path = Performance;
 			sourceTree = "<group>";
 		};
 		PF0000000000000000000005 /* TestSupport */ = {
@@ -1160,6 +1184,8 @@
 				1A5209A92EEB1C7F0B10F3AF /* LoginViewModelTests.swift in Sources */,
 				PF0000000000000000000016 /* SessionStoreTests.swift in Sources */,
 				PF0000000000000000000017 /* NavigationCoordinatorTests.swift in Sources */,
+				PF0000000000000000000018 /* ViewStateBuilderTests.swift in Sources */,
+				PF0000000000000000000019 /* PerformanceRegressionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
