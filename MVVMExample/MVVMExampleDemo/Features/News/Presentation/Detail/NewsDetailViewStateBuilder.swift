@@ -11,7 +11,6 @@ struct NewsDetailViewStateBuilder {
 
     func makeContent(
         from article: NewsArticle,
-        isFavoriteUpdating: Bool = false,
         favoriteErrorMessage: String? = nil
     ) -> NewsDetailContentViewState {
         NewsDetailContentViewState(
@@ -25,7 +24,6 @@ struct NewsDetailViewStateBuilder {
             likesText: AppStrings.formatted("Likes %@", AppStrings.localizedNumber(article.likesCount)),
             commentsText: AppStrings.formatted("Comments %@", AppStrings.localizedNumber(article.commentsCount)),
             isFavorite: article.isLiked,
-            isFavoriteUpdating: isFavoriteUpdating,
             favoriteErrorMessage: favoriteErrorMessage
         )
     }

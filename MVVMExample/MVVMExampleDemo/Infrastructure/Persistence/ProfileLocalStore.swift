@@ -86,10 +86,11 @@ struct OfflineProfileRepository: ProfileRepository {
 
     func updateProfile(id: UserProfile.ID, request: UpdateProfileRequest) async throws -> UserProfile {
         do {
-            let updated = try await remote.updateProfile(id: id, request: request)
-            await localStore.save(updated)
+            let remoteAcknowledgement = try await remote.updateProfile(id: id, request: request)
+            let locallyAcknowledgedProfile = remoteAcknowledgement.applyingEditableFields(from: request)
+            await localStore.save(locallyAcknowledgedProfile)
             await pendingMutationStore.clearProfileUpdate(userID: id, profileID: id)
-            return updated
+            return locallyAcknowledgedProfile
         } catch {
             if let localProfile = await localStore.saveLocalUpdate(id: id, request: request) {
                 await pendingMutationStore.enqueueProfileUpdate(userID: id, profileID: id, request: request)
@@ -97,5 +98,20 @@ struct OfflineProfileRepository: ProfileRepository {
             }
             throw error
         }
+    }
+}
+
+private extension UserProfile {
+    func applyingEditableFields(from request: UpdateProfileRequest) -> UserProfile {
+        UserProfile(
+            id: id,
+            username: username,
+            email: request.email,
+            firstName: request.firstName,
+            lastName: request.lastName,
+            phone: phone,
+            imageURL: imageURL,
+            companyTitle: companyTitle
+        )
     }
 }

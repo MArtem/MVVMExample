@@ -70,8 +70,7 @@ struct AppDependencies {
         let pendingMutationSyncService = PendingMutationSyncService(
             pendingStore: pendingMutationStore,
             newsRepository: newsRepository,
-            profileRepository: profileRemoteRepository,
-            profileLocalStore: profileLocalStore
+            profileRepository: profileRemoteRepository
         )
 
         return AppDependencies(

@@ -35,12 +35,10 @@ extension AppDependencies {
         )
         let newsRepository = UITestNewsRepository()
         let profileRepository = UITestProfileRepository()
-        let profileLocalStore = ProfileLocalStore(modelContext: modelContext)
         let pendingMutationSyncService = PendingMutationSyncService(
             pendingStore: pendingMutationStore,
             newsRepository: newsRepository,
-            profileRepository: profileRepository,
-            profileLocalStore: profileLocalStore
+            profileRepository: profileRepository
         )
 
         return AppDependencies(

@@ -92,8 +92,6 @@ struct NewsListViewStateBuilder {
             return "hand.thumbsup.fill"
         case .notLiked, .failed:
             return "hand.thumbsup"
-        case .updating:
-            return "clock"
         }
     }
 }

@@ -289,22 +289,19 @@ final class NewsListViewModel {
             targetIsLiked = false
         case .notLiked, .failed:
             targetIsLiked = true
-        case .updating:
-            return
         }
 
-        let optimisticArticle = articles
+        guard let optimisticArticle = articles
             .first(where: { $0.id == articleID })?
             .replacingLikeState(isLiked: targetIsLiked)
-        if let optimisticArticle {
-            interactionStore.update(with: optimisticArticle)
-            articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
-        }
+        else { return }
+
+        interactionStore.update(with: optimisticArticle)
+        articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
 
         var optimisticContent = content
         optimisticContent.cards = content.cards.map { item in
             guard item.id == articleID else { return item }
-            guard let optimisticArticle else { return item.replacingLikeState(.updating) }
             return viewStateBuilder.makeCard(from: optimisticArticle)
         }
         state = .content(optimisticContent)
@@ -312,16 +309,15 @@ final class NewsListViewModel {
         likeTasks[articleID] = Task { [repository, interactionStore, viewStateBuilder] in
             defer { likeTasks[articleID] = nil }
             do {
-                let updatedArticle = try await repository.toggleLike(
+                _ = try await repository.toggleLike(
                     articleID: articleID,
                     isLiked: targetIsLiked
                 )
                 try Task.checkCancellation()
-                let acknowledgedArticle = optimisticArticle ?? updatedArticle
-                interactionStore.update(with: acknowledgedArticle)
+                interactionStore.update(with: optimisticArticle)
                 interactionStore.clearPendingLike(articleID: articleID)
-                articles = articles.map { $0.id == articleID ? acknowledgedArticle : $0 }
-                let updatedCard = viewStateBuilder.makeCard(from: acknowledgedArticle)
+                articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
+                let updatedCard = viewStateBuilder.makeCard(from: optimisticArticle)
 
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
@@ -334,17 +330,10 @@ final class NewsListViewModel {
             } catch {
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
-                if let optimisticArticle {
-                    interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
-                    let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
-                    content.cards = latestContent.cards.map { item in
-                        item.id == articleID ? localCard : item
-                    }
-                } else {
-                    content.cards = latestContent.cards.map { item in
-                        item.id == articleID ? item.replacingLikeState(.failed) : item
-                    }
-                    content.banner = AppStrings.text("Couldn’t update like. Please try again.")
+                interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
+                let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
+                content.cards = latestContent.cards.map { item in
+                    item.id == articleID ? localCard : item
                 }
                 state = .content(content)
             }

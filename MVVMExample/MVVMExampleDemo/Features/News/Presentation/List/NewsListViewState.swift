@@ -54,7 +54,6 @@ struct NewsCardViewState: Identifiable, Equatable {
 enum LikeButtonState: Equatable {
     case notLiked
     case liked
-    case updating
     case failed
 }
 

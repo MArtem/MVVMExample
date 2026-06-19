@@ -69,7 +69,6 @@ struct NewsDetailContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier(AppAccessibilityID.News.detailFavoriteButton)
-                .disabled(state.isFavoriteUpdating)
             }
             .padding(AppSpacing.md)
         }

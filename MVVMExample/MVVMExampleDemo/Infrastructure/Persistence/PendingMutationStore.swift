@@ -136,25 +136,22 @@ final class PendingMutationSyncService {
     private let pendingStore: PendingMutationStore
     private let newsRepository: NewsRepository
     private let profileRepository: ProfileRepository
-    private let profileLocalStore: ProfileLocalStore
 
     private var syncTask: Task<Void, Never>?
 
     init(
         pendingStore: PendingMutationStore,
         newsRepository: NewsRepository,
-        profileRepository: ProfileRepository,
-        profileLocalStore: ProfileLocalStore
+        profileRepository: ProfileRepository
     ) {
         self.pendingStore = pendingStore
         self.newsRepository = newsRepository
         self.profileRepository = profileRepository
-        self.profileLocalStore = profileLocalStore
     }
 
     func syncPendingMutations(for userID: Int) {
         syncTask?.cancel()
-        syncTask = Task { [pendingStore, newsRepository, profileRepository, profileLocalStore] in
+        syncTask = Task { [pendingStore, newsRepository, profileRepository] in
             for mutation in pendingStore.dueMutations(for: userID) {
                 do {
                     try Task.checkCancellation()
@@ -176,11 +173,10 @@ final class PendingMutationSyncService {
                             pendingStore.markFailure(mutation, error: PendingMutationSyncError.invalidPayload)
                             continue
                         }
-                        let updated = try await profileRepository.updateProfile(
+                        _ = try await profileRepository.updateProfile(
                             id: payload.profileID,
                             request: payload.request
                         )
-                        profileLocalStore.save(updated)
                         pendingStore.clearProfileUpdate(userID: userID, profileID: payload.profileID)
 
                     default:
