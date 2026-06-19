@@ -1,3 +1,4 @@
+import SwiftData
 import Testing
 @testable import MVVMExample
 
@@ -52,10 +53,14 @@ struct NewsDetailViewModelTests {
         #expect(message.message == "You appear to be offline. Check your connection and try again.")
     }
 
-    @Test("Favorite failure rolls back optimistic state and keeps content visible")
-    func favoriteFailureRollsBackOptimisticStateAndKeepsContentVisible() async {
+    @Test("Favorite success keeps local optimistic count after stale server acknowledgement")
+    func favoriteSuccessKeepsLocalOptimisticCountAfterStaleServerAcknowledgement() async throws {
+        let context = try makeInMemoryModelContext()
+        let pendingMutationStore = PendingMutationStore(modelContext: context)
+        let interactionStore = ArticleInteractionStore(modelContext: context, pendingMutationStore: pendingMutationStore)
+        interactionStore.activateUser(id: 42)
         let repository = ControllableNewsDetailRepository()
-        let viewModel = makeDetailViewModel(repository: repository)
+        let viewModel = makeDetailViewModel(repository: repository, interactionStore: interactionStore)
         await loadDetailContent(viewModel: viewModel, repository: repository, article: makeDetailArticle(isLiked: false, likesCount: 10))
 
         viewModel.favoriteTapped()
@@ -63,26 +68,53 @@ struct NewsDetailViewModelTests {
 
         #expect(call.articleID == 7)
         #expect(call.isLiked == true)
-        guard case .content(let optimistic) = viewModel.state else {
-            Issue.record("Expected optimistic content state")
-            return
-        }
-        #expect(optimistic.isFavorite == true)
-        #expect(optimistic.isFavoriteUpdating == true)
-        #expect(optimistic.likesText == "Likes 11")
+        assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 11")
+
+        await repository.waitForToggleContinuation(at: 0)
+        await repository.completeToggle(at: 0, with: .success(makeDetailArticle(isLiked: false, likesCount: 10)))
+        await drainDetailMainActorTasks()
+
+        assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 11")
+        #expect(fetchPendingMutations(in: context).isEmpty)
+    }
+
+    @Test("Favorite failure keeps optimistic local state and enqueues pending mutation")
+    func favoriteFailureKeepsOptimisticLocalStateAndEnqueuesPendingMutation() async throws {
+        let context = try makeInMemoryModelContext()
+        let pendingMutationStore = PendingMutationStore(modelContext: context)
+        let interactionStore = ArticleInteractionStore(modelContext: context, pendingMutationStore: pendingMutationStore)
+        interactionStore.activateUser(id: 42)
+        let repository = ControllableNewsDetailRepository()
+        let viewModel = makeDetailViewModel(repository: repository, interactionStore: interactionStore)
+        await loadDetailContent(viewModel: viewModel, repository: repository, article: makeDetailArticle(isLiked: false, likesCount: 10))
+
+        viewModel.favoriteTapped()
+        _ = await repository.waitForToggleRequest(at: 0)
+        assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 11")
 
         await repository.waitForToggleContinuation(at: 0)
         await repository.completeToggle(at: 0, with: .failure(AppAPIError.timeout))
         await drainDetailMainActorTasks()
 
-        guard case .content(let content) = viewModel.state else {
-            Issue.record("Expected content state after rollback")
-            return
-        }
-        #expect(content.isFavorite == false)
-        #expect(content.isFavoriteUpdating == false)
-        #expect(content.likesText == "Likes 10")
-        #expect(content.favoriteErrorMessage == "Couldn’t update favorite. Please try again.")
+        assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 11")
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 7))
+        #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 7, isLiked: true))
+    }
+
+    @Test("Duplicate favorite tap while request is in flight is ignored")
+    func duplicateFavoriteTapWhileRequestIsInFlightIsIgnored() async {
+        let repository = ControllableNewsDetailRepository()
+        let viewModel = makeDetailViewModel(repository: repository)
+        await loadDetailContent(viewModel: viewModel, repository: repository, article: makeDetailArticle(isLiked: false, likesCount: 10))
+
+        viewModel.favoriteTapped()
+        _ = await repository.waitForToggleRequest(at: 0)
+        viewModel.favoriteTapped()
+        await drainDetailMainActorTasks()
+
+        #expect(await repository.toggleRequestCount() == 1)
+        assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 11")
     }
 }
 
@@ -153,14 +185,26 @@ private actor ControllableNewsDetailRepository: NewsRepository {
     func completeToggle(at index: Int, with result: Result<NewsArticle, Error>) {
         toggleContinuations.removeValue(forKey: index)?.resume(with: result)
     }
+
+    func toggleRequestCount() -> Int {
+        toggleRequests.count
+    }
 }
 
 @MainActor
 private func makeDetailViewModel(repository: ControllableNewsDetailRepository) -> NewsDetailViewModel {
+    makeDetailViewModel(repository: repository, interactionStore: ArticleInteractionStore())
+}
+
+@MainActor
+private func makeDetailViewModel(
+    repository: ControllableNewsDetailRepository,
+    interactionStore: ArticleInteractionStore
+) -> NewsDetailViewModel {
     NewsDetailViewModel(
         payload: NewsDetailRoutePayload(id: 7, title: "Payload title", thumbnailURL: nil),
         repository: repository,
-        interactionStore: ArticleInteractionStore()
+        interactionStore: interactionStore
     )
 }
 
@@ -175,6 +219,20 @@ private func loadDetailContent(
     await repository.waitForDetailContinuation(at: 0)
     await repository.completeDetail(at: 0, with: .success(article))
     await drainDetailMainActorTasks()
+}
+
+private func assertDetailContent(
+    _ state: NewsDetailViewState,
+    isFavorite: Bool,
+    likesText: String
+) {
+    guard case .content(let content) = state else {
+        Issue.record("Expected content state")
+        return
+    }
+    #expect(content.isFavorite == isFavorite)
+    #expect(content.likesText == likesText)
+    #expect(content.favoriteErrorMessage == nil)
 }
 
 private func makeDetailArticle(isLiked: Bool, likesCount: Int) -> NewsArticle {

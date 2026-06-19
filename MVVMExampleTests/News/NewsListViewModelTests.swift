@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import MVVMExample
 
@@ -54,8 +55,8 @@ struct NewsListViewModelTests {
         #expect(content.banner == "Couldn’t refresh. Showing previous content.")
     }
 
-    @Test("Like failure marks only target card as failed and keeps content visible")
-    func likeFailureMarksOnlyTargetCardAsFailedAndKeepsContentVisible() async {
+    @Test("Like success uses local optimistic count instead of stale server count")
+    func likeSuccessUsesLocalOptimisticCountInsteadOfStaleServerCount() async {
         let repository = ControllableNewsRepository()
         let viewModel = makeViewModel(repository: repository)
         await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 2))
@@ -63,25 +64,91 @@ struct NewsListViewModelTests {
         viewModel.likeTapped(id: 1)
         let request = await repository.waitForToggleRequest(at: 0)
 
-        #expect(request.articleID == 1)
-        #expect(request.isLiked == true)
-        guard case .content(let optimisticContent) = viewModel.state else {
-            Issue.record("Expected content state during like update")
-            return
-        }
-        #expect(optimisticContent.cards.first { $0.id == 1 }?.likeState == .updating)
-        #expect(optimisticContent.cards.first { $0.id == 2 }?.likeState == .notLiked)
+        #expect(request == ToggleLikeCall(articleID: 1, isLiked: true))
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "2")
+
+        await repository.completeToggle(at: 0, with: .success(makeArticle(id: 1, isLiked: false, likesCount: 1)))
+        await drainMainActorTasks()
+
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "2")
+        assertCard(viewModel.state, id: 2, likeState: .notLiked, likesText: "2")
+    }
+
+    @Test("Unlike success uses local optimistic count instead of stale server count")
+    func unlikeSuccessUsesLocalOptimisticCountInsteadOfStaleServerCount() async {
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: [
+            makeArticle(id: 1, isLiked: true, likesCount: 5),
+            makeArticle(id: 2, isLiked: false, likesCount: 2)
+        ])
+
+        viewModel.likeTapped(id: 1)
+        let request = await repository.waitForToggleRequest(at: 0)
+
+        #expect(request == ToggleLikeCall(articleID: 1, isLiked: false))
+        assertCard(viewModel.state, id: 1, likeState: .notLiked, likesText: "4")
+
+        await repository.completeToggle(at: 0, with: .success(makeArticle(id: 1, isLiked: true, likesCount: 5)))
+        await drainMainActorTasks()
+
+        assertCard(viewModel.state, id: 1, likeState: .notLiked, likesText: "4")
+    }
+
+    @Test("Like failure keeps optimistic state and enqueues pending mutation")
+    func likeFailureKeepsOptimisticStateAndEnqueuesPendingMutation() async throws {
+        let context = try makeInMemoryModelContext()
+        let pendingMutationStore = PendingMutationStore(modelContext: context)
+        let interactionStore = ArticleInteractionStore(modelContext: context, pendingMutationStore: pendingMutationStore)
+        interactionStore.activateUser(id: 42)
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository, interactionStore: interactionStore)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 2))
+
+        viewModel.likeTapped(id: 1)
+        let request = await repository.waitForToggleRequest(at: 0)
+
+        #expect(request == ToggleLikeCall(articleID: 1, isLiked: true))
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "2")
+        assertCard(viewModel.state, id: 2, likeState: .notLiked, likesText: "2")
 
         await repository.completeToggle(at: 0, with: .failure(AppAPIError.offline))
         await drainMainActorTasks()
 
-        guard case .content(let content) = viewModel.state else {
-            Issue.record("Expected content state after like failure")
-            return
-        }
-        #expect(content.cards.first { $0.id == 1 }?.likeState == .failed)
-        #expect(content.cards.first { $0.id == 2 }?.likeState == .notLiked)
-        #expect(content.banner == "Couldn’t update like. Please try again.")
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "2")
+        assertCard(viewModel.state, id: 2, likeState: .notLiked, likesText: "2")
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 1))
+        #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 1, isLiked: true))
+    }
+
+    @Test("Duplicate like tap while request is in flight is ignored")
+    func duplicateLikeTapWhileRequestIsInFlightIsIgnored() async {
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 2))
+
+        viewModel.likeTapped(id: 1)
+        _ = await repository.waitForToggleRequest(at: 0)
+        viewModel.likeTapped(id: 1)
+        await drainMainActorTasks()
+
+        #expect(await repository.toggleRequestCount() == 1)
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "2")
+    }
+
+    @Test("becameVisible updates list card after shared interaction store change")
+    func becameVisibleUpdatesListCardAfterSharedInteractionStoreChange() async {
+        let interactionStore = ArticleInteractionStore()
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository, interactionStore: interactionStore)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 2))
+
+        interactionStore.setLikeState(articleID: 1, isLiked: true, likesCount: 99)
+        viewModel.becameVisible()
+
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "99")
+        assertCard(viewModel.state, id: 2, likeState: .notLiked, likesText: "2")
     }
 
     @Test("Pagination request is backpressured while a page is already loading")
@@ -219,14 +286,26 @@ private actor ControllableNewsRepository: NewsRepository {
     func loadRequestCount() -> Int {
         loadRequests.count
     }
+
+    func toggleRequestCount() -> Int {
+        toggleRequests.count
+    }
 }
 
 @MainActor
 private func makeViewModel(repository: ControllableNewsRepository) -> NewsListViewModel {
+    makeViewModel(repository: repository, interactionStore: ArticleInteractionStore())
+}
+
+@MainActor
+private func makeViewModel(
+    repository: ControllableNewsRepository,
+    interactionStore: ArticleInteractionStore
+) -> NewsListViewModel {
     NewsListViewModel(
         repository: repository,
         router: NewsRouter(),
-        interactionStore: ArticleInteractionStore()
+        interactionStore: interactionStore
     )
 }
 
@@ -242,23 +321,43 @@ private func loadInitialContent(
     await drainMainActorTasks()
 }
 
-private func makeArticles(count: Int) -> [NewsArticle] {
-    (1...count).map { id in
-        NewsArticle(
-            id: id,
-            title: "Article \(id)",
-            excerpt: "Excerpt \(id)",
-            source: "Source",
-            category: "General",
-            rating: 4.5,
-            thumbnailURL: nil,
-            imageURLs: [],
-            publishedAt: nil,
-            likesCount: id,
-            commentsCount: id * 2,
-            isLiked: false
-        )
+private func assertCard(
+    _ state: NewsListViewState,
+    id: NewsArticle.ID,
+    likeState: LikeButtonState,
+    likesText: String
+) {
+    guard case .content(let content) = state else {
+        Issue.record("Expected content state")
+        return
     }
+    guard let card = content.cards.first(where: { $0.id == id }) else {
+        Issue.record("Expected card \(id)")
+        return
+    }
+    #expect(card.likeState == likeState)
+    #expect(card.likesText == likesText)
+}
+
+private func makeArticles(count: Int) -> [NewsArticle] {
+    (1...count).map { id in makeArticle(id: id, isLiked: false, likesCount: id) }
+}
+
+private func makeArticle(id: Int, isLiked: Bool, likesCount: Int) -> NewsArticle {
+    NewsArticle(
+        id: id,
+        title: "Article \(id)",
+        excerpt: "Excerpt \(id)",
+        source: "Source",
+        category: "General",
+        rating: 4.5,
+        thumbnailURL: nil,
+        imageURLs: [],
+        publishedAt: nil,
+        likesCount: likesCount,
+        commentsCount: id * 2,
+        isLiked: isLiked
+    )
 }
 
 @MainActor

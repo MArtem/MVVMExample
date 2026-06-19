@@ -12,6 +12,10 @@
 		B7A100000000000000000012 /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000002 /* KeychainSessionStore.swift */; };
 		B7A100000000000000000013 /* ProfileLocalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000003 /* ProfileLocalStore.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* InfrastructureSupportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */; };
+		PF0000000000000000000011 /* PersistenceTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000001 /* PersistenceTestSupport.swift */; };
+		PF0000000000000000000012 /* ArticleInteractionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000002 /* ArticleInteractionStoreTests.swift */; };
+		PF0000000000000000000013 /* PendingMutationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000003 /* PendingMutationStoreTests.swift */; };
+		PF0000000000000000000014 /* ProfileLocalStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000004 /* ProfileLocalStoreTests.swift */; };
 		C4F3A391D952F421E2E90474 /* APIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 153F7E99C93C7E8DFA65FF7B /* APIConfiguration.swift */; };
 		3D3FA0221683AA8DAEB136CB /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A417123381D3707D7AC8CE9 /* SessionStore.swift */; };
 		3458746BC90D282B559429AB /* AppAPIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27E656D996193F5444E29C40 /* AppAPIError.swift */; };
@@ -141,6 +145,10 @@
 		B7A100000000000000000003 /* ProfileLocalStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileLocalStore.swift; sourceTree = "<group>"; };
 		B1D7F9A28B8E41EF9F3D0001 /* MVVMExampleUI.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = MVVMExampleUI.xctestplan; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfrastructureSupportTests.swift; sourceTree = "<group>"; };
+		PF0000000000000000000001 /* PersistenceTestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PersistenceTestSupport.swift; sourceTree = "<group>"; };
+		PF0000000000000000000002 /* ArticleInteractionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArticleInteractionStoreTests.swift; sourceTree = "<group>"; };
+		PF0000000000000000000003 /* PendingMutationStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingMutationStoreTests.swift; sourceTree = "<group>"; };
+		PF0000000000000000000004 /* ProfileLocalStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProfileLocalStoreTests.swift; sourceTree = "<group>"; };
 		153F7E99C93C7E8DFA65FF7B /* APIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIConfiguration.swift; sourceTree = "<group>"; };
 		5A417123381D3707D7AC8CE9 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		27E656D996193F5444E29C40 /* AppAPIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAPIError.swift; sourceTree = "<group>"; };
@@ -282,6 +290,7 @@
 			isa = PBXGroup;
 			children = (
 				3972C837981E75F303A8B98B /* MVVMExampleSmokeTests.swift */,
+				PF0000000000000000000005 /* TestSupport */,
 				A1B2C3D4E5F60718293A4B5E /* Infrastructure */,
 				4C27A54B1C1FA3F2E13DC5ED /* Profile */,
 				C78AB61F17E78806203E55EA /* News */,
@@ -291,10 +300,20 @@
 			path = MVVMExampleTests;
 			sourceTree = "<group>";
 		};
+		PF0000000000000000000005 /* TestSupport */ = {
+			isa = PBXGroup;
+			children = (
+				PF0000000000000000000001 /* PersistenceTestSupport.swift */,
+			);
+			name = TestSupport;
+			path = TestSupport;
+			sourceTree = "<group>";
+		};
 		A1B2C3D4E5F60718293A4B5E /* Infrastructure */ = {
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F60718293A4B5D /* InfrastructureSupportTests.swift */,
+				PF0000000000000000000003 /* PendingMutationStoreTests.swift */,
 			);
 			name = Infrastructure;
 			path = Infrastructure;
@@ -320,6 +339,7 @@
 			children = (
 				6D717D9D5EF49EC2EE5EBFA4 /* ProfileEditViewModelTests.swift */,
 				6B39A65584A9A7E996D5AFF0 /* ProfileViewModelTests.swift */,
+				PF0000000000000000000004 /* ProfileLocalStoreTests.swift */,
 			);
 			name = Profile;
 			path = Profile;
@@ -755,6 +775,7 @@
 			isa = PBXGroup;
 			children = (
 				81860ECF963B37B43B7FFAE3 /* NewsListViewModelTests.swift */,
+				PF0000000000000000000002 /* ArticleInteractionStoreTests.swift */,
 				AFD430E4F74AD84B89561BFA /* NewsDetailViewModelTests.swift */,
 			);
 			name = News;
@@ -1108,11 +1129,15 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B2C3D4E5F60718293A4B5C /* InfrastructureSupportTests.swift in Sources */,
+				PF0000000000000000000011 /* PersistenceTestSupport.swift in Sources */,
+				PF0000000000000000000013 /* PendingMutationStoreTests.swift in Sources */,
 				B8C0CE896445844E887816E5 /* MVVMExampleSmokeTests.swift in Sources */,
 				49FCED3DAEE5BBC87F2F6131 /* ProfileEditViewModelTests.swift in Sources */,
 				00E6825C299D1E7AC2D3C76D /* NewsListViewModelTests.swift in Sources */,
+				PF0000000000000000000012 /* ArticleInteractionStoreTests.swift in Sources */,
 				F3F521CEC46F26A3AF3E35BB /* NewsDetailViewModelTests.swift in Sources */,
 				F195D173A38D03093AB4169F /* ProfileViewModelTests.swift in Sources */,
+				PF0000000000000000000014 /* ProfileLocalStoreTests.swift in Sources */,
 				1A5209A92EEB1C7F0B10F3AF /* LoginViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
