@@ -55,6 +55,23 @@ struct NewsListViewModelTests {
         #expect(content.banner == "Couldn’t refresh. Showing previous content.")
     }
 
+    @Test("Refresh applies persisted optimistic interaction state")
+    func refreshAppliesPersistedOptimisticInteractionState() async {
+        let interactionStore = ArticleInteractionStore()
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository, interactionStore: interactionStore)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 2))
+        interactionStore.setLikeState(articleID: 1, isLiked: true, likesCount: 99)
+
+        let refreshTask = Task { await viewModel.refreshRequested() }
+        _ = await repository.waitForRefreshRequest(at: 0)
+        await repository.completeRefresh(at: 0, with: .success(makeArticles(count: 2)))
+        await refreshTask.value
+
+        assertCard(viewModel.state, id: 1, likeState: .liked, likesText: "99")
+        assertCard(viewModel.state, id: 2, likeState: .notLiked, likesText: "2")
+    }
+
     @Test("Like success uses local optimistic count instead of stale server count")
     func likeSuccessUsesLocalOptimisticCountInsteadOfStaleServerCount() async {
         let repository = ControllableNewsRepository()
@@ -170,6 +187,62 @@ struct NewsListViewModelTests {
             return
         }
         #expect(content.pagination.status == .loading)
+    }
+
+    @Test("Pagination page merge applies persisted interaction state")
+    func paginationPageMergeAppliesPersistedInteractionState() async {
+        let interactionStore = ArticleInteractionStore()
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository, interactionStore: interactionStore)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 30))
+        interactionStore.setLikeState(articleID: 31, isLiked: true, likesCount: 99)
+
+        viewModel.loadNextPageIfNeeded(currentItemID: 28)
+        let request = await repository.waitForLoadRequest(at: 1)
+
+        #expect(request == NewsPageRequest(limit: 30, skip: 30))
+
+        await repository.completeLoad(at: 1, with: .success([
+            makeArticle(id: 31, isLiked: false, likesCount: 31),
+            makeArticle(id: 32, isLiked: false, likesCount: 32)
+        ]))
+        await drainMainActorTasks()
+
+        assertCard(viewModel.state, id: 31, likeState: .liked, likesText: "99")
+        assertCard(viewModel.state, id: 32, likeState: .notLiked, likesText: "32")
+    }
+
+    @Test("Pagination failure can be retried without advancing skip")
+    func paginationFailureCanBeRetriedWithoutAdvancingSkip() async {
+        let repository = ControllableNewsRepository()
+        let viewModel = makeViewModel(repository: repository)
+        await loadInitialContent(viewModel: viewModel, repository: repository, articles: makeArticles(count: 30))
+
+        viewModel.loadNextPageIfNeeded(currentItemID: 28)
+        let failedRequest = await repository.waitForLoadRequest(at: 1)
+        await repository.completeLoad(at: 1, with: .failure(AppAPIError.timeout))
+        await drainMainActorTasks()
+
+        #expect(failedRequest == NewsPageRequest(limit: 30, skip: 30))
+
+        guard case .content(let failedContent) = viewModel.state else {
+            Issue.record("Expected content state after pagination failure")
+            return
+        }
+        #expect(failedContent.pagination.status == .error(
+            message: "The request took too long. Please try again.",
+            retryTitle: "Retry loading more"
+        ))
+
+        viewModel.retryLoadNextPageTapped()
+        let retryRequest = await repository.waitForLoadRequest(at: 2)
+
+        #expect(retryRequest == NewsPageRequest(limit: 30, skip: 30))
+
+        await repository.completeLoad(at: 2, with: .success([makeArticle(id: 31, isLiked: false, likesCount: 31)]))
+        await drainMainActorTasks()
+
+        assertCard(viewModel.state, id: 31, likeState: .notLiked, likesText: "31")
     }
 }
 

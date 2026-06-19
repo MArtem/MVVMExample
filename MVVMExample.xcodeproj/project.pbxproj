@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		PF0000000000000000000015 /* AppRootCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000006 /* AppRootCoordinatorTests.swift */; };
+		PF0000000000000000000016 /* SessionStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0000000000000000000007 /* SessionStoreTests.swift */; };
 		B7A100000000000000000014 /* PendingMutationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000004 /* PendingMutationStore.swift */; };
 		B7A100000000000000000011 /* AppPersistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000001 /* AppPersistence.swift */; };
 		B7A100000000000000000012 /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7A100000000000000000002 /* KeychainSessionStore.swift */; };
@@ -139,6 +141,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		PF0000000000000000000006 /* AppRootCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRootCoordinatorTests.swift; sourceTree = "<group>"; };
+		PF0000000000000000000007 /* SessionStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SessionStoreTests.swift; sourceTree = "<group>"; };
 		B7A100000000000000000004 /* PendingMutationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingMutationStore.swift; sourceTree = "<group>"; };
 		B7A100000000000000000001 /* AppPersistence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPersistence.swift; sourceTree = "<group>"; };
 		B7A100000000000000000002 /* KeychainSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSessionStore.swift; sourceTree = "<group>"; };
@@ -289,6 +293,7 @@
 		07A8129D465A6CE5DCB047EB /* MVVMExampleTests */ = {
 			isa = PBXGroup;
 			children = (
+				PF0000000000000000000008 /* App */,
 				3972C837981E75F303A8B98B /* MVVMExampleSmokeTests.swift */,
 				PF0000000000000000000005 /* TestSupport */,
 				A1B2C3D4E5F60718293A4B5E /* Infrastructure */,
@@ -298,6 +303,15 @@
 			);
 			name = MVVMExampleTests;
 			path = MVVMExampleTests;
+			sourceTree = "<group>";
+		};
+		PF0000000000000000000008 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				PF0000000000000000000006 /* AppRootCoordinatorTests.swift */,
+			);
+			name = App;
+			path = App;
 			sourceTree = "<group>";
 		};
 		PF0000000000000000000005 /* TestSupport */ = {
@@ -359,6 +373,7 @@
 			isa = PBXGroup;
 			children = (
 				FB4BC6E55D245F1547A43922 /* LoginViewModelTests.swift */,
+				PF0000000000000000000007 /* SessionStoreTests.swift */,
 			);
 			name = Auth;
 			path = Auth;
@@ -1128,6 +1143,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				PF0000000000000000000015 /* AppRootCoordinatorTests.swift in Sources */,
 				A1B2C3D4E5F60718293A4B5C /* InfrastructureSupportTests.swift in Sources */,
 				PF0000000000000000000011 /* PersistenceTestSupport.swift in Sources */,
 				PF0000000000000000000013 /* PendingMutationStoreTests.swift in Sources */,
@@ -1139,6 +1155,7 @@
 				F195D173A38D03093AB4169F /* ProfileViewModelTests.swift in Sources */,
 				PF0000000000000000000014 /* ProfileLocalStoreTests.swift in Sources */,
 				1A5209A92EEB1C7F0B10F3AF /* LoginViewModelTests.swift in Sources */,
+				PF0000000000000000000016 /* SessionStoreTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

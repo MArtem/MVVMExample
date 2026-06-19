@@ -9,6 +9,7 @@ readonly DESTINATION_IOS_26="platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0"
 readonly WORKTREES_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 readonly DERIVED_DATA_PATH="${MVVMEXAMPLE_DERIVED_DATA_PATH:-${WORKTREES_ROOT}/.xcode-derived-data/MVVMExample}"
 readonly CLONED_PACKAGES_PATH="${MVVMEXAMPLE_XCODE_PACKAGE_CACHE:-${WORKTREES_ROOT}/.xcode-package-cache/MVVMExample}"
+readonly RESULT_BUNDLE_ROOT="${MVVMEXAMPLE_RESULT_BUNDLE_PATH:-${WORKTREES_ROOT}/.xcode-result-bundles/MVVMExample}"
 
 usage() {
   cat <<'USAGE'
@@ -57,6 +58,9 @@ run_build() {
 }
 
 run_unit_tests() {
+  local result_bundle_path="${RESULT_BUNDLE_ROOT}/unit.xcresult"
+  rm -rf "${result_bundle_path}"
+  mkdir -p "${RESULT_BUNDLE_ROOT}"
   xcodebuild \
     -project "${PROJECT}" \
     -scheme "${SCHEME}" \
@@ -65,11 +69,15 @@ run_unit_tests() {
     -destination "${DESTINATION_IOS_26}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
+    -resultBundlePath "${result_bundle_path}" \
     CODE_SIGNING_ALLOWED=NO \
     test
 }
 
 run_ui_tests() {
+  local result_bundle_path="${RESULT_BUNDLE_ROOT}/ui.xcresult"
+  rm -rf "${result_bundle_path}"
+  mkdir -p "${RESULT_BUNDLE_ROOT}"
   xcodebuild \
     -project "${PROJECT}" \
     -scheme "${SCHEME}" \
@@ -78,6 +86,7 @@ run_ui_tests() {
     -destination "${DESTINATION_IOS_26}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
+    -resultBundlePath "${result_bundle_path}" \
     CODE_SIGNING_ALLOWED=NO \
     test
 }

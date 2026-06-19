@@ -12,6 +12,8 @@ import Security
 final class KeychainSessionStore: SessionStore {
     private let service: String
     private let account: String
+    private let storage: KeychainSessionStorage
+    private let logger: any AppLogger
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
 
@@ -19,14 +21,19 @@ final class KeychainSessionStore: SessionStore {
 
     init(
         service: String = Bundle.main.bundleIdentifier ?? "MVVMExample",
-        account: String = "auth-session"
+        account: String = "auth-session",
+        storage: KeychainSessionStorage = SystemKeychainSessionStorage(),
+        logger: any AppLogger = NoOpAppLogger()
     ) {
         self.service = service
         self.account = account
+        self.storage = storage
+        self.logger = logger
         self.currentSession = Self.loadSession(
             service: service,
             account: account,
-            decoder: decoder
+            decoder: decoder,
+            storage: storage
         )
     }
 
@@ -34,51 +41,36 @@ final class KeychainSessionStore: SessionStore {
         currentSession = session
         do {
             let data = try encoder.encode(session)
-            try saveData(data)
+            try storage.save(data, service: service, account: account)
         } catch {
-            assertionFailure("Failed to persist auth session in Keychain: \(error)")
+            logger.log("Failed to persist auth session in Keychain: \(error)")
         }
     }
 
     func clear() {
         currentSession = nil
-        SecItemDelete(baseQuery() as CFDictionary)
+        storage.clear(service: service, account: account)
     }
 
-    private func saveData(_ data: Data) throws {
-        let query = baseQuery()
-        let updateStatus = SecItemUpdate(
-            query as CFDictionary,
-            [kSecValueData as String: data] as CFDictionary
-        )
-
-        if updateStatus == errSecSuccess {
-            return
-        }
-
-        guard updateStatus == errSecItemNotFound else {
-            throw KeychainSessionStoreError.unhandledStatus(updateStatus)
-        }
-
-        var addQuery = query
-        addQuery[kSecValueData as String] = data
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-
-        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-        guard addStatus == errSecSuccess else {
-            throw KeychainSessionStoreError.unhandledStatus(addStatus)
-        }
+    private static func loadSession(
+        service: String,
+        account: String,
+        decoder: JSONDecoder,
+        storage: KeychainSessionStorage
+    ) -> AuthSession? {
+        guard let data = storage.load(service: service, account: account) else { return nil }
+        return try? decoder.decode(AuthSession.self, from: data)
     }
+}
 
-    private func baseQuery() -> [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-    }
+protocol KeychainSessionStorage: Sendable {
+    func load(service: String, account: String) -> Data?
+    func save(_ data: Data, service: String, account: String) throws
+    func clear(service: String, account: String)
+}
 
-    private static func loadSession(service: String, account: String, decoder: JSONDecoder) -> AuthSession? {
+struct SystemKeychainSessionStorage: KeychainSessionStorage {
+    func load(service: String, account: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -90,11 +82,47 @@ final class KeychainSessionStore: SessionStore {
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
         guard status == errSecSuccess else { return nil }
-        guard let data = item as? Data else { return nil }
-        return try? decoder.decode(AuthSession.self, from: data)
+        return item as? Data
+    }
+
+    func save(_ data: Data, service: String, account: String) throws {
+        let query = baseQuery(service: service, account: account)
+        let updateStatus = SecItemUpdate(
+            query as CFDictionary,
+            [kSecValueData as String: data] as CFDictionary
+        )
+
+        if updateStatus == errSecSuccess {
+            return
+        }
+
+        guard updateStatus == errSecItemNotFound else {
+            throw KeychainSessionStorageError.unhandledStatus(updateStatus)
+        }
+
+        var addQuery = query
+        addQuery[kSecValueData as String] = data
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+
+        let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+        guard addStatus == errSecSuccess else {
+            throw KeychainSessionStorageError.unhandledStatus(addStatus)
+        }
+    }
+
+    func clear(service: String, account: String) {
+        SecItemDelete(baseQuery(service: service, account: account) as CFDictionary)
+    }
+
+    private func baseQuery(service: String, account: String) -> [String: Any] {
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account
+        ]
     }
 }
 
-private enum KeychainSessionStoreError: Error {
+private enum KeychainSessionStorageError: Error {
     case unhandledStatus(OSStatus)
 }

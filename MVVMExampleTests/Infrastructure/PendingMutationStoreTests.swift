@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 import Testing
 @testable import MVVMExample
@@ -38,6 +39,55 @@ struct PendingMutationStoreTests {
         #expect(mutations.count == 1)
         #expect(mutation.key == PersistedPendingMutation.profileUpdateKey(userID: 42, profileID: 42))
         #expect(store.decodeProfileUpdate(mutation) == PendingProfileUpdateMutation(profileID: 42, request: second))
+    }
+
+
+
+    @Test("Pending sync failure backoff and invalid payload behavior")
+    func pendingSyncFailureBackoffAndInvalidPayloadBehavior() async throws {
+        let context = try makeInMemoryModelContext()
+        let store = PendingMutationStore(modelContext: context)
+        let newsRepository = ControllablePendingNewsRepository()
+        let profileRepository = ControllablePendingProfileRepository()
+        let syncService = PendingMutationSyncService(
+            pendingStore: store,
+            newsRepository: newsRepository,
+            profileRepository: profileRepository
+        )
+        store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true)
+
+        syncService.syncPendingMutations(for: 42)
+        _ = await newsRepository.waitForToggleCall(at: 0)
+        await newsRepository.completeToggle(at: 0, with: .failure(AppAPIError.offline))
+        await drainPendingMainActorTasks()
+
+        let failedMutation = try #require(fetchPendingMutations(in: context).first)
+        #expect(failedMutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 7))
+        #expect(failedMutation.retryCount == 1)
+        #expect(failedMutation.lastAttemptAt != nil)
+        #expect(failedMutation.lastErrorDescription?.isEmpty == false)
+
+        let now = Date(timeIntervalSince1970: 2_000)
+        store.markAttempt(failedMutation, at: now)
+        store.markFailure(failedMutation, error: AppAPIError.offline, at: now)
+        #expect(store.dueMutations(for: 42, now: now.addingTimeInterval(1)).isEmpty)
+        #expect(store.dueMutations(for: 42, now: now.addingTimeInterval(20)).map(\.key) == [failedMutation.key])
+
+        store.clearArticleLike(userID: 42, articleID: 7)
+        context.insert(PersistedPendingMutation(
+            key: PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 8),
+            userID: 42,
+            kind: PendingMutationKind.articleLike,
+            payloadData: Data("invalid".utf8)
+        ))
+        try context.save()
+
+        syncService.syncPendingMutations(for: 42)
+        await drainPendingMainActorTasks()
+
+        let invalidPayloadMutation = try #require(fetchPendingMutations(in: context).first)
+        #expect(invalidPayloadMutation.retryCount == 1)
+        #expect(invalidPayloadMutation.lastErrorDescription?.isEmpty == false)
     }
 
     @Test("Pending sync clears successful article and profile mutations")

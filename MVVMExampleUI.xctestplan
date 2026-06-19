@@ -1,7 +1,7 @@
 {
   "configurations": [
     {
-      "id": "B1D7F9A2-8B8E-41EF-9F3D-UI0000000001",
+      "id": "B1D7F9A2-8B8E-41EF-9F3D-A10000000001",
       "name": "UI Accessibility Smoke Tests",
       "options": {}
     }

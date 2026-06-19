@@ -17,7 +17,7 @@
   "testTargets": [
     {
       "enabled": true,
-      "parallelizable": true,
+      "parallelizable": false,
       "target": {
         "containerPath": "container:MVVMExample.xcodeproj",
         "identifier": "177120BDB76CBC9039B9FB95",

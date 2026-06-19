@@ -68,6 +68,55 @@ struct ProfileEditViewModelTests {
         #expect(viewModel.state.errorMessage == AppErrorMapper.userMessage(for: AppAPIError.offline))
         #expect(router.path.isEmpty == false)
     }
+
+    @Test("Profile edit save success updates profile presentation")
+    func profileEditSaveSuccessUpdatesProfilePresentation() async {
+        let repository = ControllableProfileRepository()
+        let router = ProfileRouter()
+        let profileViewModel = ProfileViewModel(
+            session: makeEditAuthSession(),
+            repository: repository,
+            router: router,
+            onLogout: {}
+        )
+        let payload = makePayload()
+        router.openEdit(payload)
+        let editViewModel = ProfileEditViewModel(
+            payload: payload,
+            repository: repository,
+            router: router,
+            onSaveSuccess: { profileViewModel.profileUpdated($0) }
+        )
+
+        editViewModel.firstName = "  Katherine  "
+        editViewModel.lastName = "  Johnson  "
+        editViewModel.email = "  katherine@example.com  "
+
+        editViewModel.saveTapped()
+        let call = await repository.waitForUpdateCall()
+        await repository.waitForUpdateContinuation()
+
+        #expect(call.request == UpdateProfileRequest(
+            firstName: "Katherine",
+            lastName: "Johnson",
+            email: "katherine@example.com"
+        ))
+
+        await repository.completeUpdate(with: .success(makeProfile(
+            firstName: "Katherine",
+            lastName: "Johnson",
+            email: "katherine@example.com"
+        )))
+        await drainMainActorTasks()
+
+        guard case .content(let content) = profileViewModel.state else {
+            Issue.record("Expected updated profile content")
+            return
+        }
+        #expect(content.displayName == "Katherine Johnson")
+        #expect(content.emailText == "katherine@example.com")
+        #expect(router.path.isEmpty == true)
+    }
 }
 
 private struct ProfileUpdateCall: Equatable {
@@ -147,6 +196,21 @@ private func makeProfile(firstName: String, lastName: String, email: String) -> 
         phone: nil,
         imageURL: nil,
         companyTitle: nil
+    )
+}
+
+private func makeEditAuthSession() -> AuthSession {
+    AuthSession(
+        accessToken: "profile-edit-access-credential-not-a-secret",
+        refreshToken: "profile-edit-refresh-credential-not-a-secret",
+        user: AppUser(
+            id: 42,
+            username: "fixture-user",
+            email: "grace@example.com",
+            firstName: "Grace",
+            lastName: "Hopper",
+            imageURL: nil
+        )
     )
 }
 

@@ -53,6 +53,49 @@ struct NewsDetailViewModelTests {
         #expect(message.message == "You appear to be offline. Check your connection and try again.")
     }
 
+    @Test("Detail load overlays shared interaction state")
+    func detailLoadOverlaysSharedInteractionState() async {
+        let interactionStore = ArticleInteractionStore()
+        interactionStore.setLikeState(articleID: 7, isLiked: true, likesCount: 99)
+        let repository = ControllableNewsDetailRepository()
+        let viewModel = makeDetailViewModel(repository: repository, interactionStore: interactionStore)
+
+        await loadDetailContent(
+            viewModel: viewModel,
+            repository: repository,
+            article: makeDetailArticle(isLiked: false, likesCount: 10)
+        )
+
+        assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 99")
+    }
+
+    @Test("Cancelled detail load does not publish stale response")
+    func cancelledDetailLoadDoesNotPublishStaleResponse() async {
+        let repository = ControllableNewsDetailRepository()
+        let viewModel = makeDetailViewModel(repository: repository)
+
+        viewModel.appeared()
+        _ = await repository.waitForDetailRequest(at: 0)
+        await repository.waitForDetailContinuation(at: 0)
+
+        viewModel.retryTapped()
+        _ = await repository.waitForDetailRequest(at: 1)
+        await repository.waitForDetailContinuation(at: 1)
+
+        await repository.completeDetail(at: 0, with: .success(makeDetailArticle(isLiked: true, likesCount: 99)))
+        await drainDetailMainActorTasks()
+
+        guard case .loading = viewModel.state else {
+            Issue.record("Expected second loading state after stale first response")
+            return
+        }
+
+        await repository.completeDetail(at: 1, with: .success(makeDetailArticle(isLiked: false, likesCount: 10)))
+        await drainDetailMainActorTasks()
+
+        assertDetailContent(viewModel.state, isFavorite: false, likesText: "Likes 10")
+    }
+
     @Test("Favorite success keeps local optimistic count after stale server acknowledgement")
     func favoriteSuccessKeepsLocalOptimisticCountAfterStaleServerAcknowledgement() async throws {
         let context = try makeInMemoryModelContext()

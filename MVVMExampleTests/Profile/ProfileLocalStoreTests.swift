@@ -5,6 +5,46 @@ import Testing
 @MainActor
 @Suite("Profile local store tests")
 struct ProfileLocalStoreTests {
+
+
+    @Test("Profile local merge load fallback and no-local update failure")
+    func profileLocalMergeLoadFallbackAndNoLocalUpdateFailure() async throws {
+        let context = try makeInMemoryModelContext()
+        let localStore = ProfileLocalStore(modelContext: context)
+        let pendingStore = PendingMutationStore(modelContext: context)
+        let remoteRepository = QueueProfileRepository()
+        let repository = OfflineProfileRepository(
+            remote: remoteRepository,
+            localStore: localStore,
+            pendingMutationStore: pendingStore
+        )
+        let localProfile = makeLocalProfile(firstName: "Ada", lastName: "Lovelace", email: "ada@example.com")
+        localStore.save(localProfile)
+
+        let merged = localStore.merge(remoteProfile: makeLocalProfile(firstName: "Server", lastName: "Stale", email: "stale@example.com"))
+        #expect(merged == localProfile)
+
+        await remoteRepository.enqueueLoadResult(.failure(AppAPIError.offline))
+        let loaded = try await repository.loadCurrentProfile(session: makeProfileSession(userID: 42))
+        #expect(loaded == localProfile)
+
+        let emptyContext = try makeInMemoryModelContext()
+        let emptyRemoteRepository = QueueProfileRepository()
+        let emptyRepository = OfflineProfileRepository(
+            remote: emptyRemoteRepository,
+            localStore: ProfileLocalStore(modelContext: emptyContext),
+            pendingMutationStore: PendingMutationStore(modelContext: emptyContext)
+        )
+        await emptyRemoteRepository.enqueueUpdateResult(.failure(AppAPIError.offline))
+        await #expect(throws: AppAPIError.offline) {
+            _ = try await emptyRepository.updateProfile(
+                id: 42,
+                request: UpdateProfileRequest(firstName: "Ada", lastName: "Lovelace", email: "ada@example.com")
+            )
+        }
+        #expect(fetchPendingMutations(in: emptyContext).isEmpty)
+    }
+
     @Test("Profile update success preserves editable request fields when server acknowledgement is stale")
     func profileUpdateSuccessPreservesEditableRequestFieldsWhenServerAcknowledgementIsStale() async throws {
         let context = try makeInMemoryModelContext()
@@ -61,10 +101,12 @@ struct ProfileLocalStoreTests {
 }
 
 private actor QueueProfileRepository: ProfileRepository {
+    private var loadResults: [Result<UserProfile, Error>] = []
     private var updateResults: [Result<UserProfile, Error>] = []
 
     func loadCurrentProfile(session: AuthSession) async throws -> UserProfile {
-        throw AppAPIError.transport("Unsupported test path")
+        guard !loadResults.isEmpty else { throw AppAPIError.transport("Missing queued load result") }
+        return try loadResults.removeFirst().get()
     }
 
     func updateProfile(id: UserProfile.ID, request: UpdateProfileRequest) async throws -> UserProfile {
@@ -72,9 +114,28 @@ private actor QueueProfileRepository: ProfileRepository {
         return try updateResults.removeFirst().get()
     }
 
+    func enqueueLoadResult(_ result: Result<UserProfile, Error>) {
+        loadResults.append(result)
+    }
+
     func enqueueUpdateResult(_ result: Result<UserProfile, Error>) {
         updateResults.append(result)
     }
+}
+
+private func makeProfileSession(userID: Int) -> AuthSession {
+    AuthSession(
+        accessToken: "profile-access-token-not-a-secret",
+        refreshToken: "profile-refresh-token-not-a-secret",
+        user: AppUser(
+            id: userID,
+            username: "fixture-user",
+            email: "fixture@example.com",
+            firstName: "Fixture",
+            lastName: "User",
+            imageURL: nil
+        )
+    )
 }
 
 private func makeLocalProfile(firstName: String, lastName: String, email: String) -> UserProfile {
