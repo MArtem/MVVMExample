@@ -57,6 +57,11 @@ final class NewsListViewModel {
         loadIfNeeded()
     }
 
+    /// Reconciles visible rows with locally persisted user interactions when returning from detail.
+    func becameVisible() {
+        synchronizeVisibleContentWithInteractionStore()
+    }
+
     func retryTapped() {
         load()
     }
@@ -210,6 +215,25 @@ final class NewsListViewModel {
         return index >= max(articles.count - paginationThreshold, 0)
     }
 
+    private func synchronizeVisibleContentWithInteractionStore() {
+        guard !articles.isEmpty else { return }
+
+        let mergedArticles = interactionStore.merge(articles)
+        guard mergedArticles != articles else { return }
+
+        articles = mergedArticles
+        let updatedCards = viewStateBuilder.makeContent(from: articles).cards
+
+        switch state {
+        case .content(let currentContent):
+            state = .content(currentContent.replacingCards(updatedCards))
+        case .refreshing(let currentContent):
+            state = .refreshing(currentContent.replacingCards(updatedCards))
+        default:
+            break
+        }
+    }
+
     /// Rebuilds content state from the current domain cache.
     ///
     /// UI hot-path note:
@@ -333,6 +357,16 @@ final class NewsListViewModel {
         default:
             return []
         }
+    }
+}
+
+private extension NewsListContentViewState {
+    func replacingCards(_ cards: [NewsCardViewState]) -> NewsListContentViewState {
+        NewsListContentViewState(
+            cards: cards,
+            banner: banner,
+            pagination: pagination
+        )
     }
 }
 

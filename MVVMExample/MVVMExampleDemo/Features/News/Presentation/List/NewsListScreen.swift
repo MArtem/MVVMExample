@@ -23,6 +23,9 @@ struct NewsListScreen: View {
         .task {
             viewModel.appeared()
         }
+        .onAppear {
+            viewModel.becameVisible()
+        }
     }
 }
 
