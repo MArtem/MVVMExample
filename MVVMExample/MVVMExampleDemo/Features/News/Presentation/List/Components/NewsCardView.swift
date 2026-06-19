@@ -72,6 +72,7 @@ struct NewsCardView: View, Equatable {
             }
             .padding(AppSpacing.md)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppTheme.surfacePrimary)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
         .overlay {

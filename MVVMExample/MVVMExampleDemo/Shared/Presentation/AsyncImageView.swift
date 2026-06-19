@@ -33,6 +33,8 @@ struct AsyncImageView: View {
                         .foregroundStyle(AppTheme.textTertiary)
                 }
         }
-        .frame(maxWidth: width == nil ? .infinity : width)
+        .frame(width: width)
+        .frame(maxWidth: width == nil ? .infinity : nil)
+        .frame(height: height)
     }
 }

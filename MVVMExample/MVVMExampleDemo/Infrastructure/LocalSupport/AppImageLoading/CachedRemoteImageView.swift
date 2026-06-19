@@ -43,7 +43,8 @@ struct CachedRemoteImageView<Placeholder: View, Failure: View>: View {
 
     var body: some View {
         content
-            .frame(width: targetSize.width, height: targetSize.height)
+            .frame(maxWidth: .infinity)
+            .frame(height: targetSize.height)
             .clipped()
             .task(id: taskID) {
                 await load()
