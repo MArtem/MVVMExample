@@ -1,0 +1,20 @@
+{
+  "configurations" : [
+    {
+      "id" : "Debug",
+      "name" : "Debug",
+      "options" : { }
+    }
+  ],
+  "defaultOptions" : { },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:VIPERArchitectureCase.xcodeproj",
+        "identifier" : "VIPERArchitectureCaseTests",
+        "name" : "VIPERArchitectureCaseTests"
+      }
+    }
+  ],
+  "version" : 1
+}

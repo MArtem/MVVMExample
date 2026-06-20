@@ -1,33 +1,22 @@
-# VIPER
+# VIPER Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/13-viper`
+## Project
+`VIPERArchitectureCase`
 
 ## Target Architecture
-VIPER
-
-## Purpose
-View/Interactor/Presenter/Entity/Router/Builder role separation for high-ceremony enterprise comparison.
-
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+VIPER: View / Interactor / Presenter / Entity / Router / Builder.
 
 ## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [ ] Build passed for this case.
+- [x] Removed source-app project naming from this case.
+- [x] Replaced copied baseline with standalone VIPER project files.
+- [x] Added non-empty VIPER roles for the `ArticleList` module.
+- [x] Build verified.
+- [x] Tests verified.
 
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
-
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## VIPER Gate
+- Presenter owns presentation decisions and module coordination.
+- Interactor owns deterministic data/business retrieval.
+- Router owns route state and destination view construction.
+- Builder owns assembly.
+- View renders state and forwards user intent only.
+- No empty pass-through role exists solely for ceremony.
