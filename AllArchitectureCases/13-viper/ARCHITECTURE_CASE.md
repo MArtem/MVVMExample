@@ -3,20 +3,33 @@
 ## Project
 `VIPERArchitectureCase`
 
-## Target Architecture
-VIPER: View / Interactor / Presenter / Entity / Router / Builder.
+## Goal
+Full functional clone of the source app using VIPER architecture.
 
-## Conversion Status
-- [x] Removed source-app project naming from this case.
-- [x] Replaced copied baseline with standalone VIPER project files.
-- [x] Added non-empty VIPER roles for the `ArticleList` module.
-- [x] Build verified.
-- [x] Tests verified.
+## Current Status
+- [x] Full app functionality/design baseline copied into a standalone project name.
+- [x] Source app project name removed from paths and identifiers.
+- [x] Feature modules converted from presentation ownership to VIPER roles.
+- [x] Build verified after full VIPER conversion.
+- [x] Test-build verified after full VIPER conversion.
 
-## VIPER Gate
-- Presenter owns presentation decisions and module coordination.
-- Interactor owns deterministic data/business retrieval.
-- Router owns route state and destination view construction.
-- Builder owns assembly.
-- View renders state and forwards user intent only.
-- No empty pass-through role exists solely for ceremony.
+## VIPER Target State
+Each feature should use:
+- View: render-only UI and user intent forwarding.
+- Interactor: business/data loading, mutation, persistence/sync calls.
+- Presenter: presentation state, formatting coordination, user intent orchestration.
+- Entity: domain/presentation entities that do not leak DTO/database models into UI.
+- Router: navigation state and destination assembly only.
+- Builder: module assembly and dependency wiring.
+
+## Rule
+Do not remove functionality or design to make conversion easier. Preserve auth, news list/detail, profile/profile-edit, persistence/sync, local support behavior, localization, accessibility identifiers, and design system behavior unless a deliberate documented architecture decision says otherwise.
+
+
+## Implemented VIPER Mapping
+- **Views**: SwiftUI screens/components render presenter state and forward explicit user intents.
+- **Interactors**: Login, news list, detail, profile, and profile-edit modules own repository/local-store calls.
+- **Presenters**: Observable presentation owners expose explicit methods; no generic dispatch/action enum was introduced.
+- **Entities**: Existing domain entities and route payloads remain the module data contracts.
+- **Routers**: News/profile routers own navigation paths and route payloads.
+- **Builders**: Module builders assemble presenters/screens at app and navigation boundaries.

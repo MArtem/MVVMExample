@@ -1,20 +1,29 @@
 {
-  "configurations" : [
+  "configurations": [
     {
-      "id" : "Debug",
-      "name" : "Debug",
-      "options" : { }
+      "id": "7D3C8A07-7F45-4A30-9B9B-9E7F30D4C111",
+      "name": "Unit Tests",
+      "options": {}
     }
   ],
-  "defaultOptions" : { },
-  "testTargets" : [
+  "defaultOptions": {
+    "codeCoverage": false,
+    "targetForVariableExpansion": {
+      "containerPath": "container:VIPERArchitectureCase.xcodeproj",
+      "identifier": "B6C8419759BE6F64A5E6D521",
+      "name": "VIPERArchitectureCase"
+    }
+  },
+  "testTargets": [
     {
-      "target" : {
-        "containerPath" : "container:VIPERArchitectureCase.xcodeproj",
-        "identifier" : "VIPERArchitectureCaseTests",
-        "name" : "VIPERArchitectureCaseTests"
+      "enabled": true,
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:VIPERArchitectureCase.xcodeproj",
+        "identifier": "177120BDB76CBC9039B9FB95",
+        "name": "VIPERArchitectureCaseTests"
       }
     }
   ],
-  "version" : 1
+  "version": 1
 }

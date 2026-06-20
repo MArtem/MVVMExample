@@ -1,21 +1,15 @@
 # VIPERArchitectureCase
 
-A standalone iOS project demonstrating a compact, non-empty VIPER module.
+A full functional architecture-case clone of the source app converted to VIPER.
 
-## Architecture
-The sample module is `ArticleList` and uses VIPER responsibilities:
-
-- **View**: renders presenter state and forwards user intent.
-- **Interactor**: owns business/data retrieval for deterministic sample articles.
-- **Presenter**: coordinates loading, selection, and presentation mapping.
-- **Entity**: represents domain data used by the module.
-- **Router**: owns navigation route state and destination construction.
-- **Builder**: assembles the module dependencies.
+This project must preserve the original app's functionality and design while using VIPER module ownership.
 
 ## Verification
 
 ```zsh
 ./scripts/verify.sh list
 ./scripts/verify.sh build
-./scripts/verify.sh test
+./scripts/verify.sh test-build
 ```
+
+Runtime simulator UI/test lanes require an available simulator destination and remain environment-dependent.
