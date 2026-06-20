@@ -1,33 +1,33 @@
-# MVVM Explicit Intents
+# MVVM Explicit Intents Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/02-mvvm-explicit-intents`
+## Project
+`ExplicitIntentMVVMCase`
 
-## Target Architecture
-MVVM Explicit Intents
+## Goal
+Full functional clone using MVVM with explicit intent methods and standalone project identity.
 
-## Purpose
-Screen-level state with ViewModels exposing explicit user/system intent methods.
+## Current Status
+- [x] Full app functionality/design baseline copied into a standalone project name.
+- [x] Source app project name removed from paths and identifiers.
+- [x] Feature presentation ownership verified as MVVM explicit intents.
+- [x] Build verified after identity conversion.
+- [x] Test-build verified after identity conversion.
 
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+## Target State
+- **View**: SwiftUI views render immutable view state and call explicit ViewModel methods such as `loginTapped()`, `refreshRequested()`, `favoriteTapped()`, `saveTapped()`, and `logoutTapped()`.
+- **ViewModel**: owns screen state, cancellable tasks, user-safe error mapping, and orchestration of repository calls.
+- **Domain/Data**: repositories, DTO mapping, persistence, and pending sync remain outside SwiftUI views.
+- **Coordinator/Router**: navigation state only; no API, persistence, or business work.
 
-## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [ ] Build passed for this case.
+## Architecture Review
+- **Detected style**: MVVM with explicit intents plus separate navigation coordination.
+- **Evidence**: presentation files retain ViewModel roles, SwiftUI screens use `@State` model ownership only to retain observable ViewModels, and UI events call named methods instead of generic dispatch.
+- **Applicable gate**: dependencies enter through initializers; DTO/database/keychain types do not leak into views; row views receive narrow state/callbacks.
+- **Rejected for this case**: no generic `send(_:)`, no UI action-enum reducer loop, no TCA/UDF scaffolding, no decorative use-case layer.
 
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
-
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## Verification
+- `./scripts/verify.sh static`
+- `./scripts/verify.sh build`
+- `./scripts/verify.sh test-build`
+- Source-identity grep for stale project/product names
+- Architecture grep for generic `send(_:)`, `dispatch(_:)`, and action-enum reducer boilerplate
