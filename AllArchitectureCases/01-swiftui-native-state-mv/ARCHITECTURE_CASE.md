@@ -1,34 +1,37 @@
-# SwiftUI Native State / MV
+# SwiftUI Native State / MV Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/01-swiftui-native-state-mv`
+## Project
+`SwiftUINativeStateCase`
 
-## Target Architecture
-SwiftUI Native State / MV
+## Goal
+Full functional clone of the source app using SwiftUI Native State / MV ownership.
 
-## Purpose
-Local visual state, simple controls, pure SwiftUI value state where no API/DB/business ownership is needed.
+## Current Status
+- [x] Full app functionality/design baseline copied into a standalone project name.
+- [x] Source app project name removed from paths and identifiers.
+- [x] Feature presentation ownership converted from model-owner classes to SwiftUI-native state/MV roles.
+- [x] Build verified after full architecture conversion.
+- [x] Test-build verified after full architecture conversion.
 
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+## Target State
+- **View**: SwiftUI views own local state and forward explicit UI events to local methods.
+- **Model**: domain/data models and lightweight screen models hold durable state where async work cannot live directly in value-type views without unsafe lifecycle behavior.
+- **Services/Repositories**: existing infrastructure remains behind injected dependencies; views must not create raw URLSession/persistence clients.
+- **Coordinator/Router**: app/navigation state remains explicit and does not perform business/data work.
 
-## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [x] Baseline smoke build passed before architecture conversion.
-- [ ] Build passed after architecture-specific conversion.
+## Rule
+Do not remove functionality or design to make conversion easier. Preserve auth, news list/detail, profile/profile-edit, persistence/sync, local support behavior, localization, accessibility identifiers, and design system behavior unless a deliberate documented architecture decision says otherwise.
 
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
+## Architecture Review
+- **Detected style**: SwiftUI Native State / MV with explicit app/navigation state.
+- **Evidence**: SwiftUI screens own their observable screen models with `@State`; UI events call explicit methods such as `loginTapped()`, `refreshRequested()`, and `favoriteTapped()`; repositories and persistence remain injected instead of being created by views.
+- **Boundary decision**: async loading, cancellation, optimistic sync, and durable local state are kept in lightweight screen models because value-type SwiftUI views are not safe owners for those lifecycles.
+- **Navigation**: routers/coordinators own route state only; they do not perform API, persistence, or business work.
+- **Rejected for this case**: no source-app identity, no previous presentation-role naming, no generic `send(_:)`, no action-enum reducer loop, no local package reintroduction.
 
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## Verification
+- `./scripts/verify.sh static`
+- `./scripts/verify.sh build`
+- `./scripts/verify.sh test-build`
+- Source-identity grep for stale project/product names
+- Role/API grep for stale presentation-role names, generic `send(_:)`, `dispatch(_:)`, and action-enum reducer boilerplate

@@ -21,12 +21,12 @@ for path in root.rglob('*.swift'):
         for m in rx.finditer(text):
             line=text[:m.start()].count('\n')+1
             findings.append((name,rel,line))
-    if 'ViewModel.swift' in rel:
+    if 'Model.swift' in rel:
         for m in task_pattern.finditer(text):
             prefix = text[max(0, m.start()-80):m.start()]
             if '= ' not in prefix and '=\n' not in prefix:
                 line=text[:m.start()].count('\n')+1
-                findings.append(('Task without explicit ViewModel task ownership', rel, line))
+                findings.append(('Task without explicit Model task ownership', rel, line))
 if findings:
     print('SwiftUI hot-path review candidates:')
     for name,rel,line in findings[:150]:
