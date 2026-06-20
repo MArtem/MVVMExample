@@ -1,33 +1,33 @@
-# Clean / Layered
+# Clean / Layered Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/04-clean-layered`
+## Project
+`CleanLayeredCase`
 
-## Target Architecture
-Clean / Layered
+## Goal
+Full functional clone using explicit Presentation, Domain, Data, and Infrastructure boundaries with standalone project identity.
 
-## Purpose
-Presentation/domain/data split where real API/cache/DB/business boundaries exist.
+## Current Status
+- [x] Full app functionality/design baseline copied into a standalone project name.
+- [x] Source app project name removed from paths and identifiers.
+- [x] Clean / Layered boundaries verified.
+- [x] Build verified after identity conversion.
+- [x] Test-build verified after identity conversion.
 
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+## Target State
+- **Presentation**: SwiftUI views, view state builders, and ViewModels; no DTO/database/API request construction.
+- **Domain**: feature entities and repository contracts; no SwiftUI, URLSession, SwiftData, or DTO dependencies.
+- **Data**: DTOs, API request definitions, mappers, and repository implementations.
+- **Infrastructure**: reusable app-local mechanics such as network client, persistence, configuration, localization, logging, image cache/loading.
 
-## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [ ] Build passed for this case.
+## Architecture Review
+- **Detected style**: Clean / Layered feature slices with MVVM presentation.
+- **Evidence**: each feature keeps `Presentation`, `Domain`, and `Data`; DTO mapping is isolated under data mapping files; SwiftUI screens consume view state/domain values, not transport DTOs.
+- **Applicable gate**: dependency direction stays inward from data/infrastructure to domain contracts and outward composition happens at the app boundary.
+- **Rejected for this case**: no pass-through use-case layer, no decorative repository protocols beyond existing real seams, no DTO or SwiftData leakage into views.
 
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
-
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## Verification
+- `./scripts/verify.sh static`
+- `./scripts/verify.sh build`
+- `./scripts/verify.sh test-build`
+- Source-identity grep for stale project/product names
+- Layer grep/review for DTO/API/persistence leakage into presentation/domain
