@@ -34,12 +34,11 @@ final class NewsListPresenter {
     private var paginationGeneration = 0
 
     init(
-        repository: NewsRepository,
+        interactor: NewsListInteractor,
         router: NewsRouter,
-        interactionStore: ArticleInteractionStore,
         viewStateBuilder: NewsListViewStateBuilder = NewsListViewStateBuilder()
     ) {
-        self.interactor = NewsListInteractor(repository: repository, interactionStore: interactionStore)
+        self.interactor = interactor
         self.router = router
         self.viewStateBuilder = viewStateBuilder
     }

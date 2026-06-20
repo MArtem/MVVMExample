@@ -23,12 +23,11 @@ final class NewsDetailPresenter {
 
     init(
         payload: NewsDetailRoutePayload,
-        repository: NewsRepository,
-        interactionStore: ArticleInteractionStore,
+        interactor: NewsDetailInteractor,
         viewStateBuilder: NewsDetailViewStateBuilder = NewsDetailViewStateBuilder()
     ) {
         self.payload = payload
-        self.interactor = NewsDetailInteractor(repository: repository, interactionStore: interactionStore)
+        self.interactor = interactor
         self.viewStateBuilder = viewStateBuilder
         self.state = .loading(viewStateBuilder.makePlaceholder(from: payload))
     }

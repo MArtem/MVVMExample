@@ -376,9 +376,8 @@ private func makePresenter(
     interactionStore: ArticleInteractionStore
 ) -> NewsListPresenter {
     NewsListPresenter(
-        repository: repository,
-        router: NewsRouter(),
-        interactionStore: interactionStore
+        interactor: NewsListInteractor(repository: repository, interactionStore: interactionStore),
+        router: NewsRouter()
     )
 }
 

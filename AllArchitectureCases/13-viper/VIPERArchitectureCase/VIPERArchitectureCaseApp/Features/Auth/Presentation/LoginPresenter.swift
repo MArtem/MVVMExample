@@ -21,11 +21,11 @@ final class LoginPresenter {
     @ObservationIgnored private var loginTask: Task<Void, Never>?
 
     init(
-        repository: AuthRepository,
+        interactor: LoginInteractor,
         demoCredentials: DemoCredentials? = nil,
         onLoginSuccess: @escaping (AuthSession) -> Void
     ) {
-        self.interactor = LoginInteractor(repository: repository)
+        self.interactor = interactor
         self.demoCredentials = demoCredentials
         self.onLoginSuccess = onLoginSuccess
         self.state = LoginViewState(

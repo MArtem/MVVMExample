@@ -37,9 +37,8 @@ struct NewsListModuleBuilder {
     ) -> NewsListScreen {
         NewsListScreen(
             presenter: NewsListPresenter(
-                repository: repository,
-                router: router,
-                interactionStore: interactionStore
+                interactor: NewsListInteractor(repository: repository, interactionStore: interactionStore),
+                router: router
             )
         )
     }
@@ -56,8 +55,7 @@ struct NewsDetailModuleBuilder {
         NewsDetailScreen(
             presenter: NewsDetailPresenter(
                 payload: payload,
-                repository: repository,
-                interactionStore: interactionStore
+                interactor: NewsDetailInteractor(repository: repository, interactionStore: interactionStore)
             )
         )
     }

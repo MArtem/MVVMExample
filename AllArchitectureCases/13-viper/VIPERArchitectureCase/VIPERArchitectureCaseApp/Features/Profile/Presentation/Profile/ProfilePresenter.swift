@@ -21,13 +21,12 @@ final class ProfilePresenter {
     private var loadGeneration = 0
 
     init(
-        session: AuthSession,
-        repository: ProfileRepository,
+        interactor: ProfileInteractor,
         router: ProfileRouter,
         viewStateBuilder: ProfileViewStateBuilder = ProfileViewStateBuilder(),
         onLogout: @escaping () -> Void
     ) {
-        self.interactor = ProfileInteractor(session: session, repository: repository)
+        self.interactor = interactor
         self.router = router
         self.viewStateBuilder = viewStateBuilder
         self.onLogout = onLogout

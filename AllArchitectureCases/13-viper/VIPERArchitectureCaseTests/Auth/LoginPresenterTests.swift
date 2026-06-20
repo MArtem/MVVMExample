@@ -6,14 +6,14 @@ import Testing
 struct LoginPresenterTests {
     @Test("Demo credentials populate form only when configured")
     func demoCredentialsPopulateFormOnlyWhenConfigured() {
-        let hiddenPresenter = LoginPresenter(repository: ControllableAuthRepository(), demoCredentials: nil, onLoginSuccess: { _ in })
+        let hiddenPresenter = LoginPresenter(interactor: LoginInteractor(repository: ControllableAuthRepository()), demoCredentials: nil, onLoginSuccess: { _ in })
         hiddenPresenter.useDemoCredentialsTapped()
         #expect(hiddenPresenter.username == "")
         #expect(hiddenPresenter.password == "")
         #expect(hiddenPresenter.state.showsDemoCredentialsButton == false)
 
         let shownPresenter = LoginPresenter(
-            repository: ControllableAuthRepository(),
+            interactor: LoginInteractor(repository: ControllableAuthRepository()),
             demoCredentials: DemoCredentials(username: "demo-user", password: "demo-pass"),
             onLoginSuccess: { _ in }
         )
@@ -27,7 +27,7 @@ struct LoginPresenterTests {
     func loginSuccessTrimsUsernameKeepsPasswordAndPublishesSession() async {
         let repository = ControllableAuthRepository()
         var receivedSession: AuthSession?
-        let presenter = LoginPresenter(repository: repository, onLoginSuccess: { receivedSession = $0 })
+        let presenter = LoginPresenter(interactor: LoginInteractor(repository: repository), onLoginSuccess: { receivedSession = $0 })
         presenter.username = "  ada  "
         presenter.password = "  secret  "
 
@@ -52,7 +52,7 @@ struct LoginPresenterTests {
     func loginFailureMapsToUserSafeErrorAndDoesNotPublishSession() async {
         let repository = ControllableAuthRepository()
         var successCount = 0
-        let presenter = LoginPresenter(repository: repository, onLoginSuccess: { _ in successCount += 1 })
+        let presenter = LoginPresenter(interactor: LoginInteractor(repository: repository), onLoginSuccess: { _ in successCount += 1 })
         presenter.username = "ada"
         presenter.password = "wrong"
 

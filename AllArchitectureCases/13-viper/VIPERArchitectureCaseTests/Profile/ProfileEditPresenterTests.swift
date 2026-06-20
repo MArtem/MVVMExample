@@ -14,7 +14,7 @@ struct ProfileEditPresenterTests {
         var savedProfile: UserProfile?
         let presenter = ProfileEditPresenter(
             payload: payload,
-            repository: repository,
+            interactor: ProfileEditInteractor(repository: repository),
             router: router,
             onSaveSuccess: { savedProfile = $0 }
         )
@@ -53,7 +53,7 @@ struct ProfileEditPresenterTests {
 
         let presenter = ProfileEditPresenter(
             payload: payload,
-            repository: repository,
+            interactor: ProfileEditInteractor(repository: repository),
             router: router,
             onSaveSuccess: { _ in Issue.record("Save success callback must not run on failure") }
         )
@@ -74,8 +74,7 @@ struct ProfileEditPresenterTests {
         let repository = ControllableProfileRepository()
         let router = ProfileRouter()
         let profilePresenter = ProfilePresenter(
-            session: makeEditAuthSession(),
-            repository: repository,
+            interactor: ProfileInteractor(session: makeEditAuthSession(), repository: repository),
             router: router,
             onLogout: {}
         )
@@ -83,7 +82,7 @@ struct ProfileEditPresenterTests {
         router.openEdit(payload)
         let editPresenter = ProfileEditPresenter(
             payload: payload,
-            repository: repository,
+            interactor: ProfileEditInteractor(repository: repository),
             router: router,
             onSaveSuccess: { profilePresenter.profileUpdated($0) }
         )

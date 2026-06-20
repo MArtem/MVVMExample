@@ -57,8 +57,7 @@ struct ProfileModuleBuilder {
         onLogout: @escaping () -> Void
     ) -> ProfilePresenter {
         ProfilePresenter(
-            session: session,
-            repository: repository,
+            interactor: ProfileInteractor(session: session, repository: repository),
             router: router,
             onLogout: onLogout
         )
@@ -77,7 +76,7 @@ struct ProfileEditModuleBuilder {
         ProfileEditScreen(
             presenter: ProfileEditPresenter(
                 payload: payload,
-                repository: repository,
+                interactor: ProfileEditInteractor(repository: repository),
                 router: router,
                 onSaveSuccess: onSaveSuccess
             )

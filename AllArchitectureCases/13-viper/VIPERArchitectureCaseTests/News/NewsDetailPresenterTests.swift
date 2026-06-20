@@ -246,8 +246,7 @@ private func makeDetailPresenter(
 ) -> NewsDetailPresenter {
     NewsDetailPresenter(
         payload: NewsDetailRoutePayload(id: 7, title: "Payload title", thumbnailURL: nil),
-        repository: repository,
-        interactionStore: interactionStore
+        interactor: NewsDetailInteractor(repository: repository, interactionStore: interactionStore)
     )
 }
 

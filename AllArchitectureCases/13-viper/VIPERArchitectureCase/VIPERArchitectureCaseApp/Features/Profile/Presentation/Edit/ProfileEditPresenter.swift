@@ -24,12 +24,12 @@ final class ProfileEditPresenter {
 
     init(
         payload: ProfileEditRoutePayload,
-        repository: ProfileRepository,
+        interactor: ProfileEditInteractor,
         router: ProfileRouter,
         onSaveSuccess: @escaping (UserProfile) -> Void
     ) {
         self.payload = payload
-        self.interactor = ProfileEditInteractor(repository: repository)
+        self.interactor = interactor
         self.router = router
         self.onSaveSuccess = onSaveSuccess
         self.firstName = payload.firstName

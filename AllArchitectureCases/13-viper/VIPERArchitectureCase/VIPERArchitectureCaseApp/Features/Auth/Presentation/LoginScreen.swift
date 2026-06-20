@@ -92,7 +92,7 @@ struct LoginModuleBuilder {
     ) -> LoginScreen {
         LoginScreen(
             presenter: LoginPresenter(
-                repository: repository,
+                interactor: LoginInteractor(repository: repository),
                 demoCredentials: demoCredentials,
                 onLoginSuccess: onLoginSuccess
             )

@@ -33,3 +33,4 @@ Do not remove functionality or design to make conversion easier. Preserve auth, 
 - **Entities**: Existing domain entities and route payloads remain the module data contracts.
 - **Routers**: News/profile routers own navigation paths and route payloads.
 - **Builders**: Module builders assemble presenters/screens at app and navigation boundaries.
+- **Dependency boundary**: Builders create Interactors; Presenters receive Interactors and no longer accept Repository dependencies directly.

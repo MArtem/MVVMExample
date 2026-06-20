@@ -33,9 +33,11 @@ struct NewsListScreen: View {
     NavigationStack {
         NewsListScreen(
             presenter: NewsListPresenter(
-                repository: MockNewsRepository(),
-                router: NewsRouter(),
-                interactionStore: ArticleInteractionStore()
+                interactor: NewsListInteractor(
+                    repository: MockNewsRepository(),
+                    interactionStore: ArticleInteractionStore()
+                ),
+                router: NewsRouter()
             )
         )
     }

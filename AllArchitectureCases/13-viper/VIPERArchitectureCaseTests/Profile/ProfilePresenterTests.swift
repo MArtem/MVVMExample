@@ -63,8 +63,7 @@ struct ProfilePresenterTests {
         let router = ProfileRouter()
         var logoutCount = 0
         let presenter = ProfilePresenter(
-            session: makeAuthSession(),
-            repository: repository,
+            interactor: ProfileInteractor(session: makeAuthSession(), repository: repository),
             router: router,
             onLogout: { logoutCount += 1 }
         )
@@ -121,8 +120,7 @@ private actor ControllableProfileLoadRepository: ProfileRepository {
 @MainActor
 private func makeProfilePresenter(repository: ControllableProfileLoadRepository) -> ProfilePresenter {
     ProfilePresenter(
-        session: makeAuthSession(),
-        repository: repository,
+        interactor: ProfileInteractor(session: makeAuthSession(), repository: repository),
         router: ProfileRouter(),
         onLogout: {}
     )
