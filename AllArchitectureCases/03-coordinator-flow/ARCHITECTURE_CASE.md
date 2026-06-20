@@ -1,33 +1,33 @@
-# Coordinator / Flow
+# Coordinator / Flow Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/03-coordinator-flow`
+## Project
+`CoordinatorFlowCase`
 
-## Target Architecture
-Coordinator / Flow
+## Goal
+Full functional clone using explicit coordinator/router navigation ownership with standalone project identity.
 
-## Purpose
-Navigation ownership through routes/coordinators while keeping business/data work out of navigation.
+## Current Status
+- [x] Full app functionality/design baseline copied into a standalone project name.
+- [x] Source app project name removed from paths and identifiers.
+- [x] Navigation ownership verified as Coordinator / Flow.
+- [x] Build verified after identity conversion.
+- [x] Test-build verified after identity conversion.
 
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+## Target State
+- **AppRootCoordinator**: owns startup/session restoration and auth-vs-main flow switching.
+- **MainCoordinator**: owns tab selection and top-level tab routing state.
+- **Feature Routers**: own typed route state and navigation stack mutation.
+- **Screens/ViewModels**: own screen state and business/data orchestration; navigation calls go through routers/coordinators.
 
-## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [ ] Build passed for this case.
+## Architecture Review
+- **Detected style**: Coordinator / Flow with feature MVVM screens underneath.
+- **Evidence**: `AppRootCoordinator`, `MainCoordinator`, `NewsRouter`, and `ProfileRouter` hold navigation state; routes carry IDs/value payloads; screen code calls router/coordinator intents instead of creating destinations ad hoc.
+- **Applicable gate**: navigation layer does not call repositories, persistence stores, keychain, or network clients.
+- **Rejected for this case**: no DTO/database objects in routes, no SwiftUI views in route payloads, no business work in routers, no speculative coordinator per tiny child view.
 
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
-
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## Verification
+- `./scripts/verify.sh static`
+- `./scripts/verify.sh build`
+- `./scripts/verify.sh test-build`
+- Source-identity grep for stale project/product names
+- Route payload grep/review for DTO/persistence/view leakage

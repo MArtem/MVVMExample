@@ -1,0 +1,29 @@
+{
+  "configurations": [
+    {
+      "id": "7D3C8A07-7F45-4A30-9B9B-9E7F30D4C111",
+      "name": "Unit Tests",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "codeCoverage": false,
+    "targetForVariableExpansion": {
+      "containerPath": "container:CoordinatorFlowCase.xcodeproj",
+      "identifier": "B6C8419759BE6F64A5E6D521",
+      "name": "CoordinatorFlowCase"
+    }
+  },
+  "testTargets": [
+    {
+      "enabled": true,
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:CoordinatorFlowCase.xcodeproj",
+        "identifier": "177120BDB76CBC9039B9FB95",
+        "name": "CoordinatorFlowCaseTests"
+      }
+    }
+  ],
+  "version": 1
+}
