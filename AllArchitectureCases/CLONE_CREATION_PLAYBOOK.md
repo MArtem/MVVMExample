@@ -49,6 +49,12 @@ Forbidden shortcuts:
 - running simulator UI/manual/Instruments lanes without explicit approval;
 - committing generated artifacts, `.DS_Store`, `xcuserdata`, `.xcuserstate`, Xcode caches, logs, or result bundles.
 
+
+## Model Routing For Architecture Cases
+- Use `GPT-5.5` for planning, architecture decisions, state ownership, app/test architecture, boundary decisions, performance-sensitive work, Xcode integration, and final review.
+- `GPT-5.4` may be used only for low-risk mechanics after `GPT-5.5` has fixed the architecture and ownership decision, such as bulk rename, mirror sync, simple grep/report, or repetitive script patching.
+- Quality is more important than token savings; if there is uncertainty, stay on `GPT-5.5`.
+
 ## Phase 0 — Preflight And Scope Lock
 Before touching a case folder:
 

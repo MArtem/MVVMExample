@@ -1,36 +1,30 @@
-# MVVMExample
+# Modular Feature-Sliced Case
 
-`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
+`ModularFeatureSlicedCase` is a standalone full-functional architecture case that preserves the source app behavior/design while expressing ownership as app shell, core/shared support, and independently reviewable feature slices.
 
-## Current Scope
+## Project
+- Xcode project: `./ModularFeatureSlicedCase.xcodeproj`
+- Scheme: `ModularFeatureSlicedCase`
+- App module folder: `./ModularFeatureSlicedCase/ModularFeatureSlicedCaseApp`
+- Unit tests: `./ModularFeatureSlicedCaseTests`
+- UI smoke target: `./ModularFeatureSlicedCaseUITests`
 
-- Auth login gate
-- News list/detail flow
-- Profile view/edit flow
-- DummyJSON-style test API integration
-- In-memory demo session store
-- Minimal app-local infrastructure copied from the reusable baseline
+## Source Organization
+- `./ModularFeatureSlicedCase/ModularFeatureSlicedCaseApp/AppShell/`: app composition, dependency wiring, auth gate, tab coordination, and root navigation.
+- `./ModularFeatureSlicedCase/ModularFeatureSlicedCaseApp/Features/`: independently owned feature slices for `Auth`, `News`, and `Profile`.
+- `./ModularFeatureSlicedCase/ModularFeatureSlicedCaseApp/Core/`: cross-feature mechanics such as design system, networking, persistence, configuration, logging, localization, image loading, and platform fallback support.
+- `./ModularFeatureSlicedCase/ModularFeatureSlicedCaseApp/Shared/`: narrow reusable presentation helpers and accessibility identifiers.
 
-## Architecture Rules
-
-- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
-- Generic `send(_ action:)` ViewModel dispatch is not default project style.
-- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
-- App-specific feature behavior stays in `./MVVMExample/`.
-- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
-
-## Demo/Test API Policy
-
-- Test API base URL is owned by configuration.
-- Demo credentials are allowed only in debug/demo mode.
-- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
+## Architecture
+- Feature slices own their presentation, navigation, domain contracts, data adapters, DTOs, mappers, and feature-local stores.
+- `AppShell` owns composition and product routing; it does not own DTO mapping, persistence internals, or feature business logic.
+- `Core` provides reusable mechanics only; it must not embed product policy for a specific feature.
+- Shared UI helpers remain narrow and reusable; repeated rows still receive immutable state plus explicit callbacks.
+- This case intentionally uses source-level modular boundaries inside one standalone Xcode target. It does not reintroduce local `./Packages` folders.
 
 ## Verification
-
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
+./scripts/verify.sh build
+./scripts/verify.sh test-build
 ```
-
-Tests are not written or modified unless explicitly requested.
