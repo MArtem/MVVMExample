@@ -1,36 +1,33 @@
-# MVVMExample
+# Hexagonal Ports & Adapters Case
 
-`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
+`HexagonalPortsAdaptersCase` is a standalone full-functional architecture case that preserves app behavior/design while expressing feature ownership through domain-owned ports plus driving and driven adapters.
 
-## Current Scope
+## Project
+- Xcode project: `./HexagonalPortsAdaptersCase.xcodeproj`
+- Scheme: `HexagonalPortsAdaptersCase`
+- App module folder: `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp`
+- Unit tests: `./HexagonalPortsAdaptersCaseTests`
+- UI smoke target: `./HexagonalPortsAdaptersCaseUITests`
 
-- Auth login gate
-- News list/detail flow
-- Profile view/edit flow
-- DummyJSON-style test API integration
-- In-memory demo session store
-- Minimal app-local infrastructure copied from the reusable baseline
+## Source Organization
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/AppShell/`: composition root, dependency wiring, root auth/session flow, and tab coordination.
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/Features/<Feature>/Ports/`: domain entities and domain-owned ports such as repository contracts.
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/Features/<Feature>/Adapters/Driving/`: SwiftUI presentation and feature navigation adapters that drive the app through user/system intents.
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/Features/<Feature>/Adapters/Driven/`: API DTOs, request definitions, mappers, concrete repositories, and feature-local stores that fulfill ports.
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/Adapters/Driven/CoreInfrastructure/`: cross-feature infrastructure adapters and local support mechanics.
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/Adapters/Driving/DesignSystem/`: reusable UI/design adapter mechanics.
+- `./HexagonalPortsAdaptersCase/HexagonalPortsAdaptersCaseApp/Shared/`: narrow presentation helpers and accessibility identifiers.
 
-## Architecture Rules
-
-- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
-- Generic `send(_ action:)` ViewModel dispatch is not default project style.
-- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
-- App-specific feature behavior stays in `./MVVMExample/`.
-- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
-
-## Demo/Test API Policy
-
-- Test API base URL is owned by configuration.
-- Demo credentials are allowed only in debug/demo mode.
-- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
+## Architecture
+- Ports are owned by feature/domain code and represent real external variability: auth API, news API, profile API, local persistence, session, pending sync, and image/configuration mechanics.
+- Driven adapters implement external edges such as HTTP/API, DTO mapping, SwiftData/Keychain-backed local persistence, image loading, and configuration.
+- Driving adapters are SwiftUI screens, navigation stacks, and ViewModels/presenters that translate UI intent into port calls.
+- `AppShell` wires concrete adapters to feature entry points; it does not contain DTO mapping, API request construction, or persistence internals.
+- This case intentionally stays in one standalone Xcode target and does not reintroduce local `./Packages` folders.
 
 ## Verification
-
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
+./scripts/verify.sh build
+./scripts/verify.sh test-build
 ```
-
-Tests are not written or modified unless explicitly requested.

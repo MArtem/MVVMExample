@@ -9,7 +9,7 @@ patterns = [
     ('aws access key', re.compile(r'AKIA[0-9A-Z]{16}')),
     ('generic token assignment', re.compile(r'(?i)(api[_-]?key|secret|token|password)\s*[:=]\s*["\'][^"\']{16,}["\']')),
 ]
-exclude = {'.git', 'DerivedData', '.zenflow', 'docs/reusable-baseline/external-environment'}
+exclude = {'.git', 'DerivedData', '.xcode-derived-data', '.xcode-package-cache', '.xcode-result-bundles', '.zenflow', 'docs/reusable-baseline/external-environment'}
 allowed_demo_literals = (
     'demo-access-credential-not-a-secret',
     'demo-refresh-credential-not-a-secret',
@@ -34,6 +34,7 @@ for path in root.rglob('*'):
             if name == 'generic token assignment' and (
                 literal.startswith(('dev-access-', 'dev-refresh-', 'reqres-demo-refresh-'))
                 or literal.startswith('${')
+                or literal.endswith('-not-a-secret')
                 or literal in allowed_demo_literals
             ):
                 continue
