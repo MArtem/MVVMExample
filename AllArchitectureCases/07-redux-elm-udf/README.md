@@ -1,36 +1,31 @@
-# MVVMExample
+# Redux / Elm / UDF Case
 
-`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
+`ReduxElmUDFCase` is a standalone full-functional architecture case that preserves the source app behavior/design while expressing presentation ownership through feature-local Stores, typed Actions, typed Mutations, reducer-style state transitions, and isolated Effects.
 
-## Current Scope
+## Project
+- Xcode project: `./ReduxElmUDFCase.xcodeproj`
+- Scheme: `ReduxElmUDFCase`
+- App module folder: `./ReduxElmUDFCase/ReduxElmUDFCaseApp`
+- Unit tests: `./ReduxElmUDFCaseTests`
+- UI smoke target: `./ReduxElmUDFCaseUITests`
 
-- Auth login gate
-- News list/detail flow
-- Profile view/edit flow
-- DummyJSON-style test API integration
-- In-memory demo session store
-- Minimal app-local infrastructure copied from the reusable baseline
+## Source Organization
+- `./ReduxElmUDFCase/ReduxElmUDFCaseApp/AppShell/`: app composition, dependency wiring, auth gate, tab coordination, and root navigation.
+- `./ReduxElmUDFCase/ReduxElmUDFCaseApp/Features/`: feature slices for `Auth`, `News`, and `Profile`; presentation state owners are feature Stores.
+- `./ReduxElmUDFCase/ReduxElmUDFCaseApp/Core/`: cross-feature mechanics such as design system, networking, persistence, configuration, logging, localization, image loading, and platform fallback support.
+- `./ReduxElmUDFCase/ReduxElmUDFCaseApp/Shared/`: narrow reusable presentation helpers and accessibility identifiers.
 
-## Architecture Rules
-
-- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
-- Generic `send(_ action:)` ViewModel dispatch is not default project style.
-- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
-- App-specific feature behavior stays in `./MVVMExample/`.
-- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
-
-## Demo/Test API Policy
-
-- Test API base URL is owned by configuration.
-- Demo credentials are allowed only in debug/demo mode.
-- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
+## Architecture
+- SwiftUI views call explicit Store intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
+- Stores translate those intents into typed feature-local `Action` values.
+- Stores apply typed `Mutation` values through reducer-style `reduce(_ mutation:)` methods.
+- Async effects remain in Store-owned tasks and repository calls; reducers do not perform network, persistence, routing, or logging side effects.
+- `AppShell` owns composition and session/app flow; it does not own DTO mapping, persistence internals, or feature state transitions.
+- This case intentionally uses source-level UDF boundaries inside one standalone Xcode target and does not reintroduce local `./Packages` folders.
 
 ## Verification
-
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
+./scripts/verify.sh build
+./scripts/verify.sh test-build
 ```
-
-Tests are not written or modified unless explicitly requested.
