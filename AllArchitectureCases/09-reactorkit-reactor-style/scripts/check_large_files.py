@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 root = Path(__file__).resolve().parents[1]
 limit = 5 * 1024 * 1024
-exclude = {'.git', 'DerivedData', '.build', '.zenflow', '.zenflow-attachments', 'docs/reusable-baseline/external-environment'}
+exclude = {'.git', 'DerivedData', '.build', '.xcode-derived-data', '.xcode-package-cache', '.xcode-result-bundles', '.zenflow', '.zenflow-attachments', 'docs/reusable-baseline/external-environment'}
 large=[]
 for path in root.rglob('*'):
     if not path.is_file():

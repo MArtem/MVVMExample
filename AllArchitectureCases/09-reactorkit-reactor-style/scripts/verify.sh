@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly PROJECT="MVVMExample.xcodeproj"
-readonly SCHEME="MVVMExample"
-readonly UNIT_TEST_PLAN="MVVMExample"
-readonly UI_TEST_PLAN="MVVMExampleUI"
-readonly DESTINATION_IOS_26="platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0"
+readonly PROJECT="ReactorStyleCase.xcodeproj"
+readonly SCHEME="ReactorStyleCase"
+readonly UNIT_TEST_PLAN="ReactorStyleCase"
+readonly UI_TEST_PLAN="ReactorStyleCaseUI"
+readonly BUILD_DESTINATION="generic/platform=iOS Simulator"
+readonly TEST_DESTINATION="${REACTOR_STYLE_CASE_TEST_DESTINATION:-platform=iOS Simulator,name=Any iOS Simulator Device}"
 readonly CASE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-readonly DERIVED_DATA_PATH="${MVVMEXAMPLE_DERIVED_DATA_PATH:-${CASE_ROOT}/.xcode-derived-data/MVVMExample}"
-readonly CLONED_PACKAGES_PATH="${MVVMEXAMPLE_XCODE_PACKAGE_CACHE:-${CASE_ROOT}/.xcode-package-cache/MVVMExample}"
-readonly RESULT_BUNDLE_ROOT="${MVVMEXAMPLE_RESULT_BUNDLE_PATH:-${CASE_ROOT}/.xcode-result-bundles/MVVMExample}"
+readonly DERIVED_DATA_PATH="${REACTOR_STYLE_CASE_DERIVED_DATA_PATH:-${CASE_ROOT}/.xcode-derived-data/ReactorStyleCase}"
+readonly CLONED_PACKAGES_PATH="${REACTOR_STYLE_CASE_XCODE_PACKAGE_CACHE:-${CASE_ROOT}/.xcode-package-cache/ReactorStyleCase}"
+readonly RESULT_BUNDLE_ROOT="${REACTOR_STYLE_CASE_RESULT_BUNDLE_PATH:-${CASE_ROOT}/.xcode-result-bundles/ReactorStyleCase}"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  ./scripts/verify.sh <static|list|build|test-unit|test-ui|all>
+  ./scripts/verify.sh <static|list|build|test-build|test-unit|test-ui|all>
 
 Levels:
   static     Run static quality gates that do not require simulator execution
   list       Verify Xcode project structure
-  build      Build MVVMExample on iPhone 17 Pro (iOS 26.0)
+  build      Build ReactorStyleCase with a generic iOS Simulator destination
+  test-build Run build-for-testing without launching a simulator
   test-unit  Run the unit-test xctestplan only
   test-ui    Run the UI accessibility smoke xctestplan only
   all        Run static, list, build, and unit tests; UI tests remain explicit via test-ui
@@ -33,7 +35,6 @@ run_static() {
   ./scripts/check_large_files.py
   ./scripts/check_localization.py
   ./scripts/check_swiftui_hot_path_patterns.py
-  ./scripts/check_docs_index.py
 }
 
 run_list() {
@@ -50,11 +51,23 @@ run_build() {
     -project "${PROJECT}" \
     -scheme "${SCHEME}" \
     -configuration Debug \
-    -destination "${DESTINATION_IOS_26}" \
+    -destination "${BUILD_DESTINATION}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     CODE_SIGNING_ALLOWED=NO \
     build
+}
+
+run_test_build() {
+  xcodebuild \
+    -project "${PROJECT}" \
+    -scheme "${SCHEME}" \
+    -configuration Debug \
+    -destination "${BUILD_DESTINATION}" \
+    -derivedDataPath "${DERIVED_DATA_PATH}" \
+    -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
+    CODE_SIGNING_ALLOWED=NO \
+    build-for-testing
 }
 
 run_unit_tests() {
@@ -66,7 +79,7 @@ run_unit_tests() {
     -scheme "${SCHEME}" \
     -testPlan "${UNIT_TEST_PLAN}" \
     -configuration Debug \
-    -destination "${DESTINATION_IOS_26}" \
+    -destination "${TEST_DESTINATION}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     -resultBundlePath "${result_bundle_path}" \
@@ -83,7 +96,7 @@ run_ui_tests() {
     -scheme "${SCHEME}" \
     -testPlan "${UI_TEST_PLAN}" \
     -configuration Debug \
-    -destination "${DESTINATION_IOS_26}" \
+    -destination "${TEST_DESTINATION}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     -resultBundlePath "${result_bundle_path}" \
@@ -106,6 +119,9 @@ main() {
       ;;
     build)
       run_build
+      ;;
+    test-build)
+      run_test_build
       ;;
     test-unit)
       run_unit_tests

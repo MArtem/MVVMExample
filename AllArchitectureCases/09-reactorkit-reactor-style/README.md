@@ -1,36 +1,31 @@
-# MVVMExample
+# ReactorKit / Reactor-style Case
 
-`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
+`ReactorStyleCase` is a standalone full-functional architecture case that preserves the source app behavior/design while expressing presentation ownership with feature-local Reactors and Action → Mutation → State flow.
 
-## Current Scope
+## Project
+- Xcode project: `./ReactorStyleCase.xcodeproj`
+- Scheme: `ReactorStyleCase`
+- App module folder: `./ReactorStyleCase/ReactorStyleCaseApp`
+- Unit tests: `./ReactorStyleCaseTests`
+- UI smoke target: `./ReactorStyleCaseUITests`
 
-- Auth login gate
-- News list/detail flow
-- Profile view/edit flow
-- DummyJSON-style test API integration
-- In-memory demo session store
-- Minimal app-local infrastructure copied from the reusable baseline
+## Source Organization
+- `./ReactorStyleCase/ReactorStyleCaseApp/AppShell/`: app composition, dependency wiring, auth gate, tab coordination, and root navigation.
+- `./ReactorStyleCase/ReactorStyleCaseApp/Features/`: feature slices for `Auth`, `News`, and `Profile`; presentation state owners are Reactors.
+- `./ReactorStyleCase/ReactorStyleCaseApp/Core/`: cross-feature mechanics such as design system, networking, persistence, configuration, logging, localization, image loading, and platform fallback support.
+- `./ReactorStyleCase/ReactorStyleCaseApp/Shared/`: narrow reusable presentation helpers and accessibility identifiers.
 
-## Architecture Rules
-
-- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
-- Generic `send(_ action:)` ViewModel dispatch is not default project style.
-- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
-- App-specific feature behavior stays in `./MVVMExample/`.
-- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
-
-## Demo/Test API Policy
-
-- Test API base URL is owned by configuration.
-- Demo credentials are allowed only in debug/demo mode.
-- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
+## Architecture
+- SwiftUI views call explicit Reactor intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
+- Reactors translate those intents into typed feature-local `Action` values.
+- `mutate(_ action:)` maps actions to synchronous mutations or side effects.
+- `reduce(_ mutation:)` applies state transitions only.
+- Network, persistence, pending sync, routing, and cancellation behavior stay outside reducers.
+- This case intentionally uses local Reactor-style mechanics inside one standalone Xcode target and does not add local `./Packages` folders or third-party dependencies.
 
 ## Verification
-
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
+./scripts/verify.sh build
+./scripts/verify.sh test-build
 ```
-
-Tests are not written or modified unless explicitly requested.
