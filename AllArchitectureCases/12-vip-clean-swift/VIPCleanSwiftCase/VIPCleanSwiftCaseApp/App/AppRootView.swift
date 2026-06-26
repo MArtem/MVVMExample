@@ -6,15 +6,12 @@ struct AppRootView: View {
     var body: some View {
         switch coordinator.scene {
         case .login:
-            LoginScreen(
-                interactor: LoginInteractor(
-                    repository: coordinator.dependencies.authRepository,
-                    demoCredentials: coordinator.dependencies.demoCredentials,
-                    onLoginSuccess: { session in
-                        coordinator.handleLoginSuccess(session)
-                    }
-                )
-            )
+            LoginSceneBuilder(
+                dependencies: coordinator.dependencies,
+                onLoginSuccess: { session in
+                    coordinator.handleLoginSuccess(session)
+                }
+            ).build()
 
         case .main:
             if let mainCoordinator = coordinator.mainCoordinator {
@@ -23,5 +20,23 @@ struct AppRootView: View {
                 ProgressView()
             }
         }
+    }
+}
+
+
+/// Clean Swift scene builder for the login scene composition boundary.
+struct LoginSceneBuilder {
+    let dependencies: AppDependencies
+    let onLoginSuccess: (AuthSession) -> Void
+
+    @MainActor
+    func build() -> LoginScreen {
+        LoginScreen(
+            interactor: LoginInteractor(
+                repository: dependencies.authRepository,
+                demoCredentials: dependencies.demoCredentials,
+                onLoginSuccess: onLoginSuccess
+            )
+        )
     }
 }

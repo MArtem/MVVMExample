@@ -18,7 +18,7 @@ struct UserProfile: Identifiable, Equatable, Sendable {
     }
 }
 
-struct UpdateProfileRequest: Codable, Equatable, Sendable {
+struct UpdateProfileRequest: Equatable, Sendable {
     let firstName: String
     let lastName: String
     let email: String

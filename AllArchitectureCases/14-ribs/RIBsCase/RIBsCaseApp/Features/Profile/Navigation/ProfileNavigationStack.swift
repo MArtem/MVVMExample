@@ -20,7 +20,7 @@ struct ProfileNavigationStack: View {
         self.onLogout = onLogout
         _profileInteractor = State(
             initialValue: ProfileBuilder.makeInteractor(
-                component: ProfileComponent(
+                component: Self.makeComponent(
                     session: session,
                     dependencies: dependencies,
                     router: router,
@@ -37,7 +37,7 @@ struct ProfileNavigationStack: View {
                     switch route {
                     case .edit(let payload):
                         ProfileEditBuilder(
-                            component: ProfileComponent(
+                            component: Self.makeComponent(
                                 session: session,
                                 dependencies: dependencies,
                                 router: router,
@@ -53,10 +53,26 @@ struct ProfileNavigationStack: View {
 }
 
 
+private extension ProfileNavigationStack {
+    static func makeComponent(
+        session: AuthSession,
+        dependencies: AppDependencies,
+        router: ProfileRouter,
+        onLogout: @escaping () -> Void
+    ) -> ProfileComponent {
+        ProfileComponent(
+            session: session,
+            repository: dependencies.profileRepository,
+            router: router,
+            onLogout: onLogout
+        )
+    }
+}
+
 /// Profile RIB component for the authenticated profile subtree.
 struct ProfileComponent {
     let session: AuthSession
-    let dependencies: AppDependencies
+    let repository: ProfileRepository
     let router: ProfileRouter
     let onLogout: () -> Void
 }
@@ -67,7 +83,7 @@ struct ProfileBuilder {
     static func makeInteractor(component: ProfileComponent) -> ProfileInteractor {
         ProfileInteractor(
             session: component.session,
-            repository: component.dependencies.profileRepository,
+            repository: component.repository,
             router: component.router,
             onLogout: component.onLogout
         )
@@ -85,7 +101,7 @@ struct ProfileEditBuilder {
         ProfileEditScreen(
             interactor: ProfileEditInteractor(
                 payload: payload,
-                repository: component.dependencies.profileRepository,
+                repository: component.repository,
                 router: component.router,
                 onSaveSuccess: onSaveSuccess
             )

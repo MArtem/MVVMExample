@@ -9,7 +9,7 @@ import SwiftData
 /// Concurrency:
 /// Main-actor isolated because current interactions are driven by UI intents and immediately reflected in SwiftUI state.
 @MainActor
-final class ArticleInteractionStore {
+final class ArticleInteractionStore: ArticleInteractionManaging {
     private var states: [NewsArticle.ID: ArticleInteractionState] = [:]
     private let modelContext: ModelContext?
     private let pendingMutationStore: PendingMutationStore?

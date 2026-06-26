@@ -47,3 +47,7 @@ Full functional clone using Modular / Feature-Sliced ownership while preserving 
 - `./scripts/verify.sh build`.
 - `./scripts/verify.sh test-build`.
 - Vault sync and post-sync identity/generated-file greps.
+
+
+## App-scoped Core clarification
+`Core/` in this case is **app-scoped shared infrastructure**, not a reusable cross-app package or a feature-neutral platform core. It may contain cross-feature persistence/session/sync mechanics required by this standalone clone, but feature-owned presentation and navigation stay inside their slices. If this case is later evolved into stricter feature-sliced modules, feature-specific pending-mutation/profile adapters should move from `Core/Infrastructure` into the owning feature slices behind narrow shared contracts.

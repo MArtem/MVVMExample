@@ -19,9 +19,9 @@ struct ProfileNavigationStack: View {
         self.dependencies = dependencies
         self.onLogout = onLogout
         _profileInteractor = State(
-            initialValue: ProfileInteractor(
+            initialValue: ProfileSceneBuilder.makeInteractor(
                 session: session,
-                repository: dependencies.profileRepository,
+                dependencies: dependencies,
                 router: router,
                 onLogout: onLogout
             )
@@ -34,16 +34,53 @@ struct ProfileNavigationStack: View {
                 .navigationDestination(for: ProfileRoute.self) { route in
                     switch route {
                     case .edit(let payload):
-                        ProfileEditScreen(
-                            interactor: ProfileEditInteractor(
-                                payload: payload,
-                                repository: dependencies.profileRepository,
-                                router: router,
-                                onSaveSuccess: profileInteractor.profileUpdated
-                            )
-                        )
+                        ProfileEditSceneBuilder(
+                            dependencies: dependencies,
+                            router: router,
+                            payload: payload,
+                            onSaveSuccess: profileInteractor.profileUpdated
+                        ).build()
                     }
                 }
         }
+    }
+}
+
+
+/// Clean Swift scene builder for the profile scene composition boundary.
+struct ProfileSceneBuilder {
+    @MainActor
+    static func makeInteractor(
+        session: AuthSession,
+        dependencies: AppDependencies,
+        router: ProfileRouter,
+        onLogout: @escaping () -> Void
+    ) -> ProfileInteractor {
+        ProfileInteractor(
+            session: session,
+            repository: dependencies.profileRepository,
+            router: router,
+            onLogout: onLogout
+        )
+    }
+}
+
+/// Clean Swift scene builder for the profile-edit scene composition boundary.
+struct ProfileEditSceneBuilder {
+    let dependencies: AppDependencies
+    let router: ProfileRouter
+    let payload: ProfileEditRoutePayload
+    let onSaveSuccess: (UserProfile) -> Void
+
+    @MainActor
+    func build() -> ProfileEditScreen {
+        ProfileEditScreen(
+            interactor: ProfileEditInteractor(
+                payload: payload,
+                repository: dependencies.profileRepository,
+                router: router,
+                onSaveSuccess: onSaveSuccess
+            )
+        )
     }
 }

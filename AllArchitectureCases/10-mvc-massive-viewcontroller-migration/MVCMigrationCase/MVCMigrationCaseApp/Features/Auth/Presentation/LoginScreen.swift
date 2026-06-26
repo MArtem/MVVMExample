@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct LoginScreen: View {
-    @State private var store: LoginController
+    @State private var controller: LoginController
 
-    init(store: LoginController) {
-        _store = State(initialValue: store)
+    init(controller: LoginController) {
+        _controller = State(initialValue: controller)
     }
 
     var body: some View {
-        @Bindable var store = store
+        @Bindable var controller = controller
 
         VStack(spacing: AppSpacing.lg) {
             Spacer()
@@ -18,17 +18,17 @@ struct LoginScreen: View {
                     .font(.system(size: 56))
                     .foregroundStyle(AppTheme.actionPrimary)
 
-                Text(store.state.title)
+                Text(controller.state.title)
                     .font(AppTypography.largeTitle)
                     .multilineTextAlignment(.center)
 
-                Text(store.state.subtitle)
+                Text(controller.state.subtitle)
                     .font(AppTypography.body)
                     .foregroundStyle(AppTheme.textSecondary)
             }
 
             VStack(spacing: AppSpacing.md) {
-                TextField(AppStrings.text("Username"), text: $store.username)
+                TextField(AppStrings.text("Username"), text: $controller.username)
                     .accessibilityIdentifier(AppAccessibilityID.Login.usernameField)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -36,13 +36,13 @@ struct LoginScreen: View {
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
-                SecureField(AppStrings.text("Password"), text: $store.password)
+                SecureField(AppStrings.text("Password"), text: $controller.password)
                     .accessibilityIdentifier(AppAccessibilityID.Login.passwordField)
                     .padding()
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
-                if let error = store.state.errorMessage {
+                if let error = controller.state.errorMessage {
                     Text(error)
                         .accessibilityIdentifier(AppAccessibilityID.Login.errorMessage)
                         .font(AppTypography.bodySmall)
@@ -51,24 +51,24 @@ struct LoginScreen: View {
                 }
 
                 Button {
-                    store.loginTapped()
+                    controller.loginTapped()
                 } label: {
                     HStack {
-                        if store.state.isLoading {
+                        if controller.state.isLoading {
                             ProgressView()
                         }
-                        Text(store.state.loginButtonTitle)
+                        Text(controller.state.loginButtonTitle)
                             .font(AppTypography.button)
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier(AppAccessibilityID.Login.signInButton)
-                .disabled(store.state.isLoading)
+                .disabled(controller.state.isLoading)
 
-                if store.state.showsDemoCredentialsButton {
+                if controller.state.showsDemoCredentialsButton {
                     Button(AppStrings.text("Fill demo credentials")) {
-                        store.useDemoCredentialsTapped()
+                        controller.useDemoCredentialsTapped()
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier(AppAccessibilityID.Login.fillDemoCredentialsButton)
@@ -84,7 +84,7 @@ struct LoginScreen: View {
 
 #Preview {
     LoginScreen(
-        store: LoginController(
+        controller: LoginController(
             repository: MockAuthRepository(),
             demoCredentials: .dummyJSON,
             onLoginSuccess: { _ in }

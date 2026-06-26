@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 
+/// TCA semantic note:
+/// The public `state` remains the rendered view state for SwiftUI compatibility, while feature-local `FeatureState` keeps non-rendered domain/cache/form state explicit so effects and reducers do not hide state-machine data in anonymous fields.
+///
 /// Owns article-detail state and detail-only user intents.
 ///
 /// Ownership:
@@ -11,6 +14,10 @@ import Observation
 @MainActor
 @Observable
 final class NewsDetailStore {
+    struct FeatureState: Equatable {
+        var loadedArticle: NewsArticle?
+    }
+
     typealias State = NewsDetailViewState
 
     private enum Action {

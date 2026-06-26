@@ -7,25 +7,51 @@ struct NewsNavigationStack: View {
 
     var body: some View {
         NavigationStack(path: $router.path) {
-            NewsListScreen(
-                interactor: NewsListInteractor(
-                    repository: dependencies.newsRepository,
-                    router: router,
-                    interactionStore: dependencies.articleInteractionStore
-                )
-            )
+            NewsListSceneBuilder(dependencies: dependencies, router: router).build()
             .navigationDestination(for: NewsRoute.self) { route in
                 switch route {
                 case .detail(let payload):
-                    NewsDetailScreen(
-                        interactor: NewsDetailInteractor(
-                            payload: payload,
-                            repository: dependencies.newsRepository,
-                            interactionStore: dependencies.articleInteractionStore
-                        )
-                    )
+                    NewsDetailSceneBuilder(
+                        dependencies: dependencies,
+                        payload: payload
+                    ).build()
                 }
             }
         }
+    }
+}
+
+
+/// Clean Swift scene builder for the news-list scene composition boundary.
+struct NewsListSceneBuilder {
+    let dependencies: AppDependencies
+    let router: NewsRouter
+
+    @MainActor
+    func build() -> NewsListScreen {
+        NewsListScreen(
+            interactor: NewsListInteractor(
+                repository: dependencies.newsRepository,
+                router: router,
+                interactionStore: dependencies.articleInteractionStore
+            )
+        )
+    }
+}
+
+/// Clean Swift scene builder for the news-detail scene composition boundary.
+struct NewsDetailSceneBuilder {
+    let dependencies: AppDependencies
+    let payload: NewsDetailRoutePayload
+
+    @MainActor
+    func build() -> NewsDetailScreen {
+        NewsDetailScreen(
+            interactor: NewsDetailInteractor(
+                payload: payload,
+                repository: dependencies.newsRepository,
+                interactionStore: dependencies.articleInteractionStore
+            )
+        )
     }
 }

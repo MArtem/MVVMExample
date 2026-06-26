@@ -48,3 +48,7 @@ Full functional clone using Hexagonal / Ports & Adapters ownership while preserv
 - `./scripts/verify.sh build`.
 - `./scripts/verify.sh test-build`.
 - Vault sync and post-sync identity/generated-file greps.
+
+
+## Port serialization boundary
+Port/domain models in this case should not carry persistence or transport serialization requirements by default. Driven adapters own their storage/JSON payloads and map to port models at the boundary; presentation adapters receive user-safe errors and localized strings only after adapter/domain mapping.

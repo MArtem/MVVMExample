@@ -1,14 +1,14 @@
 import SwiftUI
 
 struct LoginScreen: View {
-    @State private var store: LoginReactor
+    @State private var reactor: LoginReactor
 
-    init(store: LoginReactor) {
-        _store = State(initialValue: store)
+    init(reactor: LoginReactor) {
+        _reactor = State(initialValue: reactor)
     }
 
     var body: some View {
-        @Bindable var store = store
+        @Bindable var reactor = reactor
 
         VStack(spacing: AppSpacing.lg) {
             Spacer()
@@ -18,17 +18,17 @@ struct LoginScreen: View {
                     .font(.system(size: 56))
                     .foregroundStyle(AppTheme.actionPrimary)
 
-                Text(store.state.title)
+                Text(reactor.state.title)
                     .font(AppTypography.largeTitle)
                     .multilineTextAlignment(.center)
 
-                Text(store.state.subtitle)
+                Text(reactor.state.subtitle)
                     .font(AppTypography.body)
                     .foregroundStyle(AppTheme.textSecondary)
             }
 
             VStack(spacing: AppSpacing.md) {
-                TextField(AppStrings.text("Username"), text: $store.username)
+                TextField(AppStrings.text("Username"), text: $reactor.username)
                     .accessibilityIdentifier(AppAccessibilityID.Login.usernameField)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -36,13 +36,13 @@ struct LoginScreen: View {
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
-                SecureField(AppStrings.text("Password"), text: $store.password)
+                SecureField(AppStrings.text("Password"), text: $reactor.password)
                     .accessibilityIdentifier(AppAccessibilityID.Login.passwordField)
                     .padding()
                     .background(AppTheme.surfacePrimary)
                     .clipShape(RoundedRectangle(cornerRadius: AppRadius.field))
 
-                if let error = store.state.errorMessage {
+                if let error = reactor.state.errorMessage {
                     Text(error)
                         .accessibilityIdentifier(AppAccessibilityID.Login.errorMessage)
                         .font(AppTypography.bodySmall)
@@ -51,24 +51,24 @@ struct LoginScreen: View {
                 }
 
                 Button {
-                    store.loginTapped()
+                    reactor.loginTapped()
                 } label: {
                     HStack {
-                        if store.state.isLoading {
+                        if reactor.state.isLoading {
                             ProgressView()
                         }
-                        Text(store.state.loginButtonTitle)
+                        Text(reactor.state.loginButtonTitle)
                             .font(AppTypography.button)
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier(AppAccessibilityID.Login.signInButton)
-                .disabled(store.state.isLoading)
+                .disabled(reactor.state.isLoading)
 
-                if store.state.showsDemoCredentialsButton {
+                if reactor.state.showsDemoCredentialsButton {
                     Button(AppStrings.text("Fill demo credentials")) {
-                        store.useDemoCredentialsTapped()
+                        reactor.useDemoCredentialsTapped()
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier(AppAccessibilityID.Login.fillDemoCredentialsButton)
@@ -84,7 +84,7 @@ struct LoginScreen: View {
 
 #Preview {
     LoginScreen(
-        store: LoginReactor(
+        reactor: LoginReactor(
             repository: MockAuthRepository(),
             demoCredentials: .dummyJSON,
             onLoginSuccess: { _ in }

@@ -16,7 +16,7 @@ final class NewsDetailViewModel {
     private let payload: NewsDetailRoutePayload
     private let repository: NewsRepository
     private let viewStateBuilder: NewsDetailViewStateBuilder
-    private let interactionStore: ArticleInteractionStore
+    private let interactionStore: any ArticleInteractionManaging
     private var article: NewsArticle?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var favoriteTask: Task<Void, Never>?
@@ -25,7 +25,7 @@ final class NewsDetailViewModel {
     init(
         payload: NewsDetailRoutePayload,
         repository: NewsRepository,
-        interactionStore: ArticleInteractionStore,
+        interactionStore: any ArticleInteractionManaging,
         viewStateBuilder: NewsDetailViewStateBuilder = NewsDetailViewStateBuilder()
     ) {
         self.payload = payload

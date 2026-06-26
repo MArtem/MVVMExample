@@ -31,3 +31,7 @@ flowchart TD
 ```
 
 `Core` must not depend on `Features`, `Shared`, or `AppShell`. `Shared` must not depend on feature slices or app-shell composition. Reducers must not perform network or persistence work.
+
+
+## Feature-state traceability
+Screen-scoped Stores intentionally keep rendered SwiftUI state public, but non-rendered cache/form/pagination state must stay named and reviewable as feature state. Do not hide new state-machine data in anonymous private fields without adding matching actions/mutations or an explicit `FeatureState` member.

@@ -1,30 +1,30 @@
 import SwiftUI
 
 struct NewsListScreen: View {
-    @State private var store: NewsListController
+    @State private var controller: NewsListController
 
-    init(store: NewsListController) {
-        _store = State(initialValue: store)
+    init(controller: NewsListController) {
+        _controller = State(initialValue: controller)
     }
 
     var body: some View {
         NewsListStateRenderer(
-            state: store.state,
-            onRetryTap: store.retryTapped,
-            onRefresh: store.refreshRequested,
-            onArticleTap: store.articleTapped(id:),
-            onLikeTap: store.likeTapped(id:),
-            onCommentsTap: store.commentsTapped(id:),
-            onItemAppear: store.loadNextPageIfNeeded(currentItemID:),
-            onRetryLoadNextPageTap: store.retryLoadNextPageTapped
+            state: controller.state,
+            onRetryTap: controller.retryTapped,
+            onRefresh: controller.refreshRequested,
+            onArticleTap: controller.articleTapped(id:),
+            onLikeTap: controller.likeTapped(id:),
+            onCommentsTap: controller.commentsTapped(id:),
+            onItemAppear: controller.loadNextPageIfNeeded(currentItemID:),
+            onRetryLoadNextPageTap: controller.retryLoadNextPageTapped
         )
         .navigationTitle(AppStrings.text("News"))
         .background(AppTheme.backgroundBase)
         .task {
-            store.appeared()
+            controller.appeared()
         }
         .onAppear {
-            store.becameVisible()
+            controller.becameVisible()
         }
     }
 }
@@ -32,7 +32,7 @@ struct NewsListScreen: View {
 #Preview {
     NavigationStack {
         NewsListScreen(
-            store: NewsListController(
+            controller: NewsListController(
                 repository: MockNewsRepository(),
                 router: NewsRouter(),
                 interactionStore: ArticleInteractionStore()

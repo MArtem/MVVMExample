@@ -1,29 +1,29 @@
 import SwiftUI
 
 struct ProfileScreen: View {
-    @State private var store: ProfileReactor
+    @State private var reactor: ProfileReactor
 
-    init(store: ProfileReactor) {
-        _store = State(initialValue: store)
+    init(reactor: ProfileReactor) {
+        _reactor = State(initialValue: reactor)
     }
 
     var body: some View {
         ProfileStateRenderer(
-            state: store.state,
-            onRetryTap: store.retryTapped,
-            onEditTap: store.editTapped
+            state: reactor.state,
+            onRetryTap: reactor.retryTapped,
+            onEditTap: reactor.editTapped
         )
         .navigationTitle(AppStrings.text("Profile"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(AppStrings.text("Logout")) {
-                    store.logoutTapped()
+                    reactor.logoutTapped()
                 }
                 .accessibilityIdentifier(AppAccessibilityID.Profile.logoutButton)
             }
         }
         .task {
-            store.appeared()
+            reactor.appeared()
         }
     }
 }

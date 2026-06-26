@@ -7,11 +7,12 @@ struct NewsNavigationStack: View {
 
     var body: some View {
         NavigationStack(path: $router.path) {
-            NewsListBuilder(component: NewsComponent(dependencies: dependencies, router: router)).build()
+            let component = makeComponent()
+            NewsListBuilder(component: component).build()
             .navigationDestination(for: NewsRoute.self) { route in
                 switch route {
                 case .detail(let payload):
-                    NewsDetailBuilder(component: NewsComponent(dependencies: dependencies, router: router), payload: payload).build()
+                    NewsDetailBuilder(component: component, payload: payload).build()
                 }
             }
         }
@@ -19,9 +20,20 @@ struct NewsNavigationStack: View {
 }
 
 
-/// News RIB component carrying the authenticated news dependencies for child builders.
+private extension NewsNavigationStack {
+    func makeComponent() -> NewsComponent {
+        NewsComponent(
+            repository: dependencies.newsRepository,
+            interactionStore: dependencies.articleInteractionStore,
+            router: router
+        )
+    }
+}
+
+/// News RIB component carrying only the authenticated news subtree dependencies.
 struct NewsComponent {
-    let dependencies: AppDependencies
+    let repository: NewsRepository
+    let interactionStore: ArticleInteractionStore
     let router: NewsRouter
 }
 
@@ -33,9 +45,9 @@ struct NewsListBuilder {
     func build() -> NewsListScreen {
         NewsListScreen(
             interactor: NewsListInteractor(
-                repository: component.dependencies.newsRepository,
+                repository: component.repository,
                 router: component.router,
-                interactionStore: component.dependencies.articleInteractionStore
+                interactionStore: component.interactionStore
             )
         )
     }
@@ -51,8 +63,8 @@ struct NewsDetailBuilder {
         NewsDetailScreen(
             interactor: NewsDetailInteractor(
                 payload: payload,
-                repository: component.dependencies.newsRepository,
-                interactionStore: component.dependencies.articleInteractionStore
+                repository: component.repository,
+                interactionStore: component.interactionStore
             )
         )
     }

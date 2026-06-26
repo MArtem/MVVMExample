@@ -1,28 +1,28 @@
 import SwiftUI
 
 struct ProfileEditScreen: View {
-    @State private var store: ProfileEditController
+    @State private var controller: ProfileEditController
 
-    init(store: ProfileEditController) {
-        _store = State(initialValue: store)
+    init(controller: ProfileEditController) {
+        _controller = State(initialValue: controller)
     }
 
     var body: some View {
-        @Bindable var store = store
+        @Bindable var controller = controller
 
         Form {
             Section(AppStrings.text("Personal")) {
-                TextField(AppStrings.text("First name"), text: $store.firstName)
+                TextField(AppStrings.text("First name"), text: $controller.firstName)
                     .accessibilityIdentifier(AppAccessibilityID.Profile.firstNameField)
-                TextField(AppStrings.text("Last name"), text: $store.lastName)
+                TextField(AppStrings.text("Last name"), text: $controller.lastName)
                     .accessibilityIdentifier(AppAccessibilityID.Profile.lastNameField)
-                TextField(AppStrings.text("Email"), text: $store.email)
+                TextField(AppStrings.text("Email"), text: $controller.email)
                     .accessibilityIdentifier(AppAccessibilityID.Profile.emailField)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
             }
 
-            if let error = store.state.errorMessage {
+            if let error = controller.state.errorMessage {
                 Section {
                     Text(error)
                         .foregroundStyle(AppTheme.destructive)
@@ -31,24 +31,24 @@ struct ProfileEditScreen: View {
 
             Section {
                 Button {
-                    store.saveTapped()
+                    controller.saveTapped()
                 } label: {
                     HStack {
-                        if store.state.isSaving {
+                        if controller.state.isSaving {
                             ProgressView()
                         }
-                        Text(store.state.saveButtonTitle)
+                        Text(controller.state.saveButtonTitle)
                     }
                 }
                 .accessibilityIdentifier(AppAccessibilityID.Profile.saveButton)
-                .disabled(store.state.isSaving)
+                .disabled(controller.state.isSaving)
             }
         }
         .navigationTitle(AppStrings.text("Edit Profile"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(AppStrings.text("Cancel")) {
-                    store.cancelTapped()
+                    controller.cancelTapped()
                 }
                 .accessibilityIdentifier(AppAccessibilityID.Profile.cancelButton)
             }

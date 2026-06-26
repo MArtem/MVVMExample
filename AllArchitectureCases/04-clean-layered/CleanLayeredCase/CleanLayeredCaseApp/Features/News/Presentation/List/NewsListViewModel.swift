@@ -22,7 +22,7 @@ final class NewsListViewModel {
     private let paginationThreshold = 5
     private let repository: NewsRepository
     private let viewStateBuilder: NewsListViewStateBuilder
-    private let interactionStore: ArticleInteractionStore
+    private let interactionStore: any ArticleInteractionManaging
     private weak var router: NewsRouter?
     @ObservationIgnored private var loadTask: Task<Void, Never>?
     @ObservationIgnored private var loadNextPageTask: Task<Void, Never>?
@@ -37,7 +37,7 @@ final class NewsListViewModel {
     init(
         repository: NewsRepository,
         router: NewsRouter,
-        interactionStore: ArticleInteractionStore,
+        interactionStore: any ArticleInteractionManaging,
         viewStateBuilder: NewsListViewStateBuilder = NewsListViewStateBuilder()
     ) {
         self.repository = repository

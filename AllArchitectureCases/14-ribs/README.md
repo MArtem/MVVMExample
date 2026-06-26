@@ -17,3 +17,7 @@ See `./ARCHITECTURE_CASE.md` for mapping and stop rules.
 ./scripts/verify.sh build
 ./scripts/verify.sh test-build
 ```
+
+
+## Bounded SwiftUI RIBs clarification
+This case is a **bounded RIBs-inspired SwiftUI clone**, not a UIKit/Rx RIBs framework port. SwiftUI `NavigationStack` owns physical view attachment, while Builders and Components define route-time construction boundaries and dependency scopes. Do not add a deep attach/detach tree unless a child actually needs independent lifecycle, retention, or dependency propagation beyond SwiftUI navigation.

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Composes the profile navigation stack and creates screen Stores at route boundaries.
+/// Composes the profile navigation stack and creates screen Reactors at route boundaries.
 struct ProfileNavigationStack: View {
     @Bindable var router: ProfileRouter
     let session: AuthSession
@@ -30,12 +30,12 @@ struct ProfileNavigationStack: View {
 
     var body: some View {
         NavigationStack(path: $router.path) {
-            ProfileScreen(store: profileStore)
+            ProfileScreen(reactor: profileStore)
                 .navigationDestination(for: ProfileRoute.self) { route in
                     switch route {
                     case .edit(let payload):
                         ProfileEditScreen(
-                            store: ProfileEditReactor(
+                            reactor: ProfileEditReactor(
                                 payload: payload,
                                 repository: dependencies.profileRepository,
                                 router: router,

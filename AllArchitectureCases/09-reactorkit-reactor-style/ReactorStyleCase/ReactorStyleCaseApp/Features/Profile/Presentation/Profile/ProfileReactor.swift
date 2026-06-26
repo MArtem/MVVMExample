@@ -80,7 +80,7 @@ final class ProfileReactor {
     /// Requests logout through the app-level session owner.
     ///
     /// Side effects:
-    /// This Store does not clear the session store directly; app coordination owns that transition.
+    /// This Reactor does not clear the session store directly; app coordination owns that transition.
     func logoutTapped() {
         mutate(.logoutTapped)
     }

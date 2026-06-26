@@ -7,7 +7,7 @@ struct AppRootView: View {
         switch coordinator.scene {
         case .login:
             LoginScreen(
-                store: LoginController(
+                controller: LoginController(
                     repository: coordinator.dependencies.authRepository,
                     demoCredentials: coordinator.dependencies.demoCredentials,
                     onLoginSuccess: { session in

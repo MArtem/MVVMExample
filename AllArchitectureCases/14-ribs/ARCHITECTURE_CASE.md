@@ -26,3 +26,7 @@ Use RIBs roles only when they carry real ownership:
 - Do not let components become global service locators.
 - Do not let routers perform business/data work.
 - Do not remove functionality or design to satisfy the architecture label.
+
+
+## Bounded SwiftUI RIBs clarification
+This case is a **bounded RIBs-inspired SwiftUI clone**, not a UIKit/Rx RIBs framework port. SwiftUI `NavigationStack` owns physical view attachment, while Builders and Components define route-time construction boundaries and dependency scopes. Do not add a deep attach/detach tree unless a child actually needs independent lifecycle, retention, or dependency propagation beyond SwiftUI navigation.

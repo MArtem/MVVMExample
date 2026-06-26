@@ -40,7 +40,7 @@ final class KeychainSessionStore: SessionStore {
     func save(_ session: AuthSession) {
         currentSession = session
         do {
-            let data = try encoder.encode(session)
+            let data = try encoder.encode(StoredAuthSession(session: session))
             try storage.save(data, service: service, account: account)
         } catch {
             logger.log("Failed to persist auth session in Keychain: \(error)")
@@ -59,7 +59,56 @@ final class KeychainSessionStore: SessionStore {
         storage: KeychainSessionStorage
     ) -> AuthSession? {
         guard let data = storage.load(service: service, account: account) else { return nil }
-        return try? decoder.decode(AuthSession.self, from: data)
+        return try? decoder.decode(StoredAuthSession.self, from: data).makeSession()
+    }
+}
+
+private struct StoredAuthSession: Codable {
+    let accessToken: String
+    let refreshToken: String
+    let user: StoredAppUser
+
+    init(session: AuthSession) {
+        self.accessToken = session.accessToken
+        self.refreshToken = session.refreshToken
+        self.user = StoredAppUser(user: session.user)
+    }
+
+    func makeSession() -> AuthSession {
+        AuthSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            user: user.makeUser()
+        )
+    }
+}
+
+private struct StoredAppUser: Codable {
+    let id: Int
+    let username: String
+    let email: String
+    let firstName: String
+    let lastName: String
+    let imageURL: URL?
+
+    init(user: AppUser) {
+        self.id = user.id
+        self.username = user.username
+        self.email = user.email
+        self.firstName = user.firstName
+        self.lastName = user.lastName
+        self.imageURL = user.imageURL
+    }
+
+    func makeUser() -> AppUser {
+        AppUser(
+            id: id,
+            username: username,
+            email: email,
+            firstName: firstName,
+            lastName: lastName,
+            imageURL: imageURL
+        )
     }
 }
 

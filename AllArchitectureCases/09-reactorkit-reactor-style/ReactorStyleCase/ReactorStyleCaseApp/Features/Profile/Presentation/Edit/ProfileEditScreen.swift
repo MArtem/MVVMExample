@@ -1,28 +1,28 @@
 import SwiftUI
 
 struct ProfileEditScreen: View {
-    @State private var store: ProfileEditReactor
+    @State private var reactor: ProfileEditReactor
 
-    init(store: ProfileEditReactor) {
-        _store = State(initialValue: store)
+    init(reactor: ProfileEditReactor) {
+        _reactor = State(initialValue: reactor)
     }
 
     var body: some View {
-        @Bindable var store = store
+        @Bindable var reactor = reactor
 
         Form {
             Section(AppStrings.text("Personal")) {
-                TextField(AppStrings.text("First name"), text: $store.firstName)
+                TextField(AppStrings.text("First name"), text: $reactor.firstName)
                     .accessibilityIdentifier(AppAccessibilityID.Profile.firstNameField)
-                TextField(AppStrings.text("Last name"), text: $store.lastName)
+                TextField(AppStrings.text("Last name"), text: $reactor.lastName)
                     .accessibilityIdentifier(AppAccessibilityID.Profile.lastNameField)
-                TextField(AppStrings.text("Email"), text: $store.email)
+                TextField(AppStrings.text("Email"), text: $reactor.email)
                     .accessibilityIdentifier(AppAccessibilityID.Profile.emailField)
                     .textInputAutocapitalization(.never)
                     .keyboardType(.emailAddress)
             }
 
-            if let error = store.state.errorMessage {
+            if let error = reactor.state.errorMessage {
                 Section {
                     Text(error)
                         .foregroundStyle(AppTheme.destructive)
@@ -31,24 +31,24 @@ struct ProfileEditScreen: View {
 
             Section {
                 Button {
-                    store.saveTapped()
+                    reactor.saveTapped()
                 } label: {
                     HStack {
-                        if store.state.isSaving {
+                        if reactor.state.isSaving {
                             ProgressView()
                         }
-                        Text(store.state.saveButtonTitle)
+                        Text(reactor.state.saveButtonTitle)
                     }
                 }
                 .accessibilityIdentifier(AppAccessibilityID.Profile.saveButton)
-                .disabled(store.state.isSaving)
+                .disabled(reactor.state.isSaving)
             }
         }
         .navigationTitle(AppStrings.text("Edit Profile"))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button(AppStrings.text("Cancel")) {
-                    store.cancelTapped()
+                    reactor.cancelTapped()
                 }
                 .accessibilityIdentifier(AppAccessibilityID.Profile.cancelButton)
             }

@@ -8,7 +8,20 @@ struct PendingArticleLikeMutation: Codable, Equatable, Sendable {
 
 struct PendingProfileUpdateMutation: Codable, Equatable, Sendable {
     let profileID: Int
-    let request: UpdateProfileRequest
+    let firstName: String
+    let lastName: String
+    let email: String
+
+    init(profileID: Int, request: UpdateProfileRequest) {
+        self.profileID = profileID
+        self.firstName = request.firstName
+        self.lastName = request.lastName
+        self.email = request.email
+    }
+
+    var request: UpdateProfileRequest {
+        UpdateProfileRequest(firstName: firstName, lastName: lastName, email: email)
+    }
 }
 
 enum PendingMutationKind {

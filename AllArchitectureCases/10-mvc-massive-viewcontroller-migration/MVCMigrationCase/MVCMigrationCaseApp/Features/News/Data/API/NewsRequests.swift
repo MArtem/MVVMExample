@@ -3,7 +3,7 @@ import Foundation
 /// Products list endpoint request used as the backing API for news cards.
 ///
 /// Pagination contract:
-/// `limit` and `skip` must mirror `NewsPageRequest` so Stores can apply backpressure without knowing transport details.
+/// `limit` and `skip` must mirror `NewsPageRequest` so Controllers can apply backpressure without knowing transport details.
 struct ProductsListRequest: APIRequest {
     let limit: Int
     let skip: Int

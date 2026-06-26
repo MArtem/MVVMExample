@@ -29,3 +29,7 @@
 ./scripts/verify.sh build
 ./scripts/verify.sh test-build
 ```
+
+
+## Feature-state traceability
+Screen-scoped Stores intentionally keep rendered SwiftUI state public, but non-rendered cache/form/pagination state must stay named and reviewable as feature state. Do not hide new state-machine data in anonymous private fields without adding matching actions/mutations or an explicit `FeatureState` member.

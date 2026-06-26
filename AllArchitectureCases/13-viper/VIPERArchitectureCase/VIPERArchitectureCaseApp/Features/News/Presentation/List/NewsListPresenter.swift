@@ -115,9 +115,10 @@ final class NewsListPresenter {
                 let loadedArticles = try await interactor.loadFirstPage(pageSize: pageSize)
                 try Task.checkCancellation()
                 guard generation == loadGeneration else { return }
-                articles = interactor.mergeInteractionState(into: loadedArticles)
-                nextSkip = articles.count
-                canLoadMore = loadedArticles.count == pageSize
+                let page = interactor.prepareFirstPage(loadedArticles, pageSize: pageSize)
+                articles = page.articles
+                nextSkip = page.nextSkip
+                canLoadMore = page.canLoadMore
                 state = makeStateForCurrentArticles(viewStateBuilder: viewStateBuilder)
             } catch is CancellationError {
                 return
@@ -145,9 +146,10 @@ final class NewsListPresenter {
             let refreshedArticles = try await interactor.refreshFirstPage(pageSize: pageSize)
             try Task.checkCancellation()
             guard generation == refreshGeneration else { return }
-            articles = interactor.mergeInteractionState(into: refreshedArticles)
-            nextSkip = articles.count
-            canLoadMore = refreshedArticles.count == pageSize
+            let page = interactor.prepareFirstPage(refreshedArticles, pageSize: pageSize)
+            articles = page.articles
+            nextSkip = page.nextSkip
+            canLoadMore = page.canLoadMore
             state = makeStateForCurrentArticles(viewStateBuilder: viewStateBuilder)
         } catch is CancellationError {
             return
@@ -181,10 +183,15 @@ final class NewsListPresenter {
                 try Task.checkCancellation()
                 guard generation == paginationGeneration else { return }
 
-                let mergedPage = interactor.mergeInteractionState(into: nextPageArticles)
-                articles = mergeExistingArticles(articles, with: mergedPage)
-                nextSkip += nextPageArticles.count
-                canLoadMore = nextPageArticles.count == pageSize
+                let page = interactor.prepareNextPage(
+                    existingArticles: articles,
+                    loadedArticles: nextPageArticles,
+                    currentNextSkip: nextSkip,
+                    pageSize: pageSize
+                )
+                articles = page.articles
+                nextSkip = page.nextSkip
+                canLoadMore = page.canLoadMore
                 state = makeStateForCurrentArticles(viewStateBuilder: viewStateBuilder)
             } catch is CancellationError {
                 return
@@ -245,21 +252,6 @@ final class NewsListPresenter {
         return .content(content)
     }
 
-    private func mergeExistingArticles(
-        _ existingArticles: [NewsArticle],
-        with incomingArticles: [NewsArticle]
-    ) -> [NewsArticle] {
-        var mergedArticles = existingArticles
-        var existingIDs = Set(existingArticles.map(\.id))
-
-        for article in incomingArticles where !existingIDs.contains(article.id) {
-            mergedArticles.append(article)
-            existingIDs.insert(article.id)
-        }
-
-        return mergedArticles
-    }
-
     private func openDetail(id: Int) {
         guard let card = currentCards.first(where: { $0.id == id }) else { return }
         router?.openDetail(
@@ -284,12 +276,11 @@ final class NewsListPresenter {
             targetIsLiked = true
         }
 
-        guard let optimisticArticle = articles
-            .first(where: { $0.id == articleID })?
-            .replacingLikeState(isLiked: targetIsLiked)
-        else { return }
-
-        interactor.persistOptimisticInteraction(optimisticArticle)
+        guard let currentArticle = articles.first(where: { $0.id == articleID }) else { return }
+        let optimisticArticle = interactor.prepareOptimisticLike(
+            article: currentArticle,
+            isLiked: targetIsLiked
+        )
         articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
 
         var optimisticContent = content
@@ -319,7 +310,7 @@ final class NewsListPresenter {
             } catch {
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
-                interactor.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
+                interactor.handleLikeFailure(articleID: articleID, isLiked: targetIsLiked)
                 let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
                 content.cards = latestContent.cards.map { item in
                     item.id == articleID ? localCard : item
@@ -370,6 +361,102 @@ private extension NewsCardViewState {
     }
 }
 
+
+
+/// VIPER Interactor for the news-list module.
+///
+/// Owns repository calls and local interaction synchronization for list presentation.
+@MainActor
+struct NewsListInteractor {
+    struct PageState: Equatable {
+        let articles: [NewsArticle]
+        let nextSkip: Int
+        let canLoadMore: Bool
+    }
+
+    private let repository: NewsRepository
+    private let interactionStore: ArticleInteractionStore
+
+    init(repository: NewsRepository, interactionStore: ArticleInteractionStore) {
+        self.repository = repository
+        self.interactionStore = interactionStore
+    }
+
+    func loadFirstPage(pageSize: Int) async throws -> [NewsArticle] {
+        try await repository.loadNews(page: NewsPageRequest(limit: pageSize, skip: 0))
+    }
+
+    func refreshFirstPage(pageSize: Int) async throws -> [NewsArticle] {
+        try await repository.refreshNews(page: NewsPageRequest(limit: pageSize, skip: 0))
+    }
+
+    func loadPage(_ request: NewsPageRequest) async throws -> [NewsArticle] {
+        try await repository.loadNews(page: request)
+    }
+
+    func persistLike(articleID: NewsArticle.ID, isLiked: Bool) async throws {
+        _ = try await repository.toggleLike(articleID: articleID, isLiked: isLiked)
+    }
+
+    func prepareFirstPage(_ loadedArticles: [NewsArticle], pageSize: Int) -> PageState {
+        let mergedArticles = interactionStore.merge(loadedArticles)
+        return PageState(
+            articles: mergedArticles,
+            nextSkip: mergedArticles.count,
+            canLoadMore: loadedArticles.count == pageSize
+        )
+    }
+
+    func prepareNextPage(
+        existingArticles: [NewsArticle],
+        loadedArticles: [NewsArticle],
+        currentNextSkip: Int,
+        pageSize: Int
+    ) -> PageState {
+        let mergedPage = interactionStore.merge(loadedArticles)
+        let mergedArticles = mergeExistingArticles(existingArticles, with: mergedPage)
+        return PageState(
+            articles: mergedArticles,
+            nextSkip: currentNextSkip + loadedArticles.count,
+            canLoadMore: loadedArticles.count == pageSize
+        )
+    }
+
+    func mergeInteractionState(into articles: [NewsArticle]) -> [NewsArticle] {
+        interactionStore.merge(articles)
+    }
+
+    func prepareOptimisticLike(article: NewsArticle, isLiked: Bool) -> NewsArticle {
+        let optimisticArticle = article.replacingLikeState(isLiked: isLiked)
+        interactionStore.update(with: optimisticArticle)
+        return optimisticArticle
+    }
+
+    func acknowledgeLikeSuccess(_ article: NewsArticle, articleID: NewsArticle.ID) {
+        interactionStore.update(with: article)
+        interactionStore.clearPendingLike(articleID: articleID)
+    }
+
+    func handleLikeFailure(articleID: NewsArticle.ID, isLiked: Bool) {
+        interactionStore.enqueuePendingLike(articleID: articleID, isLiked: isLiked)
+    }
+
+    private func mergeExistingArticles(
+        _ existingArticles: [NewsArticle],
+        with incomingArticles: [NewsArticle]
+    ) -> [NewsArticle] {
+        var mergedArticles = existingArticles
+        var existingIDs = Set(existingArticles.map(\.id))
+
+        for article in incomingArticles where !existingIDs.contains(article.id) {
+            mergedArticles.append(article)
+            existingIDs.insert(article.id)
+        }
+
+        return mergedArticles
+    }
+}
+
 private extension NewsArticle {
     func replacingLikeState(isLiked: Bool) -> NewsArticle {
         let adjustedLikesCount: Int
@@ -395,53 +482,5 @@ private extension NewsArticle {
             commentsCount: commentsCount,
             isLiked: isLiked
         )
-    }
-}
-
-
-/// VIPER Interactor for the news-list module.
-///
-/// Owns repository calls and local interaction synchronization for list presentation.
-@MainActor
-struct NewsListInteractor {
-    private let repository: NewsRepository
-    private let interactionStore: ArticleInteractionStore
-
-    init(repository: NewsRepository, interactionStore: ArticleInteractionStore) {
-        self.repository = repository
-        self.interactionStore = interactionStore
-    }
-
-    func loadFirstPage(pageSize: Int) async throws -> [NewsArticle] {
-        try await repository.loadNews(page: NewsPageRequest(limit: pageSize, skip: 0))
-    }
-
-    func refreshFirstPage(pageSize: Int) async throws -> [NewsArticle] {
-        try await repository.refreshNews(page: NewsPageRequest(limit: pageSize, skip: 0))
-    }
-
-    func loadPage(_ request: NewsPageRequest) async throws -> [NewsArticle] {
-        try await repository.loadNews(page: request)
-    }
-
-    func persistLike(articleID: NewsArticle.ID, isLiked: Bool) async throws {
-        _ = try await repository.toggleLike(articleID: articleID, isLiked: isLiked)
-    }
-
-    func mergeInteractionState(into articles: [NewsArticle]) -> [NewsArticle] {
-        interactionStore.merge(articles)
-    }
-
-    func persistOptimisticInteraction(_ article: NewsArticle) {
-        interactionStore.update(with: article)
-    }
-
-    func acknowledgeLikeSuccess(_ article: NewsArticle, articleID: NewsArticle.ID) {
-        interactionStore.update(with: article)
-        interactionStore.clearPendingLike(articleID: articleID)
-    }
-
-    func enqueuePendingLike(articleID: NewsArticle.ID, isLiked: Bool) {
-        interactionStore.enqueuePendingLike(articleID: articleID, isLiked: isLiked)
     }
 }

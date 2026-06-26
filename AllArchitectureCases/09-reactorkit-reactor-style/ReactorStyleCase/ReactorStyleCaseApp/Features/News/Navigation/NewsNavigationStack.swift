@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Composes the news navigation stack and creates screen Stores at route boundaries.
+/// Composes the news navigation stack and creates screen Reactors at route boundaries.
 struct NewsNavigationStack: View {
     @Bindable var router: NewsRouter
     let dependencies: AppDependencies
@@ -8,7 +8,7 @@ struct NewsNavigationStack: View {
     var body: some View {
         NavigationStack(path: $router.path) {
             NewsListScreen(
-                store: NewsListReactor(
+                reactor: NewsListReactor(
                     repository: dependencies.newsRepository,
                     router: router,
                     interactionStore: dependencies.articleInteractionStore
@@ -18,7 +18,7 @@ struct NewsNavigationStack: View {
                 switch route {
                 case .detail(let payload):
                     NewsDetailScreen(
-                        store: NewsDetailReactor(
+                        reactor: NewsDetailReactor(
                             payload: payload,
                             repository: dependencies.newsRepository,
                             interactionStore: dependencies.articleInteractionStore

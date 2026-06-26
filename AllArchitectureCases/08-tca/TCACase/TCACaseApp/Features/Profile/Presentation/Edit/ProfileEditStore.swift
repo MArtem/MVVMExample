@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 
+/// TCA semantic note:
+/// The public `state` remains the rendered view state for SwiftUI compatibility, while feature-local `FeatureState` keeps non-rendered domain/cache/form state explicit so effects and reducers do not hide state-machine data in anonymous fields.
+///
 /// Owns editable profile form state and save/cancel intents.
 ///
 /// Ownership:
@@ -11,6 +14,10 @@ import Observation
 @MainActor
 @Observable
 final class ProfileEditStore {
+    struct FeatureState: Equatable {
+        var draft: UpdateProfileRequest
+    }
+
     typealias State = ProfileEditViewState
 
     private enum Action {

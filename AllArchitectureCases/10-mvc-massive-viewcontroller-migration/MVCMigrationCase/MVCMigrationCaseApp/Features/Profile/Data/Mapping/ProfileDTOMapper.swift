@@ -7,7 +7,7 @@ enum ProfileMappingError: Error {
 /// Converts profile transport DTOs into domain models.
 ///
 /// Boundary rule:
-/// DTO optionality and backend field shape must be handled here before data reaches Stores.
+/// DTO optionality and backend field shape must be handled here before data reaches Controllers.
 struct ProfileDTOMapper {
     func map(_ dto: UserProfileDTO) throws -> UserProfile {
         guard let id = dto.id else {

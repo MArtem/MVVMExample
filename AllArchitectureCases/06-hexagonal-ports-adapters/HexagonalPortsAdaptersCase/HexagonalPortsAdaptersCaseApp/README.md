@@ -20,3 +20,7 @@ flowchart TD
 ```
 
 Ports must not depend on transport, storage, SwiftUI, URLSession, SwiftData, Keychain, or app-shell composition. `AppShell` wires adapters but does not implement adapter internals.
+
+
+## Port serialization boundary
+Port/domain models in this case should not carry persistence or transport serialization requirements by default. Driven adapters own their storage/JSON payloads and map to port models at the boundary; presentation adapters receive user-safe errors and localized strings only after adapter/domain mapping.

@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 
+/// UDF semantic note:
+/// The public `state` remains the rendered view state for SwiftUI compatibility, while feature-local `FeatureState` names the non-rendered cache/form data that actions and mutations must keep traceable.
+///
 /// Owns news-list presentation state, pagination, and user intents.
 ///
 /// Ownership:
@@ -16,6 +19,12 @@ import Observation
 @MainActor
 @Observable
 final class NewsListStore {
+    struct FeatureState: Equatable {
+        var articles: [NewsArticle] = []
+        var nextSkip: Int = 0
+        var canLoadMore: Bool = true
+    }
+
     private enum Action {
         case appeared
         case becameVisible

@@ -1,6 +1,9 @@
 import Foundation
 import Observation
 
+/// UDF semantic note:
+/// The public `state` remains the rendered view state for SwiftUI compatibility, while feature-local `FeatureState` names the non-rendered cache/form data that actions and mutations must keep traceable.
+///
 /// Owns editable profile form state and save/cancel intents.
 ///
 /// Ownership:
@@ -11,6 +14,10 @@ import Observation
 @MainActor
 @Observable
 final class ProfileEditStore {
+    struct FeatureState: Equatable {
+        var draft: UpdateProfileRequest
+    }
+
     private enum Action {
         case saveTapped
         case cancelTapped

@@ -31,3 +31,16 @@ extension NewsRepository {
         try await refreshNews(page: NewsPageRequest(limit: 30, skip: 0))
     }
 }
+
+
+/// Domain-facing boundary for locally durable article interaction state.
+///
+/// Presentation depends on this contract instead of a concrete SwiftData-backed store.
+@MainActor
+protocol ArticleInteractionManaging {
+    func merge(_ article: NewsArticle) -> NewsArticle
+    func merge(_ articles: [NewsArticle]) -> [NewsArticle]
+    func update(with article: NewsArticle)
+    func clearPendingLike(articleID: NewsArticle.ID)
+    func enqueuePendingLike(articleID: NewsArticle.ID, isLiked: Bool)
+}

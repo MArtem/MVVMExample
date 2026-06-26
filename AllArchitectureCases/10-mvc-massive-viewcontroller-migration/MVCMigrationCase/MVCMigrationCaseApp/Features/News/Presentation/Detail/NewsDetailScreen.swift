@@ -1,22 +1,22 @@
 import SwiftUI
 
 struct NewsDetailScreen: View {
-    @State private var store: NewsDetailController
+    @State private var controller: NewsDetailController
 
-    init(store: NewsDetailController) {
-        _store = State(initialValue: store)
+    init(controller: NewsDetailController) {
+        _controller = State(initialValue: controller)
     }
 
     var body: some View {
         NewsDetailStateRenderer(
-            state: store.state,
-            onRetryTap: store.retryTapped,
-            onFavoriteTap: store.favoriteTapped
+            state: controller.state,
+            onRetryTap: controller.retryTapped,
+            onFavoriteTap: controller.favoriteTapped
         )
         .navigationTitle(AppStrings.text("Details"))
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            store.appeared()
+            controller.appeared()
         }
     }
 }
