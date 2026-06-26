@@ -9,9 +9,9 @@ exclude = {'Tests', 'UITests', '.git', 'DerivedData', '.zenflow', 'docs/reusable
 rx = re.compile(r'\b(Text|Button|Label|TextField|SecureField|Section)\s*\(\s*"([^"\\]*(?:\\.[^"\\]*)*)"')
 findings=[]
 
-string_catalogs = list((root / 'MVVMExample').rglob('*.xcstrings'))
+string_catalogs = list((root / 'MVCMigrationCase').rglob('*.xcstrings'))
 if not string_catalogs:
-    print('Missing localization resources: expected at least one .xcstrings file under ./MVVMExample')
+    print('Missing localization resources: expected at least one .xcstrings file under ./MVCMigrationCase')
     sys.exit(1)
 for path in root.rglob('*.swift'):
     rel=str(path.relative_to(root))
