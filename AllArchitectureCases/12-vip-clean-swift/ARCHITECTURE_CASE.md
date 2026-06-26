@@ -1,33 +1,37 @@
-# VIP / Clean Swift
+# VIP / Clean Swift Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/12-vip-clean-swift`
+## Project
+`VIPCleanSwiftCase`
 
-## Target Architecture
-VIP / Clean Swift
+## Goal
+Full functional clone of the source app using a pragmatic VIP / Clean Swift architecture adapted for SwiftUI.
 
-## Purpose
-View/Interactor/Presenter/Router/Worker scene boundaries where role separation is meaningful.
+## Current Status
+- [x] Full app functionality/design baseline copied into a standalone project name.
+- [x] Source app and previous-case identities removed from active app/test/docs surfaces.
+- [x] Feature presentation ownership converted to Clean Swift scene roles.
+- [x] Build verified after conversion.
 
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+## VIP / Clean Swift Target State
+Each feature scene uses the roles only where they have real work:
+- **View**: SwiftUI screen/components render state and forward user intents only.
+- **Interactor**: observable scene owner for business flow, async tasks, state transitions, cancellation, optimistic updates, and route requests.
+- **Presenter**: format-only mapper from domain/error data to `*ViewState`; no repository, persistence, navigation, or async ownership.
+- **Router**: navigation path and destination routing only.
+- **Worker**: repository, persistence, and local interaction I/O used by an interactor.
+- **Request / Response / view-state roles**: represented only where the existing product already has meaningful request/view-state contracts (`UpdateProfileRequest`, `NewsPageRequest`, and `*ViewState`). No empty pass-through request/response wrappers are added.
 
-## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [ ] Build passed for this case.
+## Implemented Mapping
+- **Auth**: `LoginScreen` forwards user intents to `LoginInteractor`; `LoginWorker` owns auth repository calls.
+- **News list**: `NewsListInteractor` owns pagination, refresh, navigation intent, optimistic like state, and cancellation; `NewsListPresenter` formats cards/pagination/error view state; `NewsListWorker` owns repository and interaction-store access.
+- **News detail**: `NewsDetailInteractor` owns detail loading and favorite mutation flow; `NewsDetailPresenter` formats detail states; `NewsDetailWorker` owns repository and interaction-store access.
+- **Profile**: `ProfileInteractor` owns profile loading/edit/logout intents; `ProfilePresenter` formats profile states; `ProfileWorker` owns session-bound profile loading.
+- **Profile edit**: `ProfileEditInteractor` owns edit transaction/save/cancel; `ProfileEditWorker` owns profile mutation I/O.
+- **Routers**: `NewsRouter` and `ProfileRouter` keep navigation-only responsibilities.
 
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
-
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## Stop Rules
+- Do not add empty Clean Swift ceremony, pass-through request/response structs, or decorative protocols.
+- Do not move formatting into interactors when a presenter can format it without owning side effects.
+- Do not let presenters call repositories, persistence, or routers.
+- Do not let routers perform business/data work.
+- Do not remove source app behavior/design to make the case simpler.

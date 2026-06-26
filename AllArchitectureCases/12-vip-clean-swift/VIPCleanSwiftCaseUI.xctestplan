@@ -1,0 +1,29 @@
+{
+  "configurations": [
+    {
+      "id": "B1D7F9A2-8B8E-41EF-9F3D-A10000000001",
+      "name": "UI Accessibility Smoke Tests",
+      "options": {}
+    }
+  ],
+  "defaultOptions": {
+    "codeCoverage": false,
+    "targetForVariableExpansion": {
+      "containerPath": "container:VIPCleanSwiftCase.xcodeproj",
+      "identifier": "B6C8419759BE6F64A5E6D521",
+      "name": "VIPCleanSwiftCase"
+    }
+  },
+  "testTargets": [
+    {
+      "enabled": true,
+      "parallelizable": false,
+      "target": {
+        "containerPath": "container:VIPCleanSwiftCase.xcodeproj",
+        "identifier": "7C17E40D544DCA5DEFEA3454",
+        "name": "VIPCleanSwiftCaseUITests"
+      }
+    }
+  ],
+  "version": 1
+}

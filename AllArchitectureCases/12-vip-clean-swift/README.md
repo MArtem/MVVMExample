@@ -1,36 +1,21 @@
-# MVVMExample
+# VIPCleanSwiftCase
 
-`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
+`VIPCleanSwiftCase` is a standalone iOS 17+ SwiftUI architecture case that preserves the full source app behavior/design while demonstrating pragmatic VIP / Clean Swift scene ownership.
 
-## Current Scope
+## Architecture Summary
+- SwiftUI **Views** render immutable view state and forward user intent.
+- Scene **Interactors** own lifecycle, async work, business/data orchestration, and state transitions.
+- **Presenters** are format-only mappers into `*ViewState`.
+- **Routers** own navigation only.
+- **Workers** own repository, persistence, and local interaction I/O for interactors.
 
-- Auth login gate
-- News list/detail flow
-- Profile view/edit flow
-- DummyJSON-style test API integration
-- In-memory demo session store
-- Minimal app-local infrastructure copied from the reusable baseline
-
-## Architecture Rules
-
-- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
-- Generic `send(_ action:)` ViewModel dispatch is not default project style.
-- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
-- App-specific feature behavior stays in `./MVVMExample/`.
-- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
-
-## Demo/Test API Policy
-
-- Test API base URL is owned by configuration.
-- Demo credentials are allowed only in debug/demo mode.
-- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
+See `./ARCHITECTURE_CASE.md` for the role mapping and stop rules.
 
 ## Verification
+Use the case-local script so DerivedData, package cache, and result bundles stay inside this folder:
 
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
+./scripts/verify.sh build
+./scripts/verify.sh test-build
 ```
-
-Tests are not written or modified unless explicitly requested.
