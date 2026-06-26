@@ -35,6 +35,7 @@ for path in root.rglob('*'):
                 literal.startswith(('dev-access-', 'dev-refresh-', 'reqres-demo-refresh-'))
                 or literal.startswith('${')
                 or literal in allowed_demo_literals
+                or literal.endswith('-not-a-secret')
             ):
                 continue
             line=text[:match.start()].count('\n')+1

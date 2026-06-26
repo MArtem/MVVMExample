@@ -1,33 +1,28 @@
-# RIBs
+# RIBs Architecture Case
 
-## Case Folder
-`./AllArchitectureCases/14-ribs`
+## Project
+`RIBsCase`
 
-## Target Architecture
-RIBs
+## Goal
+Full functional clone of the source app using a bounded RIBs-style architecture adapted for SwiftUI.
 
-## Purpose
-Router/Interactor/Builder/Component lifecycle tree comparison for very large app architecture.
+## Target State
+Use RIBs roles only when they carry real ownership:
+- **Router**: owns navigation path and child attach/detach boundary; no API, persistence, or business work.
+- **Interactor**: owns lifecycle, state, async work, cancellation, business/data orchestration, and user intents.
+- **Builder**: assembles the screen/RIB and injects scoped dependencies.
+- **Component**: carries dependencies for an app/authenticated/feature scope without becoming a service locator.
+- **View**: renders immutable state and forwards user intent.
 
-## Baseline Reuse
-This case starts from the current `MVVMExample` app baseline and reuses app code, assets, tests, docs, scripts, and app-local `LocalSupport` infrastructure to avoid mechanical duplication.
+## Implemented Mapping
+- App/authenticated scope is represented by app dependencies plus session-scoped coordinators/routers.
+- News/profile feature routes use builders to create screen interactors from scoped components.
+- Existing routers keep navigation-only responsibilities.
+- A deeper RIB tree is intentionally avoided because current app flows do not need more lifecycle boundaries.
 
-## Conversion Status
-- [x] Self-contained project clone created.
-- [ ] Architecture-specific conversion completed.
-- [ ] `git diff --check` passed for this case.
-- [ ] Build passed for this case.
-
-## Safety Rules
-- Keep generated artifacts under `/Users/Artem/.zenflow`.
-- Do not modify the root `MVVMExample` baseline from this case.
-- Do not add empty pass-through layers just to imitate the style.
-- Preserve user-visible behavior unless this case explicitly documents a behavioral difference.
-- Keep demo/test API policy and token/session safety rules intact.
-
-## Verification Command
-Run from this folder after conversion:
-
-```zsh
-./scripts/verify.sh build
-```
+## Stop Rules
+- Do not create a deep RIB tree for ceremony.
+- Every attach/detach boundary must correspond to route lifecycle or dependency propagation value.
+- Do not let components become global service locators.
+- Do not let routers perform business/data work.
+- Do not remove functionality or design to satisfy the architecture label.

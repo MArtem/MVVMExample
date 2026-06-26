@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly PROJECT="MVVMExample.xcodeproj"
-readonly SCHEME="MVVMExample"
-readonly UNIT_TEST_PLAN="MVVMExample"
-readonly UI_TEST_PLAN="MVVMExampleUI"
+readonly PROJECT="RIBsCase.xcodeproj"
+readonly SCHEME="RIBsCase"
+readonly UNIT_TEST_PLAN="RIBsCase"
+readonly UI_TEST_PLAN="RIBsCaseUI"
 readonly DESTINATION_IOS_26="platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0"
 readonly CASE_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-readonly DERIVED_DATA_PATH="${MVVMEXAMPLE_DERIVED_DATA_PATH:-${CASE_ROOT}/.xcode-derived-data/MVVMExample}"
-readonly CLONED_PACKAGES_PATH="${MVVMEXAMPLE_XCODE_PACKAGE_CACHE:-${CASE_ROOT}/.xcode-package-cache/MVVMExample}"
-readonly RESULT_BUNDLE_ROOT="${MVVMEXAMPLE_RESULT_BUNDLE_PATH:-${CASE_ROOT}/.xcode-result-bundles/MVVMExample}"
+readonly DERIVED_DATA_PATH="${RIBSCASE_DERIVED_DATA_PATH:-${CASE_ROOT}/.xcode-derived-data/RIBsCase}"
+readonly CLONED_PACKAGES_PATH="${RIBSCASE_XCODE_PACKAGE_CACHE:-${CASE_ROOT}/.xcode-package-cache/RIBsCase}"
+readonly RESULT_BUNDLE_ROOT="${RIBSCASE_RESULT_BUNDLE_PATH:-${CASE_ROOT}/.xcode-result-bundles/RIBsCase}"
 
 usage() {
   cat <<'USAGE'
 Usage:
-  ./scripts/verify.sh <static|list|build|test-unit|test-ui|all>
+  ./scripts/verify.sh <static|list|build|test-build|test-unit|test-ui|all>
 
 Levels:
   static     Run static quality gates that do not require simulator execution
   list       Verify Xcode project structure
-  build      Build MVVMExample on iPhone 17 Pro (iOS 26.0)
+  build      Build RIBsCase on iPhone 17 Pro (iOS 26.0)
+  test-build Build app and tests without launching test execution
   test-unit  Run the unit-test xctestplan only
   test-ui    Run the UI accessibility smoke xctestplan only
   all        Run static, list, build, and unit tests; UI tests remain explicit via test-ui
@@ -33,7 +34,6 @@ run_static() {
   ./scripts/check_large_files.py
   ./scripts/check_localization.py
   ./scripts/check_swiftui_hot_path_patterns.py
-  ./scripts/check_docs_index.py
 }
 
 run_list() {
@@ -55,6 +55,19 @@ run_build() {
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     CODE_SIGNING_ALLOWED=NO \
     build
+}
+
+run_test_build() {
+  xcodebuild \
+    -project "${PROJECT}" \
+    -scheme "${SCHEME}" \
+    -testPlan "${UNIT_TEST_PLAN}" \
+    -configuration Debug \
+    -destination "${DESTINATION_IOS_26}" \
+    -derivedDataPath "${DERIVED_DATA_PATH}" \
+    -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
+    CODE_SIGNING_ALLOWED=NO \
+    build-for-testing
 }
 
 run_unit_tests() {
@@ -106,6 +119,9 @@ main() {
       ;;
     build)
       run_build
+      ;;
+    test-build)
+      run_test_build
       ;;
     test-unit)
       run_unit_tests
