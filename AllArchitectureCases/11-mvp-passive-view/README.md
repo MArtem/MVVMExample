@@ -1,36 +1,24 @@
-# MVVMExample
+# MVPPassiveViewCase
 
-`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
+`MVPPassiveViewCase` is a standalone full-functional architecture case that preserves the source app behavior/design while expressing feature presentation through **MVP Passive View**.
 
-## Current Scope
+The SwiftUI screens are treated as passive render-forwarding views: they observe presenter state, render it, and forward user events. Screen-scoped `*Presenter` types own presentation decisions, async orchestration, navigation handoff, error mapping, and view-state updates.
 
-- Auth login gate
-- News list/detail flow
-- Profile view/edit flow
-- DummyJSON-style test API integration
-- In-memory demo session store
-- Minimal app-local infrastructure copied from the reusable baseline
+## Architecture Intent
 
-## Architecture Rules
-
-- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
-- Generic `send(_ action:)` ViewModel dispatch is not default project style.
-- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
-- App-specific feature behavior stays in `./MVVMExample/`.
-- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
-
-## Demo/Test API Policy
-
-- Test API base URL is owned by configuration.
-- Demo credentials are allowed only in debug/demo mode.
-- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
+- **Passive view**: SwiftUI screens do not decide loading/error/content transitions; they render presenter state and forward explicit events.
+- **Presenter ownership**: `LoginPresenter`, `NewsListPresenter`, `NewsDetailPresenter`, `ProfilePresenter`, and `ProfileEditPresenter` own presentation decisions for real feature behavior.
+- **Small view seam**: the SwiftUI view-to-presenter seam is limited to explicit user-event methods and observable state; no broad view protocol is added where SwiftUI observation already provides the display channel.
+- **No action/reducer scaffold**: this is not TCA/UDF/Reactor-style. SwiftUI calls explicit presenter methods; presenters update their owned presentation state directly.
 
 ## Verification
 
+Use the case-local script so DerivedData, package caches, and result bundles remain inside this folder:
+
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
+./scripts/verify.sh build
+./scripts/verify.sh test-build
 ```
 
-Tests are not written or modified unless explicitly requested.
+Manual simulator, UI automation, and Instruments runs require separate approval.
