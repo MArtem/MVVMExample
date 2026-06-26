@@ -35,6 +35,8 @@
 		FA8B82A56492349DD0274212 /* NetworkPrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A78152113A4FA2E7E49E34 /* NetworkPrimitives.swift */; };
 		2A2CA582795988A30C6D1E6D /* URLSessionNetworkClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 815D5284158F7D62C9C6C24C /* URLSessionNetworkClient.swift */; };
 		A9A900040000000000000001 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9A900050000000000000001 /* AppIntents.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		A9A900040000000000000002 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9A900050000000000000001 /* AppIntents.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
+		A9A900040000000000000003 /* AppIntents.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A9A900050000000000000001 /* AppIntents.framework */; settings = {ATTRIBUTES = (Weak, ); }; };
 		00E6825C299D1E7AC2D3C76D /* NewsListPresenterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81860ECF963B37B43B7FFAE3 /* NewsListPresenterTests.swift */; };
 		027A0F5EB88E0712CBD8B55B /* AppAccessibilityID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 760C6EE6945A9B2B097D671B /* AppAccessibilityID.swift */; };
 		042BDFE47FB51469789FF8AD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BD874CB2509D202C42781BED /* Foundation.framework */; };
@@ -273,6 +275,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				1E4D80B4C5CBEAF3F1567A69 /* Foundation.framework in Frameworks */,
+				A9A900040000000000000002 /* AppIntents.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -281,6 +284,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2AB5F6BEFAEC04521383E29F /* Foundation.framework in Frameworks */,
+				A9A900040000000000000003 /* AppIntents.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

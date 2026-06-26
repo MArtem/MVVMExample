@@ -47,13 +47,13 @@ struct MockNewsRepository: NewsRepository {
 extension NewsArticle {
     static let fixture = NewsArticle(
         id: 1,
-        title: "SwiftUI MVVM Navigation Architecture",
+        title: "Coordinator Navigation Architecture",
         excerpt: "A practical demo of typed routers, coordinators, repositories, DTO mapping and view state.",
         source: "DummyJSON",
         category: "architecture",
         rating: 4.8,
-        thumbnailURL: URL(string: "https://dummyjson.com/image/400x200/282828/eaeaea?text=MVVM"),
-        imageURLs: [URL(string: "https://dummyjson.com/image/900x500/282828/eaeaea?text=MVVM")!],
+        thumbnailURL: URL(string: "https://dummyjson.com/image/400x200/282828/eaeaea?text=Coordinator"),
+        imageURLs: [URL(string: "https://dummyjson.com/image/900x500/282828/eaeaea?text=Coordinator")!],
         publishedAt: .now.addingTimeInterval(-3600),
         likesCount: 48,
         commentsCount: 7,

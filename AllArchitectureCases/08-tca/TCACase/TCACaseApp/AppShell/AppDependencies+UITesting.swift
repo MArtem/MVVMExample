@@ -59,7 +59,7 @@ extension AppDependencies {
 private struct UITestNewsRepository: NewsRepository {
     private let article = NewsArticle(
         id: 101,
-        title: "Accessible MVVM news card",
+        title: "Accessible TCA news card",
         excerpt: "A stable UI-test article used to verify card actions remain independently accessible.",
         source: "TCACase",
         category: "testing",
