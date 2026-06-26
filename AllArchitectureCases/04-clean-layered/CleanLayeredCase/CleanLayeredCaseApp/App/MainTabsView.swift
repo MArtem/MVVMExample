@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// SwiftUI composition surface for app-level navigation state.
+///
+/// Ownership: reads coordinator/router state and creates feature entry views; it should not own network, persistence, or feature business behavior.
 struct MainTabsView: View {
     @Bindable var coordinator: MainCoordinator
 

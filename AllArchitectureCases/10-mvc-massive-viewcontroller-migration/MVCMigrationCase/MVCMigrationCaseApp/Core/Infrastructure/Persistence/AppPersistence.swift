@@ -22,6 +22,9 @@ enum AppPersistence {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 @Model
 final class PersistedPendingMutation {
     @Attribute(.unique) var key: String
@@ -72,6 +75,9 @@ final class PersistedPendingMutation {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 @Model
 final class PersistedArticleInteraction {
     @Attribute(.unique) var key: String
@@ -95,6 +101,9 @@ final class PersistedArticleInteraction {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 @Model
 final class PersistedUserProfile {
     @Attribute(.unique) var key: String

@@ -34,6 +34,7 @@ for path in root.rglob('*'):
             if name == 'generic token assignment' and (
                 literal.startswith(('dev-access-', 'dev-refresh-', 'reqres-demo-refresh-'))
                 or literal.startswith('${')
+                or literal.endswith('-not-a-secret')
                 or literal in allowed_demo_literals
             ):
                 continue

@@ -1,5 +1,8 @@
 import Foundation
 
+/// Data-boundary mapping contract that converts transport shapes into app/domain models.
+///
+/// Failure behavior: throw explicit mapping errors for invalid backend payloads instead of manufacturing silent placeholder domain data.
 enum ProfileMappingError: Error {
     case missingID
 }

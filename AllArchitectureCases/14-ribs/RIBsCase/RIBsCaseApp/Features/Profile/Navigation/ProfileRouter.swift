@@ -24,10 +24,16 @@ final class ProfileRouter {
     }
 }
 
+/// Navigation contract for a feature route boundary.
+///
+/// Keep payloads limited to route identity and deliberate presentation snapshots; data loading and persistence stay outside navigation.
 enum ProfileRoute: Hashable {
     case edit(ProfileEditRoutePayload)
 }
 
+/// Navigation contract for a feature route boundary.
+///
+/// Keep payloads limited to route identity and deliberate presentation snapshots; data loading and persistence stay outside navigation.
 struct ProfileEditRoutePayload: Hashable, Identifiable {
     let id: Int
     let firstName: String

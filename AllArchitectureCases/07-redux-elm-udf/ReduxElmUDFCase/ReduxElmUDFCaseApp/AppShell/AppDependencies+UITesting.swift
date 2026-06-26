@@ -56,6 +56,9 @@ extension AppDependencies {
     }
 }
 
+/// Deterministic app-local fixture used for previews, smoke tests, or debug-only wiring.
+///
+/// Do not route production runtime through this implementation unless an explicit debug/demo policy selects it.
 private struct UITestNewsRepository: NewsRepository {
     private let article = NewsArticle(
         id: 101,
@@ -102,6 +105,9 @@ private struct UITestNewsRepository: NewsRepository {
     }
 }
 
+/// Deterministic app-local fixture used for previews, smoke tests, or debug-only wiring.
+///
+/// Do not route production runtime through this implementation unless an explicit debug/demo policy selects it.
 private struct UITestProfileRepository: ProfileRepository {
     func loadCurrentProfile(session: AuthSession) async throws -> UserProfile {
         UserProfile(

@@ -63,6 +63,9 @@ final class KeychainSessionStore: SessionStore {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 private struct StoredAuthSession: Codable {
     let accessToken: String
     let refreshToken: String
@@ -83,6 +86,9 @@ private struct StoredAuthSession: Codable {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 private struct StoredAppUser: Codable {
     let id: Int
     let username: String
@@ -112,12 +118,18 @@ private struct StoredAppUser: Codable {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 protocol KeychainSessionStorage: Sendable {
     func load(service: String, account: String) -> Data?
     func save(_ data: Data, service: String, account: String) throws
     func clear(service: String, account: String)
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 struct SystemKeychainSessionStorage: KeychainSessionStorage {
     func load(service: String, account: String) -> Data? {
         let query: [String: Any] = [
@@ -172,6 +184,9 @@ struct SystemKeychainSessionStorage: KeychainSessionStorage {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 private enum KeychainSessionStorageError: Error {
     case unhandledStatus(OSStatus)
 }

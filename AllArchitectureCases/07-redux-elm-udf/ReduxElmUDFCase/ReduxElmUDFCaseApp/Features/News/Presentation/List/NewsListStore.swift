@@ -25,6 +25,9 @@ final class NewsListStore {
         var canLoadMore: Bool = true
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Action {
         case appeared
         case becameVisible
@@ -37,6 +40,9 @@ final class NewsListStore {
         case retryLoadNextPageTapped
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Mutation {
         case setState(NewsListViewState)
         case setArticles([NewsArticle])

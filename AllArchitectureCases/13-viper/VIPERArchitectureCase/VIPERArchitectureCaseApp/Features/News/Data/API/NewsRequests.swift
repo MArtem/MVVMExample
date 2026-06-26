@@ -19,6 +19,9 @@ struct ProductsListRequest: APIRequest {
     }
 }
 
+/// API request description for the network adapter layer.
+///
+/// Boundary rule: encode transport path, method, headers, and body here; callers should pass domain intent, not URLSession details.
 struct ProductDetailRequest: APIRequest {
     let id: Int
     var path: String { "/products/\(id)" }

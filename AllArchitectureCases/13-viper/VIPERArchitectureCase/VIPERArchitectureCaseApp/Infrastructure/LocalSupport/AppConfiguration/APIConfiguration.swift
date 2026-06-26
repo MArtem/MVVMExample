@@ -9,6 +9,9 @@ enum AppRuntimeEnvironment: String, Sendable {
     case production
 }
 
+/// Explicit error taxonomy for a boundary where silent fallback would hide a supportable failure.
+///
+/// Map this to localized user-facing copy before rendering errors in SwiftUI.
 enum APIConfigurationError: LocalizedError, Equatable, Sendable {
     case missingProductionBaseURL
     case invalidBaseURL(String)

@@ -17,6 +17,9 @@ final class LoginStore {
         case clearError
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Mutation {
         case setCredentials(username: String, password: String)
         case setLoading(Bool)

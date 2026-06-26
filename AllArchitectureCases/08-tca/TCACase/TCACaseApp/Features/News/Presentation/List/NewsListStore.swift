@@ -27,6 +27,9 @@ final class NewsListStore {
 
     typealias State = NewsListViewState
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Action {
         case appeared
         case becameVisible
@@ -39,6 +42,9 @@ final class NewsListStore {
         case retryLoadNextPageTapped
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Effect {
         case loadFirstPage
         case refreshFirstPage
@@ -46,6 +52,9 @@ final class NewsListStore {
         case toggleLike(NewsArticle.ID)
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum StateMutation {
         case setState(NewsListViewState)
         case setArticles([NewsArticle])

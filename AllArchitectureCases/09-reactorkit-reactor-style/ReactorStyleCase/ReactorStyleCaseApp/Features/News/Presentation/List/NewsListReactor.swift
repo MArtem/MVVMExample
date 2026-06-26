@@ -18,6 +18,9 @@ import Observation
 final class NewsListReactor {
     typealias State = NewsListViewState
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Action {
         case appeared
         case becameVisible
@@ -30,6 +33,9 @@ final class NewsListReactor {
         case retryLoadNextPageTapped
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum SideEffect {
         case loadFirstPage
         case refreshFirstPage
@@ -37,6 +43,9 @@ final class NewsListReactor {
         case toggleLike(NewsArticle.ID)
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Mutation {
         case setState(NewsListViewState)
         case setArticles([NewsArticle])

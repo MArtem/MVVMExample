@@ -1,11 +1,17 @@
 import Foundation
 import SwiftData
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 struct PendingArticleLikeMutation: Codable, Equatable, Sendable {
     let articleID: Int
     let isLiked: Bool
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 struct PendingProfileUpdateMutation: Codable, Equatable, Sendable {
     let profileID: Int
     let firstName: String
@@ -24,6 +30,9 @@ struct PendingProfileUpdateMutation: Codable, Equatable, Sendable {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 enum PendingMutationKind {
     static let articleLike = "articleLike"
     static let profileUpdate = "profileUpdate"
@@ -210,6 +219,9 @@ final class PendingMutationSyncService {
     }
 }
 
+/// Persistence boundary for durable app-local state.
+///
+/// Data-safety rule: keep token-like secrets out of SwiftData and make save/load failure behavior explicit for callers.
 private enum PendingMutationSyncError: Error {
     case invalidPayload
     case unsupportedKind(String)

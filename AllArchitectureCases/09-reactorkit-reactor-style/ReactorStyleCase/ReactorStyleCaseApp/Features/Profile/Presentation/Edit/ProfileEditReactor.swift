@@ -13,16 +13,25 @@ import Observation
 final class ProfileEditReactor {
     typealias State = ProfileEditViewState
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Action {
         case saveTapped
         case cancelTapped
         case clearError
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum SideEffect {
         case save(UpdateProfileRequest)
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Mutation {
         case setSaving(Bool)
         case setError(String?)

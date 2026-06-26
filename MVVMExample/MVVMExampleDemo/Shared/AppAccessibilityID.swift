@@ -1,6 +1,12 @@
 import Foundation
 
+/// Stable accessibility identifier namespace for UI automation and assistive-technology verification.
+///
+/// Values are treated as test contracts; change them only with matching UI-test updates.
 enum AppAccessibilityID {
+    /// Stable accessibility identifier namespace for UI automation and assistive-technology verification.
+    ///
+    /// Values are treated as test contracts; change them only with matching UI-test updates.
     enum Login {
         static let usernameField = "login.usernameField"
         static let passwordField = "login.passwordField"
@@ -9,6 +15,9 @@ enum AppAccessibilityID {
         static let errorMessage = "login.errorMessage"
     }
 
+    /// Stable accessibility identifier namespace for UI automation and assistive-technology verification.
+    ///
+    /// Values are treated as test contracts; change them only with matching UI-test updates.
     enum News {
         static let list = "news.list"
         static let detailFavoriteButton = "news.detail.favoriteButton"
@@ -26,6 +35,9 @@ enum AppAccessibilityID {
         }
     }
 
+    /// Stable accessibility identifier namespace for UI automation and assistive-technology verification.
+    ///
+    /// Values are treated as test contracts; change them only with matching UI-test updates.
     enum Profile {
         static let editButton = "profile.editButton"
         static let logoutButton = "profile.logoutButton"

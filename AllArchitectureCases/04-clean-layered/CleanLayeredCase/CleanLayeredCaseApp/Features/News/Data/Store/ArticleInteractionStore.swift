@@ -115,6 +115,9 @@ final class ArticleInteractionStore: ArticleInteractionManaging {
     }
 }
 
+/// Struct contract for a local app boundary.
+///
+/// Document ownership and side effects here when this type grows beyond value-only data.
 private struct ArticleInteractionState {
     let isLiked: Bool
     let likesCount: Int

@@ -30,6 +30,9 @@ enum RemoteImagePipelineError: LocalizedError, Equatable, Sendable {
     }
 }
 
+/// Image-loading/cache primitive used by SwiftUI media surfaces.
+///
+/// Performance policy: bound memory use, avoid repeated decoding in row bodies, and keep cancellation safe for scrolling lists.
 struct RemoteImagePipeline: Sendable {
     static let shared = RemoteImagePipeline()
 

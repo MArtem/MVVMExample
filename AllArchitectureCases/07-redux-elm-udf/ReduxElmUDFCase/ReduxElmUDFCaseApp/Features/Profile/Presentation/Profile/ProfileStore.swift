@@ -19,6 +19,9 @@ final class ProfileStore {
         case logoutTapped
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Mutation {
         case setState(ProfileViewState)
     }

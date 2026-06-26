@@ -1,5 +1,8 @@
 import Foundation
 
+/// Domain model used across feature boundaries.
+///
+/// Keep this type focused on product meaning; transport, persistence, and presentation-only formatting belong in adapters/builders.
 struct NewsArticle: Identifiable, Equatable, Sendable {
     let id: Int
     let title: String

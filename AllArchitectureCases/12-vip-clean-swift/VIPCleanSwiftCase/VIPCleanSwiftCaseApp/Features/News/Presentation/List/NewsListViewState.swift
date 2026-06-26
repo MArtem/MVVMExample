@@ -13,13 +13,22 @@ enum NewsListViewState: Equatable {
     case error(MessageViewState)
 }
 
+/// Render-ready presentation state consumed by SwiftUI views.
+///
+/// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
 struct NewsListContentViewState: Equatable {
     var cards: [NewsCardViewState]
     var banner: String?
     var pagination: NewsPaginationViewState
 }
 
+/// Render-ready presentation state consumed by SwiftUI views.
+///
+/// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
 struct NewsPaginationViewState: Equatable {
+    /// Render-ready presentation state consumed by SwiftUI views.
+    ///
+    /// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
     enum Status: Equatable {
         case idle
         case loading
@@ -51,12 +60,18 @@ struct NewsCardViewState: Identifiable, Equatable {
     let commentsAccessibilityLabel: String
 }
 
+/// Render-ready presentation state consumed by SwiftUI views.
+///
+/// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
 enum LikeButtonState: Equatable {
     case notLiked
     case liked
     case failed
 }
 
+/// Render-ready presentation state consumed by SwiftUI views.
+///
+/// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
 struct MessageViewState: Equatable {
     let title: String
     let message: String

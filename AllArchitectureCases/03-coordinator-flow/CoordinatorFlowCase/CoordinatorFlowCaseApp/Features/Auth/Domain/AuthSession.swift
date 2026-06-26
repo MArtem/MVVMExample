@@ -1,11 +1,17 @@
 import Foundation
 
+/// Domain model used across feature boundaries.
+///
+/// Keep this type focused on product meaning; transport, persistence, and presentation-only formatting belong in adapters/builders.
 struct AuthSession: Codable, Equatable, Sendable {
     let accessToken: String
     let refreshToken: String
     let user: AppUser
 }
 
+/// Domain model used across feature boundaries.
+///
+/// Keep this type focused on product meaning; transport, persistence, and presentation-only formatting belong in adapters/builders.
 struct AppUser: Codable, Identifiable, Equatable, Sendable {
     let id: Int
     let username: String

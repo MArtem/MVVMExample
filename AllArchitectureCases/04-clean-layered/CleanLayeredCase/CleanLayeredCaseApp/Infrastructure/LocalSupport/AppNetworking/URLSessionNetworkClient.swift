@@ -154,6 +154,9 @@ final class URLSessionNetworkClient: NetworkClient {
     }
 }
 
+/// Transport payload owned by the data/API boundary.
+///
+/// Mapping responsibility: keep backend optionality, naming, and wire-format quirks here so domain and presentation models stay transport-independent.
 private struct APIMessageDTO: Decodable {
     let message: String?
 }

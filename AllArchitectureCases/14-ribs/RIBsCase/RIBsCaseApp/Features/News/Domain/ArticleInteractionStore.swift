@@ -115,6 +115,9 @@ final class ArticleInteractionStore {
     }
 }
 
+/// Domain model used across feature boundaries.
+///
+/// Keep this type focused on product meaning; transport, persistence, and presentation-only formatting belong in adapters/builders.
 private struct ArticleInteractionState {
     let isLiked: Bool
     let likesCount: Int

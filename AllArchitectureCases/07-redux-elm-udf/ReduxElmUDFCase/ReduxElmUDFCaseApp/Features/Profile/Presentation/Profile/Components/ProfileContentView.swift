@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// SwiftUI rendering surface for already-owned feature state.
+///
+/// Ownership: renders input state and forwards explicit user intents; do not start repository work or store durable state from `body`.
 struct ProfileContentView: View {
     let state: ProfileContentViewState
     let onEditTap: () -> Void
@@ -39,6 +42,9 @@ struct ProfileContentView: View {
     }
 }
 
+/// SwiftUI rendering surface for already-owned feature state.
+///
+/// Ownership: renders input state and forwards explicit user intents; do not start repository work or store durable state from `body`.
 private struct ProfileInfoRow: View {
     let title: String
     let value: String

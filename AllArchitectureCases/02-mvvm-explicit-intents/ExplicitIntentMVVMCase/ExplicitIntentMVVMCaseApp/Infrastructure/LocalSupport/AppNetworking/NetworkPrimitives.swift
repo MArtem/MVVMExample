@@ -1,5 +1,8 @@
 import Foundation
 
+/// Networking primitive used by repository/data adapters.
+///
+/// Boundary rule: centralize request encoding, response validation, cancellation, and user-safe error mapping outside feature views.
 enum NetworkHTTPMethod: String, Sendable {
     case get = "GET"
     case post = "POST"

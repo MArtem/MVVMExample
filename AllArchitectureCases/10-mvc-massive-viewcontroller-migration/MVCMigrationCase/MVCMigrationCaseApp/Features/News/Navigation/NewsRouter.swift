@@ -24,10 +24,16 @@ final class NewsRouter {
     }
 }
 
+/// Navigation contract for a feature route boundary.
+///
+/// Keep payloads limited to route identity and deliberate presentation snapshots; data loading and persistence stay outside navigation.
 enum NewsRoute: Hashable {
     case detail(NewsDetailRoutePayload)
 }
 
+/// Navigation contract for a feature route boundary.
+///
+/// Keep payloads limited to route identity and deliberate presentation snapshots; data loading and persistence stay outside navigation.
 struct NewsDetailRoutePayload: Hashable, Identifiable {
     let id: Int
     let title: String

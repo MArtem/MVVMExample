@@ -10,11 +10,17 @@ enum NewsDetailViewState: Equatable {
     case error(MessageViewState)
 }
 
+/// Render-ready presentation state consumed by SwiftUI views.
+///
+/// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
 struct NewsDetailPlaceholderViewState: Equatable {
     let title: String
     let thumbnailURL: URL?
 }
 
+/// Render-ready presentation state consumed by SwiftUI views.
+///
+/// Formatting policy: expensive localization, date, number, and accessibility strings should be prepared before row/body rendering hot paths.
 struct NewsDetailContentViewState: Equatable {
     let id: Int
     let title: String

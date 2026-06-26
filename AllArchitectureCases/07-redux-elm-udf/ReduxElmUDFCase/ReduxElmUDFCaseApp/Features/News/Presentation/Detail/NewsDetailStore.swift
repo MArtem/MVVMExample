@@ -18,12 +18,18 @@ final class NewsDetailStore {
         var loadedArticle: NewsArticle?
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Action {
         case appeared
         case retryTapped
         case favoriteTapped
     }
 
+    /// Enum contract for a local app boundary.
+    ///
+    /// Document ownership and side effects here when this type grows beyond value-only data.
     private enum Mutation {
         case setState(NewsDetailViewState)
         case setArticle(NewsArticle?)
