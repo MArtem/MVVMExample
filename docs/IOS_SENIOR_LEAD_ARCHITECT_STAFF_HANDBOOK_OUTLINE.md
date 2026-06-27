@@ -878,12 +878,190 @@ Feature, работающая с file system или sandbox boundaries, не г�
 - incident response описывает containment, revocation, cleanup и regression tests.
 
 ### 1.4. Privacy-гейты и модель разрешений
+#### Назначение раздела
+Privacy-гейт в iOS — это не только системный permission prompt. Это точка, где продукт, платформа и пользовательский контроль сходятся в один контракт: зачем приложению нужен sensitive capability, какие данные будут получены, как долго они живут, что произойдёт при отказе, как пользователь может изменить решение и какие disclosures должны быть правдивы в App Store, privacy manifest, onboarding и runtime UI.
+
+Senior-level ошибка — думать о permissions как о release checklist: добавить `NSCameraUsageDescription`, вызвать API, обработать `.authorized`. Staff-level ментальная модель шире: privacy-гейт — это **trust boundary**. Он защищает не framework API, а user agency. Пользователь должен понимать value exchange до запроса, иметь достойный denied/restricted path после отказа и не получать наказание за privacy-preserving choice.
+
+Эта секция продолжает `1.3`: sandbox отвечает на вопрос «где могут жить данные и кто имеет доступ», а privacy-гейты отвечают на вопрос «почему приложение вообще имеет право получить эти данные или capability».
+
+#### Ментальная модель permissions
+Permission — это не property приложения, а revocable grant от пользователя и системы. Grant может быть:
+- **not determined**: app ещё не получила решение;
+- **authorized**: доступ разрешён в текущем объёме;
+- **limited**: доступ частичный, например выбранные Photos assets;
+- **denied**: пользователь отказал;
+- **restricted**: доступ запрещён policy/device/parental/MDM constraints;
+- **unavailable**: capability отсутствует на устройстве, OS version или текущей конфигурации;
+- **ephemeral / session-scoped**: доступ существует только в рамках текущего выбора или системного UI flow.
+
+Правило проектирования: permission state должен быть частью product state machine, а не `if` перед вызовом API. UI, analytics, retry, settings navigation, support guidance и feature availability должны различать denied, restricted, limited и unavailable. Смешивание этих состояний в одну ошибку «нет доступа» создаёт плохой UX и неверную поддержку.
+
 #### Threat model и защищаемые assets
+Privacy threat model начинается не с attacker, а с вопроса: **какой user-controlled boundary мы пересекаем?**
+
+Типовые boundaries:
+- **Camera/Microphone**: live capture private environment, faces, voices, documents, screens;
+- **Photos/Media Library**: historical personal media, metadata, location, social context;
+- **Location**: movement patterns, home/work inference, safety-sensitive context;
+- **Contacts/Calendars/Reminders**: third-party personal data, не только данные текущего пользователя;
+- **Bluetooth/Local Network**: nearby devices, home topology, workplace environment;
+- **Health/fitness-like data**: high-sensitivity behavioral/biometric context;
+- **Notifications**: attention channel, lock screen exposure, behavioral nudging;
+- **Tracking/advertising identifiers**: cross-app identity and profiling;
+- **Pasteboard/Documents/Share flows**: user-generated private content and filenames.
+
+Защищаемые assets включают не только raw data. Часто более опасны derived signals: «пользователь был в клинике», «у пользователя есть дети», «у пользователя определённый документ», «пользователь находится дома», «пользователь отказал в tracking». Такие выводы нельзя бездумно отправлять в analytics, logs или personalization pipeline.
+
+#### Timing и value exchange
+Самый важный product decision — когда запрашивать permission. Cold launch prompt почти всегда слабее, чем contextual prompt рядом с понятной user value.
+
+Правила:
+- запрашивай доступ в момент, когда пользователь понимает задачу;
+- перед системным prompt дай короткий, честный pre-prompt только если он помогает понять value, а не манипулирует;
+- не обещай больше, чем реально делает feature;
+- не блокируй весь app, если permission нужен только одной feature;
+- не повторяй давление после denial; показывай settings path только там, где это действительно помогает;
+- не используй dark patterns: guilt wording, fake urgency, misleading buttons, скрытие альтернатив.
+
+Хороший privacy copy отвечает на три вопроса:
+1. **зачем** нужен доступ именно сейчас;
+2. **что** будет использовано и в каком объёме;
+3. **что произойдёт**, если пользователь откажет.
+
+Плохой copy звучит как внутреннее требование приложения: «Разрешите доступ для продолжения». Хороший copy звучит как user-centered объяснение: «Чтобы прикрепить фото к обращению, выберите снимок. Можно выбрать отдельные фото без доступа ко всей медиатеке».
+
 #### Platform mechanism и entitlement surface
+Privacy-гейты существуют на нескольких уровнях:
+
+| Уровень | Примеры | Что проверять |
+| --- | --- | --- |
+| Info.plist usage descriptions | Camera, Microphone, Location, Photos, Contacts | строка соответствует реальному purpose и не является generic boilerplate |
+| Runtime authorization API | `AVCaptureDevice`, `CLLocationManager`, Photos, Notifications | все states обработаны, запрос выполняется в правильный момент |
+| Entitlements/capabilities | HealthKit, App Groups, Push, Associated Domains, iCloud | здесь проверяется только privacy impact; детальный ownership capabilities раскрывается в `1.5` |
+| Privacy manifest | required reason APIs, declared data use, linked SDK privacy practices | manifest отражает фактическое runtime behavior, SDK usage и причины использования privacy-sensitive APIs |
+| App Store privacy labels | public product-page disclosure о collection, tracking, linked data | ответы в App Store Connect совпадают с продуктом, analytics и SDK configuration |
+| System settings | revocation, limited access changes, notification settings | app корректно reconciles state после возврата из Settings |
+
+Нельзя рассматривать Info.plist строки как деталь copywriting. Неверная строка может означать, что команда не понимает actual data flow. Если feature просит Photos «для выбора аватара», но SDK сканирует library metadata для personalization, это privacy bug, а не copy issue.
+
+#### Denied, restricted, limited и unavailable states
+Production app должна иметь first-class UX для каждого non-happy-path permission state.
+
+Матрица решений:
+
+| State | Что означает | UX правило | Engineering правило |
+| --- | --- | --- | --- |
+| Not determined | пользователь ещё не выбирал | contextual request после объяснения ценности | не делать speculative API access |
+| Denied | пользователь отказал | показать альтернативу или путь в Settings без давления | не делать prompt loop; не логировать denial как failure |
+| Restricted | system/policy запрет | объяснить недоступность без обвинения пользователя | не показывать Settings как решение, если оно не поможет |
+| Limited | доступ частичный | поддержать выбранный subset и возможность изменить selection | не предполагать full library; обрабатывать изменения |
+| Unavailable | capability отсутствует | скрыть/заменить feature | feature gating по device/OS/config |
+| Revoked after grant | доступ изменён позже | reconcile при foreground/activation | очистить stale assumptions и sensitive derived state |
+
+Limited Photos access — хороший пример senior-level ловушки. App не должна считать `.authorized` и `.limited` одинаковыми. Если пользователь выбрал только часть фото, UI должен уважать этот выбор, не ломать flows и не подталкивать к full access без необходимости.
+
+#### iOS-specific permission nuances
+Некоторые privacy-гейты имеют дополнительные состояния, которые нельзя сводить к простому allow/deny.
+
+- **Location**: различай When In Use и Always authorization, precise и reduced accuracy, temporary full accuracy и background location expectations. Запрос Always без сильной user value и background rationale — privacy и App Review риск.
+- **Photos**: различай full library access, limited library access и picker-based/session-scoped access. `PHPickerViewController`/PhotosPicker может дать выбор конкретных assets без broad library grant, и это часто предпочтительнее.
+- **Notifications**: учитывай provisional authorization, ephemeral authorization, time-sensitive/critical alert policy и lock-screen privacy. Разрешение на notifications — это доступ к attention channel, а не просто transport capability.
+- **Tracking / ATT**: App Tracking Transparency — отдельный consent flow для tracking across apps/websites. Его нельзя заменить web-consent, общим onboarding consent или privacy policy ссылкой.
+- **Microphone/Camera**: live capture требует visible user intent, clear active state и немедленную остановку capture, когда user-visible задача завершена.
+- **Local Network / Bluetooth**: эти permissions могут раскрывать окружение пользователя: домашние устройства, рабочую инфраструктуру, nearby hardware и косвенные behavioral signals.
+
+Picker-based access и permissioned access — разные privacy модели. Если user выбирает конкретный файл, фото или документ через системный picker, app получает scoped доступ к выбранному объекту. Это не равно праву сканировать всю библиотеку, строить hidden index или сохранять unrelated metadata.
+
 #### Data lifecycle, retention и deletion behavior
+Permission grant не даёт бессрочное моральное право хранить полученные данные. Для каждого permission-backed data flow нужно определить lifecycle:
+- какие raw data попадают в память;
+- какие derived data создаются;
+- что persist-ится;
+- где хранится;
+- как долго живёт;
+- что удаляется при logout/account deletion;
+- что происходит при permission revocation;
+- что попадает в backup, cache, logs, analytics и crash reports.
+
+Особенно важны derived artifacts:
+- thumbnails из Photos;
+- transcribed microphone text;
+- geohash/region derived from precise location;
+- contact matching results;
+- notification engagement history;
+- local network device fingerprints.
+
+Если user revoked permission, app не всегда обязана удалить все ранее созданные user-owned artifacts: например, пользователь мог импортировать фото в документ. Но app должна различать **user-owned imported copy** и **permission-derived cache/index**. Первое может жить по product contract; второе обычно должно иметь retention/deletion policy, связанную с permission scope.
+
 #### Logging, analytics и crash-reporting ограничения
+Privacy-гейты особенно часто ломаются через diagnostics. Команда обрабатывает permission state, но потом отправляет sensitive context в analytics.
+
+Запрещённые или risky signals:
+- precise location, raw coordinates, Wi‑Fi/Bluetooth identifiers;
+- contact names, emails, phone numbers;
+- photo filenames, metadata, EXIF location;
+- microphone transcripts или audio-derived text;
+- health-like values;
+- pasteboard/document contents;
+- user denial reason в форме shame/guilt analytics;
+- raw notification payloads с private content;
+- tracking state, связанный с identity без policy.
+
+Безопаснее логировать абстрактные состояния: `permission_state=denied`, `scope=limited`, `source=photos_picker`, `error=restricted`, `settings_returned=true`, `selected_count_bucket=1_5`, `location_accuracy=reduced`, `diagnostic_id=<redacted>`. Даже эти поля должны проходить privacy review, потому что некоторые комбинации могут деанонимизировать поведение.
+
 #### Review checklist и incident response
-#### Примеры и adversarial questions для добавления
+Permission/privacy review должен проверять не только код вызова API, но и весь data flow:
+- есть sensitive data inventory;
+- permission запрашивается только при понятной user value;
+- Info.plist usage description точная и user-facing;
+- denied/restricted/limited/unavailable states имеют UX;
+- settings deep link не используется как pressure tactic;
+- raw и derived data имеют retention/deletion policy;
+- permission revocation reconciles local state;
+- analytics/logs/crash metadata redacted;
+- privacy manifest отражает SDK/API usage;
+- App Store privacy labels совпадают с фактическим collection/tracking behavior;
+- third-party SDKs не расширяют data collection за пределами заявленного;
+- QA покрывает first launch, denial, limited access, revocation, device without capability и managed/restricted device.
+
+Incident response для privacy-gate failure должен быть быстрым, потому что ошибка может затрагивать доверие пользователя и compliance:
+1. определить data category и affected capability;
+2. выяснить, была ли collection, persistence, transmission или disclosure;
+3. оценить affected versions, cohorts и jurisdictions;
+4. отключить risky path через kill switch/config, если возможно;
+5. удалить/редактировать logs, diagnostics или cached derived data, если policy требует;
+6. обновить permission copy, privacy manifest, labels и support messaging;
+7. добавить regression tests и release gate.
+
+P0/P1 findings по умолчанию: misleading permission purpose, missing denied path для critical flow, secret/PII logging from permission-backed data, undeclared SDK data collection, tracking без корректного consent, permission prompt на cold launch без product necessity, collection beyond user-visible purpose.
+
+#### Senior / Lead / Staff проверочные вопросы
+1. Какую user value получает пользователь в момент запроса permission?
+2. Что app делает, если permission denied, restricted, limited, revoked или unavailable?
+3. Какие raw и derived data создаются после grant?
+4. Какие данные persist-ятся, попадают в backup/cache/logs/analytics/crash reports?
+5. Какие third-party SDKs получают доступ к permission-backed data или derived signals?
+6. Синхронизированы ли Info.plist strings, privacy manifest, App Store labels и реальный runtime behavior?
+7. Может ли пользователь выполнить core flow без full access?
+8. Не превращает ли UI settings path в давление после отказа?
+9. Что произойдёт после изменения permission в Settings во время suspended app state?
+10. Какие telemetry докажут, что пользователи не застревают в denied/restricted flows?
+
+#### Чеклист production-readiness
+Feature с privacy-гейтом не готова к production, пока:
+- permission purpose понятен пользователю и соответствует реальному data flow;
+- request timing contextual, а не механический cold-launch prompt;
+- все authorization states смоделированы как product states;
+- limited/reduced access поддержан там, где платформа его предоставляет;
+- denied/restricted paths полезны и не манипулятивны;
+- raw и derived data имеют storage, retention и deletion policy;
+- revocation очищает stale assumptions;
+- logs/analytics/crash metadata не содержат sensitive values;
+- privacy manifest и App Store labels соответствуют runtime behavior;
+- third-party SDK behavior проверен;
+- QA matrix включает denial, limited access, revocation, unavailable capability и managed/restricted devices.
+
 ### 1.5. Entitlements и системные возможности
 #### Определение и mental model
 #### Синтаксис и API surface
