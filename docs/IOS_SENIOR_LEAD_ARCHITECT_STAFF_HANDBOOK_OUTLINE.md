@@ -28,7 +28,7 @@
 #### Ожидаемая глубина объяснения
 #### Признаки, что читатель освоил этот уровень
 #### Типичные ошибки на этом уровне
-#### Упражнения и проверочные вопросы
+#### Упражнения, проверочные вопросы и эталонные ответы
 - Как правильно применять концепцию.
 - Типовое использование API.
 - Простые примеры.
@@ -38,7 +38,7 @@
 #### Ожидаемая глубина объяснения
 #### Признаки, что читатель освоил этот уровень
 #### Типичные ошибки на этом уровне
-#### Упражнения и проверочные вопросы
+#### Упражнения, проверочные вопросы и эталонные ответы
 - Правила ownership.
 - Поведение при сбоях.
 - Performance-последствия.
@@ -49,7 +49,7 @@
 #### Ожидаемая глубина объяснения
 #### Признаки, что читатель освоил этот уровень
 #### Типичные ошибки на этом уровне
-#### Упражнения и проверочные вопросы
+#### Упражнения, проверочные вопросы и эталонные ответы
 - Стратегия миграции.
 - Границы ответственности команд.
 - Процесс review.
@@ -60,7 +60,7 @@
 #### Ожидаемая глубина объяснения
 #### Признаки, что читатель освоил этот уровень
 #### Типичные ошибки на этом уровне
-#### Упражнения и проверочные вопросы
+#### Упражнения, проверочные вопросы и эталонные ответы
 - Матрица tradeoff-ов.
 - Долгосрочная эволюция.
 - Platform strategy.
@@ -83,16 +83,16 @@
 10. **Debugging-сценарии**
 11. **Типичные ошибки**
 12. **Антипаттерны**
-13. **Senior-level вопросы**
+13. **Senior-level Q&A с ответами**
 14. **Staff-level tradeoff-ы**
 15. **Примеры кода для добавления**
 16. **Чеклисты**
-17. **Упражнения**
+17. **Упражнения с критериями проверки / ответами**
 18. **Дополнительное чтение / источники**
 
 
 ## Политика дискретного расширения
-Используй этот outline как granular content backlog, а не только как оглавление. При раскрытии глав сохраняй каждую существующую часть, главу и секцию, затем заполняй самый точный подраздел, соответствующий материалу. Лучше добавить новый подраздел более низкого уровня, чем смешивать несвязанную теорию, runtime-поведение, production-правила, примеры, упражнения и review-вопросы в одном блоке.
+Используй этот outline как granular content backlog, а не только как оглавление. При раскрытии глав сохраняй каждую существующую часть, главу и секцию, затем заполняй самый точный подраздел, соответствующий материалу. Лучше добавить новый подраздел более низкого уровня, чем смешивать несвязанную теорию, runtime-поведение, production-правила, примеры, упражнения и review Q&A в одном блоке.
 
 ---
 
@@ -108,7 +108,7 @@
 2. связать ограничения платформы с конкретными инженерными решениями;
 3. объяснить lifecycle и process model, из-за которых эти ограничения становятся реальными;
 4. разобрать подкапотные аспекты memory, scheduling, energy и termination;
-5. превратить mental model в production-правила, примеры и review-вопросы.
+5. превратить mental model в production-правила, примеры и review Q&A с ответами.
 
 #### Определение и mental model
 iOS-приложение — это **guest process** в user-first, battery-powered, privacy-controlled операционной системе. Приложение может запрашивать ресурсы; система решает, доступны ли они, как долго они доступны и с каким приоритетом. Неправильная mental model: «моё приложение работает, пока само не завершится». Правильная ментальная модель: **система постоянно арбитрирует foreground priority, background eligibility, memory pressure, CPU scheduling, I/O, network access, thermal pressure и privacy permission surfaces между всеми приложениями и системными сервисами**.
@@ -166,12 +166,12 @@ Foreground-приложение получает максимум возможн
 - **MainActor correctness** предотвращает UI data races.
 - **MainActor performance** требует не держать expensive work на main actor.
 
-Код может быть корректным и одновременно давать плохой UX, если монополизирует main actor. Senior review должен спрашивать:
-- Вычисляет ли view derived collections во время `body` evaluation?
-- Декодирует ли screen images, парсит JSON, форматирует много дат или делает persistence fetches на main actor?
-- Инвалидирует ли observation boundary большое view tree ради маленького state change?
-- Возвращается ли async task на main actor с тяжёлым post-processing?
-- Показывает ли UI partial progress и cancellation, или блокируется на all-or-nothing operation?
+Код может быть корректным и одновременно давать плохой UX, если монополизирует main actor. Senior review должен фиксировать не вопросы без ответа, а конкретные проверки с ожидаемым решением:
+- **Derived collections в `body`:** если view вычисляет большие derived collections во время `body` evaluation, вынеси computation в model/preprocessing layer или memoized state с явной invalidation boundary.
+- **Heavy work на main actor:** image decoding, JSON parsing, массовое date formatting и persistence fetches не должны выполняться на main actor во время launch, navigation или scrolling.
+- **Broad invalidation:** если small state change invalidates большое view tree, сузь observation boundary, выдели row/input subviews или раздели state ownership.
+- **Async post-processing:** если async task возвращается на main actor с тяжёлой обработкой, перенеси post-processing off-main и назначай на main actor только финальное UI state.
+- **Partial progress и cancellation:** long operation должна показывать progress/cancel/retry там, где это повышает trust; all-or-nothing blocking допустим только для короткой bounded работы.
 
 SwiftUI-specific вывод: `body` — это описание UI, а не work queue. Любая операция, которая выглядела бы подозрительно внутри `tableView(_:cellForRowAt:)`, так же подозрительна в SwiftUI `body`, computed view properties, formatter allocation per row или broad observable state, вызывающем full-list invalidation.
 
@@ -293,29 +293,29 @@ Senior engineer проектирует state machines вокруг этих fail
 - **OS policy evolves**: поведение меняется между iOS versions. Production code должен опираться на documented guarantees и observable fallback behavior, а не folklore одного release.
 
 #### Senior/staff design heuristics
-Используй эти heuristics при review features:
-1. **Может ли app быть killed на каждом `await`?** Не буквально всегда, но user-visible operation может быть interrupted между steps; design должен учитывать persistence/recovery.
-2. **Какой smallest durable fact?** Persist user intent и irreversible decisions до large derived state.
-3. **Какой bounded resource?** Для каждой feature определи реальный лимит: memory, CPU, network, disk, battery, privacy, user attention, server quota или team comprehension.
-4. **Какую work можно cancel?** Work, которая больше не user-visible, обычно должна быть cancellable, если она не сохраняет data integrity.
-5. **Какую work можно defer?** Всё, что не нужно для следующего user-visible state, должно быть lazy, incremental или scheduled.
-6. **Какое degraded behavior?** Определи поведение при offline, denied permission, Low Power Mode, thermal pressure, memory pressure и stale server state.
-7. **Что докажет, что это работает в production?** Заранее реши, какие metrics, logs, diagnostics и support signals показывают health после release.
+Используй эти heuristics при review features. Каждая проверка включает ожидаемое правило, а не оставляет вопрос без ответа:
+1. **Проверка interruption:** app может быть killed между meaningful steps. **Правило:** user-visible operation проектируется с persistence/recovery на границах `await`, navigation и background transition.
+2. **Проверка smallest durable fact:** сначала сохраняется минимальный факт, который нельзя потерять. **Правило:** persist user intent и irreversible decisions до large derived state.
+3. **Проверка bounded resource:** у каждой feature есть реальный лимит. **Правило:** явно назвать memory, CPU, network, disk, battery, privacy, user attention, server quota или team comprehension budget.
+4. **Проверка cancellation:** работа, потерявшая user value, не должна продолжаться бесконечно. **Правило:** cancellable всё, что больше не user-visible и не сохраняет data integrity.
+5. **Проверка deferral:** не вся полезная работа должна выполняться сейчас. **Правило:** всё, что не нужно для следующего user-visible state, делается lazy, incremental или scheduled.
+6. **Проверка degradation:** constrained runtime требует заранее заданного degraded behavior. **Правило:** определить поведение при offline, denied permission, Low Power Mode, thermal pressure, memory pressure и stale server state.
+7. **Проверка production evidence:** release считается успешным только при observable proof. **Правило:** заранее определить metrics, logs, diagnostics и support signals, показывающие health после release.
 
-#### Production checklist
-Feature не production-ready в constrained runtime, пока на эти вопросы нет защищаемых ответов:
-- Что переживает process death?
-- Что происходит, если app suspended mid-operation?
-- Что отменяется, когда screen disappears?
-- Что persist-ится до network acknowledgement?
-- Что retry-ится, с каким idempotency key и каким backoff?
-- Какой maximum memory footprint для largest realistic input?
-- Какая main-actor work происходит во время launch, navigation и scrolling?
-- Что происходит в Low Power Mode или serious/critical thermal state?
-- Что происходит, когда permissions denied, revoked или restricted?
-- Что происходит, когда disk full или file protection delays access?
-- Что логируется, и может ли log line утечь sensitive data?
-- Как после release будут обнаружены hangs, launch regressions, memory terminations, disk writes и high energy usage?
+#### Production checklist с ожидаемыми ответами
+Feature не production-ready в constrained runtime, пока каждый пункт не имеет защищаемого ответа:
+- **Process death:** durable остаются user intent, critical persisted state, idempotency keys и recovery metadata; transient UI/cache можно восстановить.
+- **Suspension mid-operation:** операция имеет checkpoint или безопасно повторяется; background continuation не считается guaranteed.
+- **Screen disappears:** screen-owned fetch/prefetch/rendering work отменяется; critical mutation переходит под durable owner.
+- **Before network acknowledgement:** persist-ятся local mutation, operation id, affected entity, desired value, timestamp и sync status.
+- **Retry policy:** retry выполняется только для safe/idempotent operations, с idempotency key, bounded backoff и cancellation/relevance checks.
+- **Memory footprint:** определён largest realistic input, steady-state footprint и peak во время buffering/decoding/mapping/rendering.
+- **Main-actor work:** launch, navigation и scrolling не выполняют avoidable decoding, parsing, persistence fetches, heavy formatting или broad invalidation.
+- **Low Power Mode / thermal:** speculative work снижается или отменяется; correctness-critical work остаётся bounded и observable.
+- **Permissions denied/revoked/restricted:** UI имеет first-class states, альтернативы или честное explanation; app reconciles state после изменений.
+- **Disk full / file protection:** writes имеют failure handling, atomicity/transactional strategy и user-safe recovery; до unlock app не ломает launch.
+- **Logging:** logs/analytics/crash metadata redacted; raw PII, tokens, payloads, precise location и sensitive filenames не попадают наружу.
+- **Production detection:** после release отслеживаются hangs, launch regressions, memory terminations, disk writes, high energy usage и user-visible failures.
 
 #### Практические Swift-примеры
 Пример: screen-owned work должна быть cancellable и не должна предполагать, что task переживёт view.
@@ -468,20 +468,44 @@ Senior-point не в маленькой структуре как таковой
 - Путать `@MainActor` safety с performance safety.
 - Рисовать architecture diagrams, где отсутствуют cancellation, persistence и background expiration paths.
 
-#### Senior interview и review questions
-Эти вопросы отделяют поверхностное знание от production judgment:
-1. Почему iOS app не может предполагать, что получит final termination callback?
-2. Чем отличаются scene lifecycle, process lifetime и task lifetime?
-3. Как feature остаётся корректной, если app killed между local mutation и server acknowledgement?
-4. Почему compressed 200 KB image может создать multi-megabyte memory pressure?
-5. Что должно происходить с image prefetching в Low Power Mode или serious thermal state?
-6. Как решить, безопасен ли retry для failed network request?
-7. Что делает background task idempotent?
-8. Что memory termination report показывает такого, чего может не быть в Swift stack trace?
-9. Почему broad `@Observable` model рискован для больших SwiftUI lists?
-10. Как доказать после release, что launch optimization улучшила real user experience?
-11. Что нужно persist до long-running sync?
-12. Какие constraints являются product constraints, а не только technical constraints?
+#### Senior interview и review Q&A
+Эти Q&A отделяют поверхностное знание от production judgment.
+
+1. **Почему iOS app не может предполагать, что получит final termination callback?**
+   **Ответ:** iOS может завершить процесс non-cooperatively: из-за jetsam, crash, force quit, reboot, update или system policy. `applicationWillTerminate` и lifecycle callbacks не являются durable persistence mechanism. Всё пользовательски значимое состояние нужно сохранять до рискованного перехода, а cleanup callbacks рассматривать только как best-effort opportunity.
+
+2. **Чем отличаются scene lifecycle, process lifetime и task lifetime?**
+   **Ответ:** process lifetime отвечает за существование app process в памяти; scene lifecycle — за конкретное UI-окно/scene и её foreground/background состояние; task lifetime — за async work, её cancellation, suspension, ownership и expiration. Ошибка — привязать critical work к scene или view, если product contract требует пережить исчезновение UI.
+
+3. **Как feature остаётся корректной, если app killed между local mutation и server acknowledgement?**
+   **Ответ:** feature должна сначала durable сохранить user intent с idempotency key и sync status, а потом выполнять best-effort delivery. После relaunch она reconciles local pending state с server state: повторяет безопасно, помечает conflict или показывает recoverable error. In-memory optimistic UI не считается durability.
+
+4. **Почему compressed 200 KB image может создать multi-megabyte memory pressure?**
+   **Ответ:** compressed file size не равен decoded pixel buffer. После decoding memory зависит от dimensions, scale, pixel format, intermediate buffers и caching. Thumbnail UI должен downsample image до display size до создания UI image, иначе малый файл может создать большой resident/dirty footprint.
+
+5. **Что должно происходить с image prefetching в Low Power Mode или serious thermal state?**
+   **Ответ:** prefetching обычно speculative, поэтому его нужно снижать, отменять или откладывать. В Low Power Mode приоритет — меньше wakeups, network и decoding; при serious/critical thermal state — быстрое load shedding: остановить prefetch, уменьшить concurrency и не начинать тяжёлую обработку.
+
+6. **Как решить, безопасен ли retry для failed network request?**
+   **Ответ:** retry безопасен, если operation idempotent или имеет idempotency key, failure transient, user intent всё ещё актуален, retry bounded и используется backoff. Blind retry non-idempotent mutation может создать duplicate side effects, battery drain, server load и inconsistent UI.
+
+7. **Что делает background task idempotent?**
+   **Ответ:** task может быть запущена повторно, пропущена или прервана без нарушения данных. Для этого нужны durable checkpoints, stable operation ids, safe retry, no duplicate side effects и recovery после partial completion. Background timing нельзя считать contractual scheduler-ом.
+
+8. **Что memory termination report показывает такого, чего может не быть в Swift stack trace?**
+   **Ответ:** jetsam/memory termination часто не даёт обычный Swift exception stack. Reports и organizer metrics показывают pressure context, footprint, termination reason и affected device/OS pattern. Это помогает отличить leak, peak decoding, cache pressure и dirty memory growth от обычного crash.
+
+9. **Почему broad `@Observable` model рискован для больших SwiftUI lists?**
+   **Ответ:** широкая observation boundary может invalidating большой view tree при малом state change. В списках это превращает точечные изменения в массовую recomputation/layout работу. Нужны узкие state slices, stable identity, row-level inputs и перенос expensive derived work вне `body`.
+
+10. **Как доказать после release, что launch optimization улучшила real user experience?**
+    **Ответ:** нужны production metrics: cold/warm launch distribution, time-to-interactive, hang rate, crash/jetsam rate, device/iOS segmentation и regression guardrails. Simulator или локальный single-device замер не доказывает улучшение real user experience.
+
+11. **Что нужно persist до long-running sync?**
+    **Ответ:** smallest durable facts: user intent, operation/idempotency key, affected entity, desired value, local timestamp, retry metadata, progress checkpoint и sync status. Derived server response или temporary UI state можно восстановить; user intent потерять нельзя.
+
+12. **Какие constraints являются product constraints, а не только technical constraints?**
+    **Ответ:** offline behavior, stale state, permission denial, battery use, background timing, data retention, privacy disclosure, conflict resolution и recovery UX — это product constraints. Они определяют обещание пользователю, support burden и App Review/compliance risk, а не только implementation details.
 
 #### Источники для дальнейшего раскрытия главы
 Используй эти официальные Apple references при расширении темы в полноценную главу:
@@ -510,7 +534,7 @@ Senior-point не в маленькой структуре как таковой
 - **Тепловой режим** ограничивает длительную resource-intensive работу и требует graceful degradation.
 - **Сеть** ограничивает latency expectations, delivery guarantees, freshness, retry strategy, offline behavior и server consistency.
 
-Senior-level design не спрашивает только «помещается ли это в память сейчас?» или «работает ли запрос на Wi‑Fi?». Он спрашивает:
+Senior-level design не ограничивается проверкой «помещается ли это в память сейчас» или «работает ли запрос на Wi‑Fi». Он фиксирует конкретные параметры:
 1. какой worst realistic input;
 2. какой peak footprint во время decoding/mapping/rendering;
 3. какая работа user-visible, а какая speculative;
@@ -601,7 +625,7 @@ Idempotency — это не только backend feature. iOS client долже�
 Cancellation не является failure. Это нормальный outcome lifecycle-aware работы. Ошибка senior-level implementation — превращать cancellation в пользовательский error message или retry storm.
 
 #### Offline, cache и persistence-последствия
-Offline support начинается не с красивого empty state, а с ответа на вопрос: **какое состояние пользователь имеет право считать сохранённым?**
+Offline support начинается не с красивого empty state, а с явного правила: **какое состояние пользователь имеет право считать сохранённым**.
 
 Уровни offline-поведения:
 1. **Read-only stale cache**: пользователь может читать старые данные, но UI явно показывает freshness.
@@ -682,17 +706,36 @@ Production diagnostics должны заранее отвечать, как ко
 - Путать cancellation с failure.
 - Не иметь метрик, которые отличают server issue от client resource issue.
 
-#### Senior / Lead / Staff проверочные вопросы
-1. Какой maximum realistic memory footprint у feature на worst input?
-2. Где возникает peak memory: network buffering, decoding, mapping, rendering или image decompression?
-3. Что является smallest durable user intent?
-4. Какие requests можно отменить без product loss, а какие требуют recovery?
-5. Какие mutations idempotent, и где хранится idempotency key?
-6. Что пользователь увидит при stale cache, offline и retry exhaustion?
-7. Какие данные нельзя логировать даже при production incident?
-8. Как cache разделён между accounts/environments/security scopes?
-9. Как feature деградирует в Low Power Mode или serious thermal state?
-10. Какие metrics докажут, что release не ухудшил memory, battery и network behavior?
+#### Senior / Lead / Staff проверочные Q&A
+1. **Какой maximum realistic memory footprint у feature на worst input?**
+   **Ответ:** его считают по worst realistic dataset: количество элементов, размер payload, decoded media, temporary buffers, cache и view/rendering overhead. Важно оценивать не только steady-state, но и peak во время fetch → decode → map → render.
+
+2. **Где возникает peak memory: network buffering, decoding, mapping, rendering или image decompression?**
+   **Ответ:** peak ищут по pipeline, а не по итоговому model size. Частые источники — whole-response buffering, full-array decoding, intermediate DTO/domain arrays, image decompression, attributed text/layout caches и simultaneous prefetch.
+
+3. **Что является smallest durable user intent?**
+   **Ответ:** минимальная запись, которая доказывает намерение пользователя и позволяет восстановить operation: entity id, desired change, operation/idempotency key, timestamp, account scope и sync status. UI state и server response — вторичны.
+
+4. **Какие requests можно отменить без product loss, а какие требуют recovery?**
+   **Ответ:** search, prefetch, preview loading и obsolete screen fetch обычно можно отменять без recovery. Mutations, uploads, payments, saves и user-confirmed actions требуют durable intent, retry/reconcile и user-visible status.
+
+5. **Какие mutations idempotent, и где хранится idempotency key?**
+   **Ответ:** mutation idempotent, если повторная delivery с тем же key не создаёт второй side effect. Key должен храниться рядом с durable pending operation, переживать process death и использоваться при retry/reconcile.
+
+6. **Что пользователь увидит при stale cache, offline и retry exhaustion?**
+   **Ответ:** UI должен честно показывать freshness, offline status, pending changes и recoverable action. Нельзя скрывать stale data как свежие или превращать retry exhaustion в silent failure.
+
+7. **Какие данные нельзя логировать даже при production incident?**
+   **Ответ:** tokens, auth headers, raw payloads, PII, precise location, document contents, private filenames, contact data, health/financial data и user-generated private text. Диагностика должна использовать redacted categories, buckets и correlation ids.
+
+8. **Как cache разделён между accounts/environments/security scopes?**
+   **Ответ:** cache key и storage должны включать user/account, environment и data sensitivity. Account switch/logout не должен показывать stale private data другого пользователя; shared cache допустим только для truly public/regenerable content.
+
+9. **Как feature деградирует в Low Power Mode или serious thermal state?**
+   **Ответ:** она отменяет speculative work, снижает prefetch/concurrency, batch-ит network/disk, уменьшает качество expensive processing и сохраняет correctness-critical work. Thermal response должен быть быстрее, чем обычная energy optimization.
+
+10. **Какие metrics докажут, что release не ухудшил memory, battery и network behavior?**
+    **Ответ:** memory terminations, peak/resident memory, hang/dropped-frame rate, request latency/error taxonomy, retry counts, cache hit/eviction rate, background expiration, energy diagnostics, thermal correlations и segmented rollout comparisons.
 
 #### Чеклист production-readiness
 Feature, зависящая от памяти, батареи, теплового режима или сети, не готова к production, пока нет ответов:
@@ -852,17 +895,36 @@ Incident response должен быть заранее понятен. Если 
 
 P0/P1 findings по умолчанию: insecure token persistence, PII/secret logging, unintended backup sensitive data, unvalidated external file execution path, shared container leak между accounts/targets, missing privacy explanation для shipped capability.
 
-#### Senior / Lead / Staff проверочные вопросы
-1. Какие assets защищает sandbox в этой feature, а какие остаются exposed через logs, backups или shared containers?
-2. Почему выбран именно этот storage location, а не `Caches`, `Documents`, Application Support, Keychain или App Group?
-3. Что происходит с данными при logout, account switch, uninstall/reinstall, restore from backup и account deletion?
-4. Какие файлы должны быть excluded from backup и почему?
-5. Какой file protection class нужен для sensitive data, и что делает app до first unlock?
-6. Может ли extension увидеть больше данных, чем ей нужно?
-7. Что произойдёт, если external file malformed, huge, encrypted, partially available или protected до unlock?
-8. Какие log/crash/analytics fields доказывают проблему без раскрытия sensitive content?
-9. Есть ли способ быстро отключить risky export/logging path после release?
-10. Как reviewer докажет, что temporary sensitive files удаляются на всех paths: success, failure, cancellation и crash recovery?
+#### Senior / Lead / Staff проверочные Q&A
+1. **Какие assets защищает sandbox в этой feature, а какие остаются exposed через logs, backups или shared containers?**
+   **Ответ:** sandbox защищает app container от других apps, но не защищает от собственных logs, analytics, crash metadata, backups, support exports и App Group sharing. Review должен перечислить credentials, user content, derived data, diagnostics и cache surfaces отдельно.
+
+2. **Почему выбран именно этот storage location, а не `Caches`, `Documents`, Application Support, Keychain или App Group?**
+   **Ответ:** выбор должен следовать semantics: user-owned durable documents — в `Documents`; app-managed durable state — в Application Support/database; regenerable data — в `Caches`; secrets — в Keychain; cross-target minimum state — в App Group. Если reason нельзя объяснить, storage location выбран случайно.
+
+3. **Что происходит с данными при logout, account switch, uninstall/reinstall, restore from backup и account deletion?**
+   **Ответ:** для каждого data type нужна policy: что удаляется, что сохраняется, что re-scoped, что может пережить reinstall через Keychain, что возвращается через backup/restore и что удаляется при account deletion. Silent carryover private data между accounts — security/privacy bug.
+
+4. **Какие файлы должны быть excluded from backup и почему?**
+   **Ответ:** regenerable caches, thumbnails, temporary exports, downloaded previews и sensitive diagnostic bundles обычно не должны попадать в backup. User-owned documents и durable user data могут быть backup-eligible, если это соответствует product promise и privacy policy.
+
+5. **Какой file protection class нужен для sensitive data, и что делает app до first unlock?**
+   **Ответ:** highly sensitive files часто требуют `NSFileProtectionComplete`; databases/queues, нужные после первого unlock, часто используют `NSFileProtectionCompleteUntilFirstUserAuthentication`. App должна иметь behavior для unavailable files до unlock и не ломать cold launch/background paths.
+
+6. **Может ли extension увидеть больше данных, чем ей нужно?**
+   **Ответ:** не должна. App Group должен содержать минимальный shared subset, versioned schema и explicit ownership. Extension не должна читать full database/main-app private cache, если ей нужен один widget snapshot или pending handoff.
+
+7. **Что произойдёт, если external file malformed, huge, encrypted, partially available или protected до unlock?**
+   **Ответ:** app должна валидировать type/size/content, обрабатывать parse failures, не выполнять heavy preview на main actor, сохранять controlled copy только при принятом ownership и показывать user-safe error. External file всегда untrusted input.
+
+8. **Какие log/crash/analytics fields доказывают проблему без раскрытия sensitive content?**
+   **Ответ:** storage category, file size bucket, operation id, redacted error class, cleanup result, protection state category, account-scope hash по policy и correlation id. Raw paths, filenames, payloads и document contents недопустимы.
+
+9. **Есть ли способ быстро отключить risky export/logging path после release?**
+   **Ответ:** для sensitive diagnostics/export paths нужен kill switch, remote config или release rollback plan. Incident response должен включать containment, revocation, log deletion/redaction и user/support messaging.
+
+10. **Как reviewer докажет, что temporary sensitive files удаляются на всех paths: success, failure, cancellation и crash recovery?**
+    **Ответ:** через code path review, cleanup ownership, tests/manual scenarios для success/failure/cancel, launch-time cleanup of orphaned temp files и bounded retention policy. `defer` полезен, но недостаточен для crash/process death.
 
 #### Чеклист production-readiness
 Feature, работающая с file system или sandbox boundaries, не готова к production, пока:
@@ -898,7 +960,7 @@ Permission — это не property приложения, а revocable grant о�
 Правило проектирования: permission state должен быть частью product state machine, а не `if` перед вызовом API. UI, analytics, retry, settings navigation, support guidance и feature availability должны различать denied, restricted, limited и unavailable. Смешивание этих состояний в одну ошибку «нет доступа» создаёт плохой UX и неверную поддержку.
 
 #### Threat model и защищаемые assets
-Privacy threat model начинается не с attacker, а с вопроса: **какой user-controlled boundary мы пересекаем?**
+Privacy threat model начинается не с attacker, а с определения **user-controlled boundary**, который пересекает feature.
 
 Типовые boundaries:
 - **Camera/Microphone**: live capture private environment, faces, voices, documents, screens;
@@ -1036,17 +1098,36 @@ Incident response для privacy-gate failure должен быть быстры
 
 P0/P1 findings по умолчанию: misleading permission purpose, missing denied path для critical flow, secret/PII logging from permission-backed data, undeclared SDK data collection, tracking без корректного consent, permission prompt на cold launch без product necessity, collection beyond user-visible purpose.
 
-#### Senior / Lead / Staff проверочные вопросы
-1. Какую user value получает пользователь в момент запроса permission?
-2. Что app делает, если permission denied, restricted, limited, revoked или unavailable?
-3. Какие raw и derived data создаются после grant?
-4. Какие данные persist-ятся, попадают в backup/cache/logs/analytics/crash reports?
-5. Какие third-party SDKs получают доступ к permission-backed data или derived signals?
-6. Синхронизированы ли Info.plist strings, privacy manifest, App Store labels и реальный runtime behavior?
-7. Может ли пользователь выполнить core flow без full access?
-8. Не превращает ли UI settings path в давление после отказа?
-9. Что произойдёт после изменения permission в Settings во время suspended app state?
-10. Какие telemetry докажут, что пользователи не застревают в denied/restricted flows?
+#### Senior / Lead / Staff проверочные Q&A
+1. **Какую user value получает пользователь в момент запроса permission?**
+   **Ответ:** пользователь должен видеть конкретную пользу прямо сейчас: сделать фото, выбрать файл, включить маршрут, получить уведомления по важному событию. Абстрактное «улучшить опыт» не является достаточным purpose для sensitive permission.
+
+2. **Что app делает, если permission denied, restricted, limited, revoked или unavailable?**
+   **Ответ:** denied получает альтернативный flow или ненавязчивый путь в Settings; restricted объясняется как policy/device limitation; limited поддерживается как нормальный режим; revoked reconciles state при activation; unavailable скрывает или заменяет feature.
+
+3. **Какие raw и derived data создаются после grant?**
+   **Ответ:** нужно учитывать raw capture/library/contact/location data и derived artifacts: thumbnails, transcripts, geohashes, contact matches, local network fingerprints, notification engagement. Derived data часто не менее sensitive, чем source data.
+
+4. **Какие данные persist-ятся, попадают в backup/cache/logs/analytics/crash reports?**
+   **Ответ:** каждый permission-backed data flow должен иметь storage/retention/deletion policy. Raw sensitive data обычно не должна уходить в logs/analytics/crash reports; caches и backups должны соответствовать user ownership и privacy disclosures.
+
+5. **Какие third-party SDKs получают доступ к permission-backed data или derived signals?**
+   **Ответ:** SDK access нужно считать частью data flow. Если analytics, ads, crash, support или ML SDK видит permission-backed data, это должно быть justified, minimized, disclosed и отражено в privacy manifest/App Store labels where applicable.
+
+6. **Синхронизированы ли Info.plist strings, privacy manifest, App Store labels и реальный runtime behavior?**
+   **Ответ:** да только если usage descriptions описывают actual purpose, privacy manifest отражает SDK/API/data-use behavior, App Store labels отражают collection/tracking, а runtime не делает скрытых дополнительных сборов.
+
+7. **Может ли пользователь выполнить core flow без full access?**
+   **Ответ:** если full access не обязателен, app должна поддерживать limited/picker-based/session-scoped access. Например, выбор одного фото не требует права сканировать всю медиатеку.
+
+8. **Не превращает ли UI settings path в давление после отказа?**
+   **Ответ:** Settings path допустим, когда пользователь пытается выполнить действие, невозможное без доступа. Он не должен быть guilt wording, modal loop, fake urgency или блокировкой unrelated app functionality.
+
+9. **Что произойдёт после изменения permission в Settings во время suspended app state?**
+   **Ответ:** при foreground activation app должна re-read authorization state, очистить stale assumptions, обновить UI, остановить запрещённые tasks и пересчитать derived/cache policy при необходимости.
+
+10. **Какие telemetry докажут, что пользователи не застревают в denied/restricted flows?**
+    **Ответ:** нужны redacted metrics: prompt impression, state distribution, denial/limited rates, alternative-flow completion, settings return, feature abandonment, support events и error taxonomy без raw sensitive data.
 
 #### Чеклист production-readiness
 Feature с privacy-гейтом не готова к production, пока:
