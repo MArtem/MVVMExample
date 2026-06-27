@@ -1910,12 +1910,283 @@ Production rules:
 
 
 ### 1.10. Стратегия освоения платформы уровня Staff
-#### Decision context и stakeholders
+#### Назначение раздела
+Staff-level освоение iOS-платформы — это не реакция на каждый WWDC-анонс и не накопление “современных” API ради резюме. Это управляемая стратегия: какие возможности Apple ecosystem дают продукту, пользователям, командам и платформе реальную отдачу; какие требуют migration cost; какие несут release, privacy, performance, accessibility или support risks; какие нужно отложить, пока у команды нет ownership, telemetry или compatibility plan.
+
+Senior engineer часто решает локально: “можно ли использовать этот API в feature”. Staff/Architect решает шире: **какие платформенные возможности компания должна освоить, стандартизировать, запретить, отложить или обернуть в shared infrastructure**, чтобы несколько команд двигались быстрее и безопаснее.
+
+Эта секция связывает предыдущие темы части I в единый governance-процесс: WWDC cycle, deployment target, backward compatibility, deprecation, hidden support cost, release gates, privacy, accessibility и operational readiness.
+
+#### Контекст решения и stakeholders
+Стратегия освоения платформы начинается с контекста, а не с технологии.
+
+Минимальный контекст решения:
+- **Product opportunity:** какую пользовательскую или бизнес-проблему решает возможность.
+- **Platform leverage:** может ли возможность ускорить несколько features/teams, а не только один экран.
+- **User cohorts:** какие users/devices/OS versions реально получат ценность.
+- **Deployment target:** доступна ли возможность текущей supported OS matrix.
+- **Fallback behavior:** что увидит пользователь, если возможность недоступна.
+- **Release risk:** что изменится в TestFlight/App Store, signing, entitlements, review notes, privacy labels или rollout.
+- **Operational risk:** как возможность будет debug-иться, мониториться и поддерживаться после release.
+- **Team readiness:** понимает ли команда API, lifecycle, concurrency, testing и failure modes.
+- **Removal/migration path:** как убрать experimental abstraction, если подход не оправдался.
+
+Stakeholders:
+- **Product:** определяет value, success criteria, non-goals и communication.
+- **Design:** отвечает за UX, fallback, accessibility, localization и platform idioms.
+- **iOS engineering:** проектирует ownership, APIs, lifecycle, performance и testing strategy.
+- **QA:** определяет device/OS matrix, edge cases, regression scope и manual/automated gates.
+- **Security/privacy:** проверяет permission surfaces, data minimization, logging, privacy manifest и risk acceptance.
+- **Release owner:** проверяет TestFlight/App Store readiness, signing, entitlements, rollout и rollback.
+- **Support/operations:** готовит support scripts, known issues, diagnostics и escalation paths.
+- **Engineering management:** выделяет budget, staffing, sequencing и cross-team alignment.
+
+Staff engineer обязан сделать этих участников видимыми. Если возможность затрагивает entitlements, persistence, sync, security, monetization, app lifecycle, navigation ownership или public APIs между модулями, решение не должно оставаться устной договорённостью внутри одной feature-команды.
+
 #### Technical tradeoff и organizational impact
+Платформенная возможность должна оцениваться как инвестиция, а не как isolated API call.
+
+| Вопрос | Локальный ответ уровня feature | Staff-level ответ |
+| --- | --- | --- |
+| Доступность | `if #available` и fallback | OS adoption data, support policy, deprecation timeline, QA matrix |
+| Архитектура | добавить wrapper/helper | ownership boundary, public API, dependency direction, migration plan |
+| UX | показать новый system UI | design guidelines, accessibility, localization, degraded state |
+| Performance | “работает на моём устройстве” | старые devices, memory/energy/thermal budget, launch/scroll impact |
+| Privacy | добавить usage description | data minimization, logs, analytics, privacy manifest, incident response |
+| Release | feature flag | rollout stages, App Review notes, entitlement validation, rollback path |
+| Команды | одна команда умеет использовать API | enablement, docs, examples, review checklist, ownership model |
+
+Типичный Staff tradeoff: новый platform API может уменьшить custom code и улучшить system integration, но повысить minimum OS, добавить entitlement, изменить permission flow, усложнить тестирование и потребовать migration существующих features. Правильное решение не обязано быть “adopt early” или “wait”. Правильное решение объясняет **когда, где, для кого, с каким fallback, под чьим ownership и по каким success metrics** возможность используется.
+
+#### Классификация платформенных возможностей
+Не все новые возможности Apple ecosystem требуют одинакового процесса.
+
+| Категория | Примеры | Governance level |
+| --- | --- | --- |
+| Локальное UI/API improvement | новый SwiftUI modifier, UIKit convenience API | lightweight review, availability check, visual QA |
+| Cross-feature UI pattern | NavigationStack conventions, sheet behavior, Dynamic Type policy | shared guideline, examples, regression matrix |
+| Возможность с permission/entitlement | Camera, Location, Bluetooth, HealthKit, App Groups, Push Notifications | ADR/RFC, privacy review, release checklist |
+| Возможность с data ownership | SwiftData/Core Data migration, offline sync, App Intents writing data | ADR/RFC, migration/rollback plan, observability |
+| Возможность с external contract | Universal Links, widgets, Live Activities, App Clips, extensions | backend/product/support alignment, rollout plan |
+| Platform-wide abstraction | networking client, analytics layer, design system, navigation shell | architecture governance, ownership, adoption plan |
+| Experimental adoption | beta APIs, speculative new UX, prototype-only platform feature | explicit experiment scope, no production coupling без review |
+
+Rule of thumb: чем больше возможность меняет user trust, persisted data, app lifecycle, external integrations или team APIs, тем больше нужен формальный артефакт решения.
+
+#### End-to-end процесс принятия решения
+Практический процесс должен быть линейным и проверяемым:
+
+1. **Idea:** сформулировать user/product/platform problem, а не только название API.
+2. **Triage:** определить категорию риска: local UI, cross-feature pattern, data ownership, entitlement, external contract или platform abstraction.
+3. **Evidence:** собрать OS adoption, affected flows, privacy/security surface, QA matrix, performance risks и support impact.
+4. **Pilot:** ограничить внедрение reversible scope, если uncertainty высокая.
+5. **RFC/ADR:** зафиксировать options, decision, owner, migration, rollout, rollback и revisit/kill criteria.
+6. **Rollout:** выпускать staged; feature flag или remote config использовать только там, где они реально помогают отключить риск без data loss.
+7. **Observability:** заранее определить metrics, logs, crash/performance signals и support tags.
+8. **Standardization or stop:** если pilot успешен — стандартизировать examples, docs и review criteria; если нет — закрыть experiment, удалить abstraction или оставить bounded fallback с owner.
+
+Этот flow защищает от двух крайностей: хаотичного внедрения каждого нового API и консервативного запрета всего нового без product evidence.
+
 #### Governance artifact или process to produce
+Staff engineer не должен превращать каждую мелкую API adoption в бюрократию. Но значимые платформенные решения требуют одного из трёх уровней артефакта.
+
+1. **Lightweight decision note** — для локального API usage без irreversible consequences.
+   - Что используем.
+   - На каких OS versions.
+   - Какой fallback.
+   - Как проверено.
+   - Кто owner.
+
+2. **RFC** — для cross-team pattern или shared infrastructure.
+   - Problem statement.
+   - Options considered.
+   - Recommended approach.
+   - Public API / integration contract.
+   - Migration plan.
+   - План тестирования и release.
+   - Open questions с owner, deadline и stop/continue rule.
+
+3. **ADR** — для irreversible или high-risk decisions.
+   - Context.
+   - Problem.
+   - Options considered.
+   - Decision.
+   - Consequences.
+   - Migration plan.
+   - Rollback plan.
+   - Review/revisit trigger.
+   - Owner.
+
+Открытые вопросы в RFC допустимы только как управляемый work item: у каждого вопроса должен быть owner, срок, правило `stop/continue` и влияние на release scope. В готовом учебном материале вопросы без ответа не оставляются; в реальном RFC они не должны превращаться в бессрочную неопределённость.
+
+ADR/RFC обязателен, если platform adoption:
+- вводит новый module/package/layer;
+- меняет persistence/backend/sync architecture;
+- добавляет critical dependency;
+- меняет navigation/session/auth ownership;
+- добавляет feature flags или rollout infrastructure;
+- требует entitlement, App Group, extension target или background mode;
+- меняет privacy/data retention/logging model;
+- делает irreversible migration/release decision.
+
+#### Platform adoption roadmap
+Освоение платформы должно попадать в roadmap так же явно, как product features.
+
+Хороший platform adoption roadmap содержит:
+- **Now:** возможности, которые уже нужны текущим product goals и имеют clear rollout path.
+- **Next:** возможности, которые нужно подготовить через abstractions, docs, QA matrix или dependency work.
+- **Later:** возможности с возможной ценностью, но без достаточного adoption/data/team readiness.
+- **Not now:** возможности, которые выглядят модно, но несут несоразмерный cost или не решают текущую проблему.
+
+Каждая entry должна иметь:
+- owner;
+- expected user/product/platform value;
+- supported OS/device policy;
+- fallback/degraded behavior;
+- risks and mitigations;
+- validation plan;
+- rollout and rollback plan;
+- documentation/review checklist;
+- revisit trigger.
+
+Без revisit trigger roadmap превращается в wish list. Пример trigger: “вернуться к внедрению, когда iOS N+ adoption > 80% active users”, “когда dependency X поддержит нужный OS target”, “после закрытия P0 accessibility gaps”, “после появления telemetry для current workaround”.
+
+Kill criteria нужны так же, как success criteria. Pilot закрывается или откатывается, если:
+- degraded/accessibility paths не проходят supported device/OS checks;
+- crash, hang, launch, memory или support metrics ухудшаются сверх заранее заданного threshold;
+- возможность требует постоянного expert-only ownership;
+- fallback становится сложнее исходной проблемы;
+- privacy/security review находит неприемлемый risk;
+- App Review, entitlement или backend contract делает rollout непредсказуемым.
+
+Пример roadmap entry:
+
+| Поле | Пример для App Intents |
+| --- | --- |
+| Owner | iOS platform lead + product owner search/actions |
+| Ценность | user может выполнить сохранённое действие из system surfaces без открытия полного flow |
+| OS policy | только supported iOS versions с App Intents; для остальных обычный in-app flow |
+| Fallback | если auth/session/permission недоступны, intent возвращает безопасную localized ошибку и не мутирует данные |
+| Risks | privacy of exposed entities, localization, background execution, idempotency, support confusion |
+| Validation | unit/integration tests for intent handlers, manual VoiceOver/localization checks, analytics tags |
+| Rollout | staged behind server-side eligibility where applicable, release notes and support docs |
+| Rollback | disable eligibility, keep in-app flow, preserve local pending mutations |
+| Revisit/kill trigger | kill if support tickets or failed intent rate exceed threshold during first release cohort |
+
+#### Enablement и стандартизация
+Staff-level adoption считается успешным только тогда, когда возможность может безопасно использовать не один эксперт, а несколько команд.
+
+Enablement package:
+- reference implementation или пример в production-like context;
+- review checklist;
+- usage guidelines;
+- anti-patterns и минимум один плохой пример, который review должен отклонять;
+- test matrix;
+- accessibility/localization notes;
+- privacy/logging rules;
+- release notes template;
+- migration guide;
+- owner and escalation path.
+
+Стандартизация не означает “обернуть всё в generic framework”. Часто лучший standard — короткий guideline, один хороший пример и запрещение опасных вариантов. Shared abstraction нужна только там, где она уменьшает duplicated risk, защищает invariants или создаёт cross-team leverage. Если abstraction скрывает platform semantics, ломает debugging или заставляет feature teams угадывать lifecycle, она вреднее прямого API usage.
+
 #### Escalation, alignment и communication risks
+Платформенные решения часто конфликтуют с локальными целями feature-команд. Staff engineer управляет этим конфликтом через ясные escalation rules.
+
+Escalation нужен, если:
+- команда хочет использовать возможность без fallback для supported OS;
+- feature требует permission до понятной user value;
+- rollout зависит от entitlement, backend contract, push, Universal Links или App Store review;
+- migration может потерять user data;
+- new dependency меняет deployment target, binary size, privacy surface или build reliability;
+- performance impact не измерен на старых devices;
+- возможность создаёт новый public API, который будут использовать другие команды;
+- product хочет deadline, несовместимый с release safety.
+
+Communication risks:
+- **local optimization:** одна команда ускорилась, но остальные получили debt;
+- **platform theater:** возможность adopted ради “modern stack”, но без user value;
+- **silent policy change:** deployment target, permission behavior или data retention изменились без product/support awareness;
+- **expert bottleneck:** только один engineer понимает new API и все edge cases;
+- **documentation gap:** возможность есть, но review не знает критериев correctness;
+- **fallback neglect:** happy path polished, degraded state плохо протестирован.
+
+Staff response: не блокировать innovation reflexively, а потребовать evidence, scope, owner, fallback и артефакт решения подходящего размера.
+
+Для high-risk возможностей обязателен threat/privacy review. Минимальный scope: какие данные становятся доступными новой поверхности, когда показывается permission prompt, что попадает в logs/analytics/crash metadata, нужен ли privacy manifest update, какой App Review risk появляется, как выглядит incident path и кто принимает residual risk.
+
+Новая платформенная возможность не считается внедрённой, пока degraded paths и accessibility paths не проверены на поддерживаемых устройствах/iOS: VoiceOver, Dynamic Type, Reduce Motion, localization length, denied/restricted permissions и offline/error states.
+
+#### Success metrics и observability
+У платформенной стратегии должны быть observable outcomes.
+
+Метрики adoption:
+- доля features, использующих standard pattern вместо custom paths;
+- сокращение duplicated code/workarounds;
+- снижение defects в affected flows;
+- time-to-implement для новых features;
+- build/release stability;
+- crash/hang/performance metrics by OS/device;
+- accessibility/localization regression rate;
+- support tickets by capability/version/device;
+- скорость удаления legacy fallback после target raise.
+
+Метрики должны защищать от vanity adoption. Если новый API внедрён, но user-visible reliability ухудшилась, QA matrix выросла без бюджета, а support не получил diagnostics, adoption нельзя считать успешным.
+
 #### Review Q&A с ответами и calibration rubric
-#### Case studies и упражнения с эталонным разбором для добавления
+1. **Почему Staff engineer не должен автоматически внедрять каждый новый Apple API?**
+   **Ответ:** новый API может быть ценным, но он несёт compatibility, release, privacy, performance, training и support costs. Staff-level решение требует доказать user/platform value, fallback, ownership и rollout path.
+
+2. **Когда достаточно lightweight decision note, а когда нужен ADR/RFC?**
+   **Ответ:** lightweight note подходит для локального reversible API usage. ADR/RFC нужен, когда решение меняет public API, ownership, persistence, sync, dependencies, entitlements, rollout infrastructure, privacy model или deployment target.
+
+3. **Как отличить platform leverage от локального convenience?**
+   **Ответ:** platform leverage улучшает несколько команд или целый класс features: снижает duplicated risk, ускоряет delivery, стандартизирует UX/correctness или улучшает observability. Local convenience ускоряет один implementation без устойчивой cross-team выгоды.
+
+4. **Почему fallback — часть platform strategy, а не UI detail?**
+   **Ответ:** fallback определяет, остаётся ли продукт корректным на supported OS/devices, при denied permissions, failed entitlement path, offline state или rollout rollback. Плохой fallback превращает platform adoption в сегментированный product bug.
+
+5. **Как понять, что adoption стал bottleneck из-за одного эксперта?**
+   **Ответ:** признаки: review ждёт одного человека, bugs не triage-ятся без него, docs отсутствуют, examples устарели, feature teams копируют code snippets без понимания lifecycle, а incidents эскалируются не по owner path, а “к тому, кто внедрял”.
+
+6. **Что должно быть в calibration rubric для review?**
+   **Ответ:** reviewers должны проверять value, supported OS policy, fallback, ownership, privacy/logging, accessibility/localization, performance, testing, rollout/rollback и observability. Если любой critical пункт неизвестен, решение не готово к broad adoption.
+
+#### Case studies и упражнения с эталонным разбором
+**Case study 1: раннее внедрение нового SwiftUI navigation API**
+
+Сценарий: команда хочет заменить существующую navigation abstraction на новый SwiftUI API сразу после WWDC, потому что текущий код сложный.
+
+**Эталонный разбор:** правильное решение начинается не с migration PR. Нужно собрать affected flows, supported OS matrix, deep links, state restoration, tests, known bugs, feature team usage и rollback strategy. Если новый API доступен не всем supported OS, нужен compatibility layer или staged adoption. Если abstraction является public API для нескольких команд, требуется RFC: options, migration plan, examples, review checklist и owner. Если benefit локальный, а migration risk высокий, допустим pilot на одном reversible flow.
+
+**Case study 2: adoption App Intents для user actions**
+
+Сценарий: product хочет добавить App Intents, чтобы user мог выполнять действия через system surfaces.
+
+**Эталонный разбор:** Staff review проверяет не только API usage. Нужно определить supported actions, auth/session behavior, permission state, offline behavior, data mutation idempotency, privacy of exposed phrases/entities, analytics, localization, accessibility, support docs и rollback. Если intent мутирует данные, required path включает persistence consistency, conflict handling, background execution constraints и diagnostics.
+
+**Case study 3: новая dependency для shared networking layer**
+
+Сценарий: одна команда предлагает заменить networking layer на популярную library, чтобы ускорить implementation.
+
+**Эталонный разбор:** Staff-level ответ требует dependency review: minimum OS, binary size, security posture, maintenance health, cancellation semantics, `URLSession` integration, auth refresh, logging redaction, testing, migration, rollback и ownership. Если выгода только в syntactic convenience, dependency может быть rejected. Если выгода в reliability, observability и shared correctness, решение оформляется ADR с staged migration.
+
+#### Чеклист готовности platform adoption
+Возможность не готова к Staff-level adoption, пока нет защищаемых ответов:
+- **Value:** какая user/product/platform проблема решается.
+- **Scope:** где возможность используется и где не используется.
+- **OS policy:** какие iOS versions/devices supported, какой fallback.
+- **Ownership:** кто владеет API, docs, incidents, migration и cleanup.
+- **Architecture:** какие boundaries, dependencies и public contracts меняются.
+- **Privacy/security:** какие data, permissions, entitlements, logs и manifests затронуты.
+- **Accessibility/localization:** как возможность ведёт себя с VoiceOver, Dynamic Type, locale, RTL и content size changes.
+- **Performance:** что происходит с launch, scrolling, memory, energy и old devices.
+- **Testing:** какая automated/manual matrix доказывает correctness.
+- **Release:** какие App Store/TestFlight/signing/entitlement/rollout steps нужны.
+- **Observability:** как будут обнаружены regressions после release.
+- **Rollback:** как отключить, откатить или ограничить возможность без data loss.
+- **Enablement:** как другие команды узнают правильный usage и anti-patterns.
+
 
 ## 2. App lifecycle и поведение процесса
 ### 2.1. Холодный запуск
