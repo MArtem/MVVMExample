@@ -1740,11 +1740,175 @@ Compatibility/deprecation work не готово, пока:
 **Эталонный разбор:** команда не переписывает весь navigation layer в одном PR. Сначала делается inventory screens и flows, где используется deprecated API. Затем выбирается boundary: например, navigation coordinator или small view adapter, который выбирает new API на iOS N+1 и fallback на iOS N. QA получает matrix для oldest supported OS и newest OS. Telemetry сравнивает navigation failures и support tickets по OS version. ADR фиксирует, что fallback будет удалён после повышения deployment target до iOS N+1. Если migration затрагивает deep links или state restoration, их проверяют отдельно fixtures и manual smoke.
 
 ### 1.9. Скрытая стоимость поддержки старых версий iOS
+#### Назначение раздела
+Поддержка старых версий iOS редко выглядит дорогой в одной строке кода. Стоимость прячется в матрице тестирования, fallback UI, ветках `if #available`, старых баг-репортах, замедленном освоении новых возможностей платформы, обращениях в support, ограничениях зависимостей, baseline security, раздробленной аналитике и cognitive load команды. Эта секция раскрывает экономическую сторону обратной совместимости: почему старый deployment target может быть оправдан, но должен иметь явную цену и владельца.
+
+Связь с предыдущими секциями: `1.7` описывает governance решения о deployment target, `1.8` — correctness mechanics backward compatibility. Здесь focus — **total cost of support**: сколько реально стоит продолжать поддерживать старые версии iOS и как сделать эту стоимость видимой для engineering, QA, product, support и release owners.
+
 #### Scope и prerequisites
+Перед оценкой стоимости нужно собрать inventory:
+- supported OS versions и device classes;
+- active users / revenue / strategic cohorts на старых OS;
+- critical flows, используемые этими cohorts;
+- fallback code и ветки `if #available`;
+- old-OS-only bugs и support tickets;
+- стоимость manual QA, device coverage и release smoke checks;
+- dependency/toolchain constraints;
+- performance/memory limitations старых devices;
+- security/privacy limitations старых OS;
+- release blockers, App Review issues и known workarounds.
+
+Стоимость поддержки нельзя считать только количеством пользователей. Маленький cohort может быть стратегически важным enterprise segment. Большой cohort может использовать только low-value flow. Decision model должен учитывать value, risk, support promise и opportunity cost.
+
 #### Core theory и mental model
+Скрытая стоимость старых iOS versions проявляется в нескольких слоях:
+
+| Cost layer | Как проявляется | Почему скрыто |
+| --- | --- | --- |
+| Code complexity | availability branches, shims, duplicated UI paths | каждый branch кажется маленьким |
+| QA cost | больше OS/device combinations | редко видно в feature estimate |
+| Runtime risk | старые lifecycle/rendering/permission behaviors | баги появляются только на older devices |
+| Performance cost | weaker CPU/GPU/memory, old WebKit/SwiftUI behavior | simulator не воспроизводит pressure |
+| Dependency cost | packages drop old OS support | upgrade blocked unrelated feature work |
+| Security/privacy cost | newer protections unavailable | risk появляется как compliance/security debt |
+| Product cost | delayed adoption of new capabilities | opportunity loss не виден в crash logs |
+| Support cost | old OS-specific tickets and guidance | support burden не попадает в code review |
+| Cognitive cost | engineers боятся менять старые ветки поведения | slows delivery and onboarding |
+
+Mental model: поддержка старой OS — это **ongoing subscription**, а не one-time compatibility work. Пока target остаётся низким, команда платит каждый sprint: в design, implementation, testing, release, support и incident response.
+
 #### Подкапотные детали
+Старые iOS versions могут отличаться не только отсутствием новых APIs. Различаться могут:
+- SwiftUI layout invalidation и behavior modifiers;
+- UIKit lifecycle edge cases;
+- keyboard, safe area, sheet, navigation и focus behavior;
+- `URLSession`, background tasks, push delivery и notification behavior;
+- WebKit rendering и JavaScript quirks;
+- Core Data/SwiftData availability and migration paths;
+- memory pressure thresholds на older devices;
+- permission prompts and limited access behavior;
+- file protection timing;
+- accessibility/Dynamic Type behavior;
+- App Store/TestFlight требования к актуальному Xcode/base SDK, которые существуют отдельно от выбранного deployment target.
+
+Важно не путать два слоя:
+- **Deployment target** определяет минимальную версию iOS, на которой приложение обещает запускаться.
+- **Base SDK / Xcode toolchain** определяет SDK и инструменты, которыми приложение собирается и отправляется в App Store/TestFlight.
+
+Поддержка старого deployment target обычно не означает сборку старым SDK. Но она означает, что runtime path на старой iOS должен быть валиден, протестирован и не зависеть от APIs, доступных только на новых версиях системы.
+
+Подкапотный риск: команда может считать старую ветку поведения “unchanged”, но новый feature code всё равно проходит через старые runtime assumptions. Например, новый SwiftUI screen использует modifier, который на старой OS имеет другой layout behavior. Или новая dependency повышает minimum OS silently и ломает archive для старого target.
+
+#### Cost accounting framework
+Чтобы обсуждение не было эмоциональным, Staff engineer делает стоимость видимой.
+
+Минимальная cost model:
+- **User value retained:** сколько active/critical users получают updates благодаря старому target.
+- **Engineering hours:** сколько времени уходит на fallback implementation и maintenance.
+- **QA hours:** сколько стоит matrix старых OS/devices per release.
+- **Bug/support cost:** сколько incidents/tickets специфичны для старой OS.
+- **Opportunity cost:** какие APIs/features/tooling заблокированы.
+- **Risk cost:** какие security/privacy/performance ограничения остаются.
+- **Complexity cost:** сколько code paths, shims и ownerless workarounds существуют.
+
+Пример числового расчёта: если старая iOS версия даёт 3% active users, но требует 30% manual QA времени на релиз, блокирует security update networking dependency и создаёт 20% support tickets по критическому flow, это уже не “маленький compatibility branch”. Это отдельная продуктово-платформенная ставка, которую нужно либо финансировать, либо выводить из поддержки через понятный deprecation plan.
+
+Пример threshold thinking:
+- если old OS cohort low usage + high QA/support cost + blocks strategic API, raise target становится сильным кандидатом;
+- если old OS cohort мал, но revenue-critical или contractual, нужен бюджет поддержки, а не игнорирование стоимости;
+- если данных нет, first action — instrumentation, а не target change.
+
+#### Матрица ownership
+Скрытая стоимость становится управляемой только тогда, когда у каждого слоя есть владелец.
+
+| Владелец | За что отвечает | Типичный сигнал риска |
+| --- | --- | --- |
+| Engineering | fallback inventory, availability branches, dependency constraints, cleanup after target raise | workaround без owner/removal trigger |
+| QA | OS/device matrix, release smoke checks, old-device regression coverage | старая OS declared supported, но не тестируется |
+| Product | value старого cohort, communication, deprecation timeline, exceptions | target decision принимается только по engineering convenience |
+| Support | known issues, support scripts, ticket tagging by OS/device | old-OS bugs выглядят как random incidents |
+| Release owner | TestFlight/App Store readiness, no-release gates, rollout/rollback notes | release подписывается без evidence по supported OS matrix |
+| Security/privacy owner | limitations старой OS, accepted risks, logging/data handling | старый runtime не покрывает текущие privacy expectations |
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- не называй старый OS support “free”, если есть fallback code или QA matrix;
+- если старая iOS заявлена supported, но нет реального device/simulator coverage и smoke checks для critical flows, это **release risk** и потенциальный **no-release gate**, а не полноценная поддержка;
+- каждый old-OS workaround должен иметь owner и removal trigger;
+- old device performance нужно проверять на realistic inputs;
+- dependency upgrades должны включать minimum OS impact review;
+- support tickets по старым OS должны попадать в platform cost dashboard;
+- release estimates должны учитывать old OS validation;
+- product roadmap должен видеть features blocked by deployment target;
+- security/privacy limitations старых OS должны быть explicit risk, а не implicit acceptance.
+
+Ловушки:
+- **invisible QA tax:** старые OS остаются в support, но никто не выделяет время на тестирование;
+- **zombie fallback:** fallback branch не используется большинством users, но ломается при каждом refactor;
+- **dependency hostage:** важный package нельзя обновить из-за старого target;
+- **performance denial:** команда тестирует только новый device и игнорирует older memory/CPU limits;
+- **support blind spot:** tickets tagged as “random bug”, хотя pattern связан со старой OS;
+- **false compassion:** команда якобы защищает старых users, но отдаёт им unstable, poorly tested experience.
+
+#### Governance и decision process
+Скрытая стоимость должна попадать в регулярный platform review, а не всплывать только во время release fire drill.
+
+Рекомендуемый cadence:
+- quarterly OS/device/support cost review;
+- compatibility debt inventory;
+- old OS crash/support/performance dashboard;
+- dependency minimums review;
+- QA matrix cost review;
+- deployment target ADR update;
+- product/support communication readiness.
+
+Результаты решения:
+- **Keep support with budget:** старая OS остаётся, но получает выделенный QA/support/engineering budget.
+- **Prepare deprecation:** начинается communication, instrumentation, deprecation timeline и support plan.
+- **Raise target:** target повышается с ADR, release plan и cleanup tasks.
+- **Exception:** отдельный enterprise/strategic cohort получает special support path, если это продуктово оправдано.
+
+#### Review Q&A с ответами
+1. **Почему поддержка старой iOS не бесплатна, даже если код уже написан?**
+   **Ответ:** код нужно тестировать, понимать, поддерживать при refactor, учитывать в release gates, объяснять support и не ломать при dependency/toolchain updates. Даже unchanged branch создаёт cognitive и QA cost.
+
+2. **Как отличить реальную заботу о пользователях от ложной поддержки?**
+   **Ответ:** реальная поддержка имеет QA coverage, support docs, bug triage, performance validation и owner. Ложная поддержка оставляет старых users на poorly tested path, который команда боится менять.
+
+3. **Какие данные нужны, чтобы аргументировать повышение target?**
+   **Ответ:** active/revenue users by OS/device, critical flow usage, old-OS crash/support rates, QA hours, fallback inventory, blocked roadmap items, dependency constraints и security/privacy risks.
+
+4. **Когда маленький old OS cohort всё равно нужно поддерживать?**
+   **Ответ:** когда cohort contractual, enterprise-critical, regulated, revenue-critical или стратегически важен. Тогда поддержка должна иметь explicit budget и service-level expectations.
+
+5. **Почему dependency minimum OS — platform strategy issue?**
+   **Ответ:** dependency может заблокировать security fixes, SDK updates, build modernization или feature work. Если старый target удерживает устаревшую dependency, это уже platform risk, а не локальная convenience.
+
+6. **Что делать с old OS workaround после повышения target?**
+   **Ответ:** удалить branch, tests, docs, screenshots/previews и support notes, если они больше не нужны. Если оставить workaround без supported users, он превращается в dead complexity.
+
+7. **Почему отсутствие QA coverage для старой OS хуже честного deprecation?**
+   **Ответ:** честный deprecation сообщает пользователям границы поддержки и даёт last compatible version. Непроверенная “поддержка” создаёт ложное обещание: приложение формально запускается, но critical flows могут быть сломаны без detection и owner.
+
+#### Чеклист видимости стоимости
+Поддержка старых iOS versions не считается управляемой, пока:
+- **Users:** known active/revenue/strategic cohorts by OS/device.
+- **QA:** old OS/device matrix имеет explicit owner и budget.
+- **Release gate:** critical flows на supported OS matrix имеют smoke evidence или documented release risk.
+- **Code:** fallback/workaround inventory поддерживается актуальным.
+- **Metrics:** crash/hang/performance/support data сегментированы by OS/device.
+- **Dependencies:** minimum OS constraints проверяются при upgrades.
+- **Security/privacy:** limitations старой OS зафиксированы как accepted risk или blocker.
+- **Product:** roadmap items blocked by old target видимы decision makers.
+- **Support:** old OS known issues имеют support guidance.
+- **Removal:** есть timeline или trigger для deprecation/target raise.
+
+#### Практическое упражнение с эталонным разбором
+**Сценарий:** старую iOS версию использует 3% active users, но она создаёт 30% manual QA времени и блокирует upgrade важной networking dependency.
+
+**Эталонный разбор:** Staff engineer не предлагает немедленно “отрезать 3%”. Сначала cohort разбивается по revenue, geography, enterprise accounts и critical flows. QA показывает cost matrix, engineering показывает blocked dependency risks, support показывает ticket pattern. Если cohort не strategic, создаётся ADR на target raise: timeline, release notes, last compatible version, cleanup PRs, dependency upgrade plan и monitoring. Если cohort strategic, решение может быть “keep support with budget”: отдельная QA lane, owner fallback code, dependency mitigation и дата повторного review.
+
+
 ### 1.10. Стратегия освоения платформы уровня Staff
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
