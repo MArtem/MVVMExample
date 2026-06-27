@@ -1287,12 +1287,182 @@ Feature с entitlement/system capability не готова к production, пок
 **Эталонный разбор:** безопасный design не кладёт всю database в shared container. Main app создаёт минимальный widget snapshot: document id, redacted title или user-approved display title, timestamp, account scope, schema version и expiration. Запись atomic, с file protection, backup exclusion для regenerable snapshot, bounded retention/expiration, cleanup при logout/account switch и fallback UI, если snapshot недоступен. Widget перед render валидирует schema version, account scope и expiration. Widget не получает access к tokens, full document contents, pending mutations или unrelated cache. Review проверяет App Group id в app и widget targets, signed entitlements, privacy/logging policy, backup behavior, retention policy и migration path.
 
 ### 1.6. Цикл платформенных релизов и эволюция через WWDC
+#### Назначение раздела
+Цикл платформенных релизов Apple — это не ежегодное событие для просмотра keynote, а production input для iOS engineering strategy. Каждый WWDC открывает период, когда меняются SDK, Xcode, Swift, SwiftUI/UIKit APIs, privacy requirements, App Store policy, device behavior, runtime diagnostics, design language и пользовательские ожидания. Senior/Lead/Staff engineer должен превращать этот поток изменений в управляемый engineering process: triage, adoption plan, compatibility strategy, release gates, telemetry и rollback.
+
+Правильная mental model: WWDC создаёт **platform change backlog**, но не каждое изменение сразу становится product work. Команда должна отделять:
+- mandatory changes: policy, privacy, signing, App Store, deprecations, crash/build blockers;
+- strategic opportunities: APIs, design capabilities, performance tools, Swift language improvements;
+- optional experiments: визуальные новинки, non-critical convenience APIs, developer productivity improvements;
+- watchlist items: beta bugs, ambiguous documentation, SDK behavior, который может стабилизироваться позже.
+
 #### Operational goal и ownership
+Цель release-cycle process — не «успеть переписать app под новый iOS», а сохранить production reliability во время эволюции вместе с платформой. Ownership должен быть распределён явно:
+
+| Роль | Ответственность | Ожидаемый результат |
+| --- | --- | --- |
+| Platform/Staff owner | triage WWDC changes, risk matrix, adoption strategy | documented platform roadmap и decision log |
+| Release owner | signing, build numbers, TestFlight/App Store gates | release checklist, archive validation, rollback plan |
+| Feature owners | impact analysis для своих screens/flows | compatibility notes, migration tasks, test scope |
+| QA owner | device/iOS matrix, smoke/regression strategy | beta/GM/release candidate test plan |
+| Security/privacy owner | privacy manifests, permissions, SDK policy changes | updated disclosures и blocked-risk list |
+| Support/product owner | user-facing changes, support scripts, rollout comms | release notes, known issues, support FAQ |
+
+Staff-level правило: adoption без owner превращается в набор случайных PR. Каждый platform change должен иметь один из статусов: **adopt now**, **prepare**, **observe**, **defer**, **reject with reason**.
+
+#### Release calendar как engineering system
+Платформенный год удобно мыслить как несколько phases:
+
+1. **WWDC / early beta:** собрать изменения, выделить risks/opportunities, не строить long-term architecture на unstable beta behavior.
+2. **Beta stabilization:** проверять build compatibility, critical flows, privacy/signing changes, deprecations и performance regressions.
+3. **GM / Release Candidate:** закрыть release blockers, обновить test matrix, проверить archive, TestFlight, dSYM, crash reporting и support notes.
+4. **Public OS rollout:** мониторить metrics by OS version, feature flags, crash/hang rates, permission behavior, App Review feedback.
+5. **Post-release learning:** обновить standards, удалить устаревшие workarounds, зафиксировать ADRs и tech debt.
+
+Это не waterfall. Некоторые urgent policy/security изменения могут идти сразу в текущий release, а визуальные/API migrations — через staged adoption.
+
+#### Beta toolchain vs production lane
+Главное release-engineering правило сезона WWDC: **beta exploration lane и production release lane должны быть изолированы**. Ранний переход всей команды, CI или release branch на beta Xcode/SDK создаёт риск, который сложно откатить.
+
+Практическая модель:
+- **Production lane** остаётся на stable Xcode/toolchain, пока команда выпускает текущие App Store/TestFlight builds.
+- **Exploration lane** использует beta Xcode/SDK для compatibility checks, spikes, warnings, early adoption experiments и bug filing.
+- **CI isolation** не позволяет beta toolchain случайно стать default для release branches.
+- **Cutover criteria** фиксируются заранее: GM/RC toolchain, green archive, critical smoke, signing/provisioning validation, dependency compatibility и no open P0/P1 regressions.
+- **Freeze window** перед public OS release защищает app от late unreviewed migrations.
+
+Исключения возможны только для mandatory policy/build blockers, и даже тогда нужен explicit release owner, rollback plan и separate validation.
+
 #### Build, signing и environment constraints
+Новый Xcode/SDK может менять не только API availability, но и build behavior, Swift diagnostics, signing requirements, linker warnings, privacy manifests, simulator/device differences и App Store validation.
+
+Release-cycle gate проверяет эти surfaces именно как release-time verification. Механика sandbox, privacy и entitlements раскрыта в `1.3–1.5`; здесь важно доказать, что они согласованы в archive/TestFlight/App Store lane. Gate должен проверять:
+- clean archive на supported Xcode version;
+- bundle IDs, entitlements, App Groups и provisioning profiles;
+- version/build number policy;
+- Debug/TestFlight/App Store environment separation;
+- dSYM generation/upload и crash symbolication;
+- privacy manifests, Info.plist usage descriptions и App Privacy labels;
+- dependency compatibility с новым SDK и server contract compatibility для OS-season changes;
+- CI images/toolchains consistency;
+- simulator, physical device, extensions/widgets/App Clips/watch targets smoke для release-critical flows там, где такие surfaces есть;
+- backward compatibility для minimum deployment target.
+
+Важная ловушка: build success на новом SDK не доказывает runtime readiness. App может компилироваться, но получить changed lifecycle behavior, altered permission prompt, SwiftUI layout regression, keyboard/safe-area difference, new privacy validation или background policy change.
+
+#### API adoption и compatibility strategy
+Adoption strategy должна отвечать не только на «можем ли использовать новый API», но и на «какую стоимость создаёт conditional behavior».
+
+Матрица решений:
+
+| Решение | Когда подходит | Риск | Правило |
+| --- | --- | --- | --- |
+| Adopt immediately | mandatory policy/security/build blocker или явная product value | beta instability, regressions | feature flag, availability checks, rollback |
+| Wrap behind availability | новый API полезен, но deployment target ниже | divergent behavior | единый abstraction только если реально снижает duplication |
+| Defer | API не критичен или docs/behavior unstable | missed opportunity | revisit date и owner |
+| Reject | API усложняет architecture или нарушает product goals | future regret | documented rationale |
+| Prepare only | нужно изменить architecture перед adoption | planning debt | RFC/ADR и migration milestones |
+
+Compatibility code должен быть explicit. `if #available` не должен расползаться случайно по UI. Staff-level approach: определить feature boundary, fallback behavior, test matrix и removal plan для старых branches после повышения deployment target.
+
+#### Multi-year compatibility и deprecation lifecycle
+Платформенная эволюция длится несколько лет, поэтому временный compatibility code должен иметь срок жизни. Иначе codebase накапливает `if #available`, shims, legacy visual fallbacks, duplicated behavior и test matrix cost.
+
+Staff-level policy должна включать:
+- критерии повышения minimum deployment target: user share, business constraints, device support, QA cost, security/privacy requirements, App Store policy и dependency support;
+- owner для каждого temporary workaround или compatibility shim;
+- removal date или revisit trigger;
+- tests, которые доказывают fallback behavior до удаления;
+- migration plan для persisted data и user-visible behavior;
+- ADR/RFC, если deployment target change влияет на product reach или team roadmap.
+
+Правило: каждый workaround после WWDC должен быть либо promoted в stable architecture, либо удалён, либо явно оставлен с cost/owner. Вечный temporary compatibility layer — это architecture debt.
+
 #### Telemetry, logging и alerting signals
+Платформенные изменения должны иметь production feedback loop. Без telemetry команда не знает, улучшила ли adoption продукт или создала тихую regression.
+
+Минимальные signals:
+- crash-free sessions by OS version/device class;
+- hang rate, launch time, memory terminations, energy regressions;
+- permission authorization distributions after OS update;
+- SwiftUI layout/interaction support tickets;
+- network/background task failures by OS version;
+- App Store/TestFlight feedback themes;
+- feature flag exposure и rollback events;
+- dSYM upload/symbolication health;
+- adoption-specific events, redacted and bounded.
+
+Alerting должен быть связан с action. Если metric ухудшился, команда должна знать owner, rollback path, kill switch или next diagnostic step. Dashboard без ownership — это декоративная observability без operational value.
+
 #### Rollout, rollback и incident workflow
+Platform adoption должен идти staged, если change может затронуть large user base. Rollout strategy зависит от риска:
+- internal dogfood для beta OS и new SDK builds;
+- TestFlight cohorts для compatibility и support feedback;
+- feature flags для risky runtime behavior;
+- phased release для App Store rollout там, где подходит;
+- kill switch для server-driven features;
+- rollback plan для app release, backend config и feature flag defaults.
+
+Rollback в iOS имеет ограничения: установленный app binary нельзя мгновенно отозвать у всех пользователей. Поэтому безопасный design делает risky behavior отключаемым удалённо, server contracts backward-compatible, а diagnostics достаточными для triage. Data migrations должны быть reversible там, где это реально; если migration one-way, она должна быть versioned, gated, recoverable и не должна зависеть от предположения, что emergency rollback вернёт старый local state.
+
+Incident workflow:
+1. classify: build/signing, runtime crash, data loss, privacy, App Review, performance, support regression;
+2. identify affected OS/device/app versions;
+3. disable risky path if possible;
+4. prepare hotfix/TestFlight validation;
+5. update support messaging;
+6. preserve evidence: logs, dSYMs, metrics, timeline;
+7. write postmortem and update release gate.
+
 #### Compliance и support handoff checklist
-#### Runbook-примеры для добавления
+Платформенный release часто меняет не только code, но и compliance/support obligations.
+
+Release handoff должен включать:
+- обновлённые privacy manifests и App Privacy labels там, где применимо;
+- изменения permission copy и screenshots там, где релевантно;
+- export compliance/payment capability notes, если релевантно;
+- App Review notes for new capabilities, background modes, account deletion, login, health/payment/location behavior;
+- support FAQ for changed permissions, OS-specific behavior, known issues;
+- rollback/kill switch instructions;
+- diagnostics instructions: где найти build number, OS version, device class, correlation id;
+- known limitations и expected degraded behavior.
+
+Support handoff не должен раскрывать internal secrets или debug-only steps. Его цель — дать support/product/QA общий язык для user-facing incidents.
+
+#### Production-ловушки и Q&A с ответами
+1. **Почему WWDC adoption нельзя начинать с массового refactor?**
+   **Ответ:** ранние beta APIs и behavior могут измениться, а массовый refactor смешивает learning, migration и product changes. Надёжнее начать с triage, spikes, compatibility checks, risk matrix и небольших reversible adoption slices.
+
+2. **Почему `if #available` сам по себе не является compatibility strategy?**
+   **Ответ:** availability check только предотвращает вызов API на старой OS. Он не определяет fallback UX, test coverage, ownership, removal plan и consistency между OS versions.
+
+3. **Как понять, что новый SDK создал production regression?**
+   **Ответ:** сравниваются metrics по app version, OS version, device class и rollout cohort: crash-free sessions, hangs, launch, memory, permission flows, support tickets и feature-specific events. Локальная проверка build success недостаточна.
+
+4. **Почему rollback для iOS сложнее, чем для backend?**
+   **Ответ:** app binary уже установлен на устройствах, App Store rollout не мгновенный, review/hotfix занимает время, а migrated local data может быть несовместима со старым behavior. Поэтому нужны feature flags, backward-compatible migrations и server-side safety.
+
+5. **Что делает WWDC adoption staff-level задачей?**
+   **Ответ:** она затрагивает не один API, а roadmap, team ownership, release gates, compatibility, privacy, QA, support, incident response и long-term platform strategy.
+
+#### Review checklist с ожидаемыми ответами
+Platform release/adoption work не готово, пока:
+- **Triage:** каждое platform change classified как adopt now / prepare / observe / defer / reject.
+- **Ownership:** у risky changes есть owner, review path и decision log.
+- **Build/signing:** clean archive, profiles, entitlements, dSYM и App Store validation проверены.
+- **Compatibility:** fallback behavior и availability strategy описаны для supported OS versions.
+- **Telemetry:** metrics/alerts привязаны к owner и action.
+- **Rollout:** TestFlight/phased release/feature flag strategy выбрана по risk level.
+- **Rollback:** risky behavior можно отключить или безопасно заменить; migrations forward-compatible.
+- **Compliance:** privacy manifests, App Privacy labels, usage descriptions и review notes обновлены там, где применимо; это release-time verification surface для механик из `1.3–1.5`.
+- **Support:** support FAQ, known issues и diagnostic instructions готовы.
+- **Learning:** после release обновлены docs, ADRs, tech debt и removal plan для temporary workarounds.
+
+#### Практический runbook с эталонным разбором
+**Сценарий:** после перехода на новый Xcode и SDK приложение стало чаще падать на iOS beta/новом major release.
+
+**Эталонный разбор:** release owner сначала сегментирует crash-free sessions по OS version, device class, app build и rollout cohort. Затем проверяет dSYM/symbolication health, known SDK release notes, recent API adoption и feature flags. Если crash связан с new API path, risky behavior отключается remote flag, готовится hotfix branch, QA прогоняет critical smoke на affected OS/device, support получает known issue note. После hotfix команда пишет postmortem: какой gate пропустил regression, какие beta/RC checks добавить, какой workaround временный и когда его удалить.
+
 ### 1.7. Стратегия deployment target
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
