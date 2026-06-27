@@ -111,7 +111,7 @@
 5. превратить mental model в production-правила, примеры и review-вопросы.
 
 #### Определение и mental model
-iOS-приложение — это **guest process** в user-first, battery-powered, privacy-controlled операционной системе. Приложение может запрашивать ресурсы; система решает, доступны ли они, как долго они доступны и с каким приоритетом. Неправильная mental model: «моё приложение работает, пока само не завершится». Правильная mental model: **система постоянно арбитрирует foreground priority, background eligibility, memory pressure, CPU scheduling, I/O, network access, thermal pressure и privacy permission surfaces между всеми приложениями и системными сервисами**.
+iOS-приложение — это **guest process** в user-first, battery-powered, privacy-controlled операционной системе. Приложение может запрашивать ресурсы; система решает, доступны ли они, как долго они доступны и с каким приоритетом. Неправильная mental model: «моё приложение работает, пока само не завершится». Правильная ментальная модель: **система постоянно арбитрирует foreground priority, background eligibility, memory pressure, CPU scheduling, I/O, network access, thermal pressure и privacy permission surfaces между всеми приложениями и системными сервисами**.
 
 Практическое следствие: production iOS-код нужно проектировать так, будто interruption — нормальное состояние, а не исключение. Senior iOS engineer предполагает, что:
 - launch может быть cold, warm, after jetsam, after crash, после обновления, после изменения permissions или после восстановления scene state;
@@ -709,12 +709,174 @@ Feature, зависящая от памяти, батареи, тепловог�
 - diagnostics позволяют отличить memory, network, server, auth и mapping failures.
 
 ### 1.3. App sandbox и границы файловой системы
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Назначение раздела
+App sandbox — это не только security-механизм, который «не даёт приложению читать чужие файлы». Для senior-level iOS engineering это архитектурная граница владения данными, жизненного цикла данных, политики резервного копирования, privacy exposure, взаимодействия с extensions и incident response. Sandbox определяет, какие файлы приложение может создать, какие внешние ресурсы может временно открыть, какие данные переживают reinstall, backup и logout, какие shared containers доступны extensions и где легко случайно нарушить ожидания пользователя.
+
+Правильная ментальная модель: приложение работает в собственном контейнере, но даже внутри контейнера данные имеют разные уровни доверия и разные жизненные циклы. `Documents`, `Library/Application Support`, `Library/Caches`, temporary directories, bundle resources, Keychain, App Group container и security-scoped external files нельзя смешивать как «просто пути на диске». Каждый storage location несёт product contract: видимость пользователю, backup behavior, ожидания cleanup, file protection, sensitivity и recoverability.
+
+#### Модель угроз и защищаемые assets
+Модель угроз начинается с инвентаризации assets. Без неё команда не понимает, что именно защищает sandbox и какие дополнительные меры нужны поверх sandbox.
+
+Типовые защищаемые assets:
+- **credentials и tokens**: access/refresh tokens, session identifiers, API keys, OAuth state, device-bound secrets;
+- **user-generated content**: документы, фото, аудио, PDF, черновики, импортированные файлы, attachments;
+- **personal data**: имя, email, phone, contacts-derived data, location, health-like data, financial data, private messages;
+- **product state**: pending mutations, drafts, offline queue, local database, feature flags, entitlement state;
+- **diagnostic data**: logs, crash breadcrumbs, metrics, support bundles, correlation ids;
+- **derived/cache data**: thumbnails, decoded media, search indexes, temporary exports, downloaded previews.
+
+Sandbox снижает blast radius между apps, но не делает данные автоматически безопасными внутри app boundary. Если sensitive data попадает в неправильный directory, backup, log file, crash report, shared container или temporary export, sandbox уже не решает проблему. Senior review должен рассматривать классы атакующих:
+1. пользователь с доступом к device backup или shared Mac;
+2. другой app, который пытается получить данные через extension, pasteboard, URL scheme, document picker или share sheet;
+3. malicious/compromised SDK внутри того же process;
+4. support/analytics/crash pipeline, куда утекли некорректно redacted данные;
+5. команда разработки, случайно добавившая secret fixture или verbose logging.
+
+#### Механизмы платформы и entitlement surface
+iOS app container обычно включает несколько разных областей с разной семантикой:
+
+| Область | Типичное назначение | Production-правило | Риск |
+| --- | --- | --- | --- |
+| App bundle | read-only ресурсы приложения | не хранить runtime data | попытка мутировать bundle или хранить config как runtime state |
+| `Documents` | пользовательские документы, видимые как durable content | класть только user-owned data, которое должно быть backup-eligible | unintended backup sensitive/cache data |
+| `Library/Application Support` | durable app-managed data | подходит для databases, queues, configuration, но требует protection/retention policy | данные переживают дольше, чем ожидает пользователь |
+| `Library/Caches` | regenerable data | cache должен быть recreatable и bounded | потеря cache не должна ломать correctness |
+| temporary directory | краткоживущие промежуточные файлы | cleanup обязателен после success/failure/cancel | temporary sensitive data остаётся на диске |
+| App Group container | shared state между app/extensions/widgets | нужен явный ownership, locking/coordination и cleanup | runtime coupling, privacy leak между targets |
+| Keychain | secrets и credentials | выбирать accessibility class и logout/revocation behavior | tokens сохраняются после logout/reinstall без осознанного contract |
+
+Entitlements расширяют sandbox surface: App Groups, Keychain Sharing, iCloud, Associated Domains, Push, Background Modes, HealthKit, Photos, Camera, Bluetooth и другие capabilities. Staff-level правило: entitlement — это не «checkbox в Xcode», а изменение trust boundary и review surface. Каждый entitlement должен иметь owner, rationale, data flow, denial behavior, logging policy и release verification.
+
+Особенно опасны shared containers. Widget, share extension и main app могут читать одну область, но это не значит, что они должны видеть все данные друг друга. Нужны минимальные shared records, versioned schema, atomic writes, file coordination там, где есть concurrent access, и cleanup при logout/account switch.
+
+#### Жизненный цикл данных, retention и deletion behavior
+Файловая граница должна проектироваться вместе с lifecycle данных. Для каждого типа данных нужно определить:
+- где он хранится;
+- sensitive ли он;
+- должен ли попадать в backup;
+- должен ли переживать logout;
+- должен ли переживать account switch;
+- можно ли его восстановить с server;
+- кто отвечает за deletion;
+- как работает migration;
+- что происходит при disk full, file protection lock и partial write.
+
+Матрица жизненного цикла данных:
+
+| Тип данных | Где хранить | Backup | Logout/account switch | Delete behavior |
+| --- | --- | --- | --- | --- |
+| Access/refresh token | Keychain | зависит от accessibility class: migratable classes могут участвовать в backup/restore, `ThisDeviceOnly` привязан к устройству | удалить или revoke по session policy; помнить, что Keychain item может пережить reinstall | clear credentials, revoke где нужно и invalidate in-memory state |
+| Offline mutation queue | Application Support / database | зависит от product promise | сохранить только если user/account совпадает | удалить после successful sync или explicit account deletion |
+| User-created document | Documents или document provider location | обычно да, если user-owned | не удалять silently без product requirement | удалить только по user action/account deletion policy |
+| Image thumbnails/cache | Caches | нет | очистить при account switch, если содержит private content | regenerable cleanup |
+| Temporary export/import | temporary directory | нет | очистить независимо от account | cleanup on success/failure/cancel |
+| Support diagnostic bundle | temporary или controlled support area | обычно нет | не переносить между accounts | auto-expire и redact |
+
+File protection важен для данных, которые не должны быть доступны до unlock. Но protection class — это не замена product policy. Например, база может быть защищена, но если из неё пишутся breadcrumbs с PII в crash metadata, защита файла уже не помогает. Аналогично, cache может быть regenerable, но если он содержит private thumbnails, он всё равно sensitive.
+
+Decision rules для file protection:
+- `NSFileProtectionComplete` подходит для highly sensitive user data, к которому app не должна обращаться до unlock; риск — сломать launch/background paths, если код не готов к unavailable files.
+- `NSFileProtectionCompleteUntilFirstUserAuthentication` часто подходит для databases/queues, которые должны быть доступны после первого unlock и переживать background work, но всё ещё защищены до unlock после reboot.
+- Less restrictive protection нельзя выбирать ради удобства без documented product reason и security review.
+- File protection decision должен проверяться вместе с lifecycle: cold launch after reboot, background task, widget/extension access, migration и support export.
+- Если данные дублируются в cache, thumbnails, logs или App Group, protection class primary file уже не покрывает весь риск.
+
+Keychain требует отдельной политики. Некоторые Keychain items могут переживать reinstall, а backup/restore поведение зависит от accessibility class и выбора migratable vs `ThisDeviceOnly`. Поэтому logout/account deletion должны явно удалять relevant Keychain entries, а не полагаться на uninstall как cleanup mechanism.
+
+Retention должен быть минимальным. Данные, которые не нужны для user value, recovery, legal requirement или диагностики, не должны сохраняться. Staff-level governance требует явного retention owner: кто решает срок хранения, кто меняет policy, как policy проверяется в release и как пользователь может запросить удаление.
+
+#### Границы внешних файлов и imported content
+Document picker, Photos picker, share extension, URL schemes, Universal Links, pasteboard и drag-and-drop — это внешние input boundaries. Нельзя считать файл безопасным только потому, что его выбрал пользователь или передал system UI.
+
+Правила:
+- проверяй type, size, extension, MIME/UTType и фактическое содержимое, где возможно;
+- не доверяй filename: он может содержать sensitive text, path-like strings или control characters;
+- не сохраняй security-scoped URL как обычный durable path без bookmark/access policy;
+- копируй импортированный файл в controlled app storage, если feature должна владеть им долговременно;
+- отличай временную capability доступа от ownership: security-scoped access даёт право открыть внешний ресурс, но не делает его durable app-owned file;
+- очищай temporary copies после failed parsing/upload/share;
+- не открывай arbitrary URL/file без allowlist и validation;
+- не выполняй preview/rendering больших файлов на main actor;
+- рассматривай malformed PDF/image/archive как потенциальный memory, performance и security input.
+
+Граница внешнего файла — это одновременно security- и reliability-тема. Большой PDF может не быть malicious, но всё равно вызвать memory spike. Неверный file protection timing может сломать cold launch до unlock. Share extension может записать partial state, который main app увидит после crash extension. Поэтому validation, atomic writes и versioned handoff обязательны.
+
+#### Ограничения logging, analytics и crash reporting
+Sandbox не защищает данные, если приложение само отправило их в logs, analytics или crash pipeline. Production diagnostics должны быть redacted by design.
+
+Запрещено логировать:
+- tokens, authorization headers, cookies, session ids;
+- raw file paths, если path содержит user/account/document names;
+- precise location, contacts, private messages, document text, health/financial data;
+- импортированные filenames без redaction;
+- raw request/response bodies;
+- screenshots или attachments с private content без explicit user-controlled support flow.
+
+Допустимая диагностика:
+- storage category вместо full path: `documents`, `cache`, `appGroup`, `temporary`;
+- file size bucket вместо точного filename/content;
+- error class вместо payload;
+- account/user hash только если policy разрешает и hash не reversible;
+- correlation id;
+- operation id, retry count, cleanup result, file protection state category;
+- redacted entitlement/capability state.
+
+Crash breadcrumbs особенно опасны: они часто добавляются в спешке для incident debugging и потом годами отправляют sensitive context. Senior review должен спрашивать не «поможет ли log debug-у», а «можно ли безопасно хранить и передавать эту строку для всех users, accounts, locales и jurisdictions».
+
+Storage и export decisions также влияют на privacy manifest и declared data use. Если app сохраняет diagnostics, импортированные documents, thumbnails, identifiers или shared App Group data, это должно соответствовать фактическому data flow, SDK usage и privacy disclosures. Privacy manifest не должен описывать желаемую архитектуру; он должен отражать реальное поведение runtime и third-party SDKs.
+
 #### Review checklist и incident response
-#### Примеры и adversarial questions для добавления
+Security/privacy review sandbox-sensitive feature должен включать минимум:
+- составлен sensitive data inventory;
+- для каждого data type выбран storage location и backup policy;
+- tokens/secrets не попадают в UserDefaults, files, logs, analytics или crash metadata;
+- выбран Keychain accessibility class и описан logout/revocation behavior;
+- App Group data минимизирована, versioned и имеет owner;
+- external input проходит type/size/content validation;
+- temporary files очищаются на success, failure и cancellation;
+- writes для critical data atomic или transactional;
+- disk full и file protection unavailable имеют user-safe behavior;
+- account switch не смешивает данные разных users;
+- deletion/retention policy реализована и проверяема;
+- diagnostics redacted и bounded;
+- entitlements имеют documented rationale;
+- privacy manifest и permission strings соответствуют реальным data flows.
+
+Incident response должен быть заранее понятен. Если обнаружена утечка через file storage или diagnostics, команда должна уметь быстро ответить:
+1. какие versions затронуты;
+2. какие data categories могли попасть наружу;
+3. через какой channel произошла утечка: backup, logs, crash, analytics, shared container, support export;
+4. можно ли remote-disable problematic logging/export;
+5. нужна ли token revocation, cache purge, migration или user notification;
+6. какие tests/gates предотвращают повтор.
+
+P0/P1 findings по умолчанию: insecure token persistence, PII/secret logging, unintended backup sensitive data, unvalidated external file execution path, shared container leak между accounts/targets, missing privacy explanation для shipped capability.
+
+#### Senior / Lead / Staff проверочные вопросы
+1. Какие assets защищает sandbox в этой feature, а какие остаются exposed через logs, backups или shared containers?
+2. Почему выбран именно этот storage location, а не `Caches`, `Documents`, Application Support, Keychain или App Group?
+3. Что происходит с данными при logout, account switch, uninstall/reinstall, restore from backup и account deletion?
+4. Какие файлы должны быть excluded from backup и почему?
+5. Какой file protection class нужен для sensitive data, и что делает app до first unlock?
+6. Может ли extension увидеть больше данных, чем ей нужно?
+7. Что произойдёт, если external file malformed, huge, encrypted, partially available или protected до unlock?
+8. Какие log/crash/analytics fields доказывают проблему без раскрытия sensitive content?
+9. Есть ли способ быстро отключить risky export/logging path после release?
+10. Как reviewer докажет, что temporary sensitive files удаляются на всех paths: success, failure, cancellation и crash recovery?
+
+#### Чеклист production-readiness
+Feature, работающая с file system или sandbox boundaries, не готова к production, пока:
+- есть documented sensitive data inventory;
+- storage location выбран по user ownership, sensitivity, backup и retention semantics;
+- secrets живут в Keychain или approved secure storage;
+- App Group и extension boundaries минимизированы;
+- external files/URLs валидируются как untrusted input;
+- temporary data cleanup покрывает failure/cancellation paths;
+- backup exclusions настроены для regenerable/sensitive cache;
+- logout/account deletion очищают нужные local data;
+- diagnostics не содержат PII/secrets/raw paths/raw payloads;
+- incident response описывает containment, revocation, cleanup и regression tests.
+
 ### 1.4. Privacy-гейты и модель разрешений
 #### Threat model и защищаемые assets
 #### Platform mechanism и entitlement surface
@@ -971,10 +1133,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 4.8. Сопоставление с образцом
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 4.9. Правила инициализации
@@ -1911,17 +2073,17 @@ Feature, зависящая от памяти, батареи, тепловог�
 
 ## 18. SwiftUI performance
 ### 18.1. Форматирование в `body`
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 18.2. Повторное создание formatters
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 18.3. Декодирование изображений в rows
@@ -2881,10 +3043,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
 ### 36.8. Антипаттерн с перегруженным Presenter
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 
@@ -2915,10 +3077,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 37.5. Lifecycle attach/detach
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 37.6. Распространение dependencies
@@ -3032,10 +3194,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 
 ## 40. Design systems
 ### 40.1. Tokens
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 40.2. Components
@@ -3242,10 +3404,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Security, privacy и logging-ограничения
 #### Test matrix и production diagnostics
 ### 44.3. Refresh tokens
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 44.4. Expiration
@@ -3497,10 +3659,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 
 ## 49. Data safety
 ### 49.1. Secrets vs non-secrets
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 49.2. Защита файлов
@@ -3528,10 +3690,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 49.6. Требования в стиле GDPR/CCPA
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 
@@ -3541,10 +3703,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 
 ## 50. Security model iOS
 ### 50.1. Sandbox
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 50.2. Keychain
@@ -3582,10 +3744,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 
 ## 51. Threat modeling для iOS
 ### 51.1. Случайный атакующий
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 51.2. Устройство с jailbreak
@@ -3623,10 +3785,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 
 ## 52. Secure coding
 ### 52.1. Lifecycle секретов
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 52.2. Хранение token
@@ -3675,38 +3837,38 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 53.2. Permission prompts
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 53.3. Privacy manifests
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 53.4. Privacy labels App Store
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 53.5. Privacy analytics
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 53.6. Privacy crash reports
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 
@@ -4612,10 +4774,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 73.2. Privacy-safe analytics
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 73.3. Product metrics
@@ -4904,10 +5066,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
 ### 80.3. Security
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 80.4. Performance
@@ -5594,10 +5756,10 @@ Feature, зависящая от памяти, батареи, тепловог�
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
 ### 97.5. Чеклист security
-#### Threat model и защищаемые assets
-#### Platform mechanism и entitlement surface
-#### Data lifecycle, retention и deletion behavior
-#### Logging, analytics и crash-reporting ограничения
+#### Модель угроз и защищаемые assets
+#### Механизмы платформы и entitlement surface
+#### Жизненный цикл данных, retention и deletion behavior
+#### Ограничения logging, analytics и crash reporting
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 97.6. Чеклист performance
