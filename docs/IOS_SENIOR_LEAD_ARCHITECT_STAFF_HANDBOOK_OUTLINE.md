@@ -1464,31 +1464,166 @@ Platform release/adoption work не готово, пока:
 **Эталонный разбор:** release owner сначала сегментирует crash-free sessions по OS version, device class, app build и rollout cohort. Затем проверяет dSYM/symbolication health, known SDK release notes, recent API adoption и feature flags. Если crash связан с new API path, risky behavior отключается remote flag, готовится hotfix branch, QA прогоняет critical smoke на affected OS/device, support получает known issue note. После hotfix команда пишет postmortem: какой gate пропустил regression, какие beta/RC checks добавить, какой workaround временный и когда его удалить.
 
 ### 1.7. Стратегия deployment target
+#### Назначение раздела
+Deployment target — это не только значение в Xcode project settings. Это продуктово-инженерное решение о том, какие пользователи, устройства, OS capabilities, QA matrix, support obligations и architecture tradeoffs команда готова поддерживать. Слишком низкий deployment target увеличивает стоимость compatibility code, тестирования и workaround-ов. Слишком высокий target может отрезать пользователей, enterprise cohorts, старые devices или markets, где обновление OS происходит медленнее.
+
+Staff-level mental model: deployment target — это **contract of support**. Он определяет minimum runtime guarantees, доступные APIs, required fallback behavior, CI/device matrix, release policy и срок жизни compatibility layers. Решение нельзя принимать только из желания использовать новый API или уменьшить количество `if #available`.
+
 #### Decision context и stakeholders
-#### Technical tradeoff и organizational impact
+Решение о deployment target должно учитывать несколько владельцев, потому что стоимость и benefit распределены неравномерно.
+
+| Stakeholder | Что защищает | Какие данные нужны |
+| --- | --- | --- |
+| Product | reach, market coverage, user value | active users by OS/device, revenue/usage segments, feature demand |
+| Engineering | maintainability, API adoption, build/test cost | compatibility code inventory, crash/hang metrics, dependency constraints |
+| QA | test matrix realism | supported OS/device matrix, critical flow coverage, automation cost |
+| Support | user communication и known issues | support ticket volume by OS/device, upgrade guidance |
+| Security/privacy | minimum OS security baseline, privacy APIs | OS-level protections, policy requirements, SDK privacy behavior |
+| Release owner | App Store/TestFlight readiness | archive/build constraints, dependency minimums, rollout risk |
+| Leadership/Staff | long-term platform strategy | cost model, migration roadmap, opportunity cost |
+
+Правило: deployment target нельзя менять без user impact analysis и engineering cost analysis. Для consumer app и enterprise app критерии могут различаться: consumer продукт смотрит на active usage/revenue cohorts, enterprise продукт — на managed device fleets, MDM policy, contractual support и upgrade windows.
+
+#### Data inputs и decision model
+Минимальный набор evidence:
+- active users by iOS version and device class;
+- revenue/critical workflow usage by OS version;
+- crash/hang/performance metrics by OS version;
+- support tickets and known issues by OS version;
+- QA cost for old OS/device combinations;
+- compatibility code hotspots and workaround count;
+- dependency minimum requirements;
+- Apple policy/App Store/toolchain constraints;
+- security/privacy benefit of newer OS baseline;
+- feature roadmap requiring newer APIs.
+
+Decision не должен опираться на global OS adoption numbers alone. Команде нужны собственные analytics, потому что user base конкретного продукта может отличаться от публичной статистики. Если таких данных нет, это риск, а не разрешение принимать решение на интуиции.
+
+#### Technical tradeoffs и organizational impact
+Deployment target change должен быть синхронизирован не только в app target. Release owner проверяет все связанные targets и artifacts: app, extensions, widgets, App Clips, watch targets, test hosts, Swift packages, third-party SDK minimums, CI schemes, archive settings, TestFlight installability и App Store validation. Несогласованный target между app и extension может пройти локальный build, но сломать archive, installability или runtime handoff.
+
+Повышение deployment target обычно даёт:
+- меньше availability branches;
+- меньше fallback UI и workaround-ов;
+- доступ к новым APIs/framework behavior;
+- меньшую QA matrix;
+- возможность удалить legacy dependencies;
+- упрощение onboarding новых engineers;
+- иногда лучшую security/privacy baseline.
+
+Но оно также создаёт cost:
+- потеря части пользователей или enterprise customers;
+- support burden для users, которые не могут обновиться;
+- migration communication;
+- App Store review/support questions;
+- необходимость coordination с backend/product/legal/support;
+- риск скрытых regressions на devices, которые остаются supported.
+
+Staff-level decision — это не «новый API стоит потери N% пользователей». Это tradeoff между **user reach**, **engineering leverage**, **risk reduction**, **product roadmap** и **organizational capacity**. Иногда правильное решение — поднять target резко. Иногда — оставить старый target, но выделить budget на compatibility debt и назначить removal milestone.
+
+#### Compatibility code lifecycle
+Каждый старый OS branch должен иметь owner и срок жизни. Если `if #available` остаётся без удаления, codebase постепенно превращается в набор параллельных реализаций.
+
+Правила:
+- каждый fallback имеет owner, reason и removal trigger;
+- fallback behavior тестируется так же, как основной path;
+- workaround должен ссылаться на OS bug/API limitation или product requirement;
+- при повышении target нужно удалять dead branches, а не только менять setting;
+- compatibility removal должен включать cleanup tests, docs и screenshots/previews, если UI меняется;
+- persisted data migrations должны учитывать пользователей, которые обновятся app после долгого времени на старой OS.
+
+Deployment target strategy тесно связана с `1.8` и `1.9`: обратная совместимость и скрытая стоимость старых iOS versions раскрываются глубже там. В этой секции focus — decision governance и release impact.
+
 #### Governance artifact или process to produce
+Решение о deployment target должно оставлять durable artifact: ADR, RFC или release decision note.
+
+Минимальная структура ADR:
+- current target и proposed target;
+- decision date и intended release window;
+- affected users/devices/markets/cohorts;
+- product impact и support messaging;
+- engineering benefits;
+- removed compatibility code и remaining compatibility debt;
+- QA matrix до/после;
+- dependencies/toolchain constraints;
+- risks, mitigations и rollback limits;
+- approval owners: product, engineering, QA, support, security/privacy;
+- follow-up tasks: delete branches, update docs, update CI matrix, update release notes.
+
+Rollback reality важна: если app release поднял deployment target, пользователи на старой OS обычно остаются на последней совместимой версии. Это не togglable feature flag. Команда должна заранее решить, будет ли эта версия получать critical-fix support, security hotfixes или будет frozen. Поэтому decision должен быть принят до release branch cut и сопровождаться communication/support plan.
+
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+Deployment target change требует escalation, если:
+- affected cohort materially large или revenue-critical;
+- enterprise/regulated customers зависят от старой OS;
+- feature roadmap требует нового OS baseline, но product не готов терять reach;
+- dependency/vendor прекращает поддержку старого OS;
+- security/privacy requirement требует newer baseline;
+- QA не может честно покрывать старую matrix;
+- release уже близко, а migration/support messaging не готов.
+
+Communication risk: команда может продать решение как «техническую чистку», хотя для пользователя это loss of updates. Правильная коммуникация говорит честно: какие devices/OS остаются supported, какая последняя app version доступна старым users, какие security/support implications существуют и где получить help.
+
+#### Review Q&A с ответами и calibration rubric
+Threshold thinking помогает перевести спор из вкусового режима в decision model. Пороговые значения не универсальны, но ADR должен явно назвать допустимые границы: доля affected active users, revenue/strategic cohort impact, support ticket volume, crash/hang delta on old OS, engineering hours saved, QA matrix reduction и roadmap value unlocked. Если threshold не назван, команда не сможет честно повторить или оспорить решение через квартал.
+
+1. **Почему deployment target нельзя повышать только ради нового API?**
+   **Ответ:** новый API даёт engineering benefit, но deployment target меняет support contract. Нужно сравнить user reach loss, QA/support impact, product roadmap, security benefits и long-term maintenance cost.
+
+2. **Какие данные доказывают, что target можно повысить?**
+   **Ответ:** active usage/revenue by OS/device, critical flow usage, support tickets, crash/performance data, QA cost, compatibility debt inventory, dependency constraints и product approval. Публичной OS adoption статистики недостаточно.
+
+3. **Что значит “старый fallback можно удалить”?**
+   **Ответ:** minimum target больше не требует branch, tests подтверждают новый path, no supported users depend on old behavior, docs/previews/screenshots обновлены, migration risks закрыты и owner подтвердил removal.
+
+4. **Почему deployment target decision нужно делать до release branch cut?**
+   **Ответ:** это влияет на App Store availability, QA matrix, CI, support notes, release notes и user communication. Позднее решение создаёт риск непроверенной matrix и некорректного support messaging.
+
+5. **Как калибровать спор между product reach и engineering leverage?**
+   **Ответ:** использовать rubric: affected active users, revenue/strategic cohorts, engineering hours saved, risk removed, feature roadmap unlocked, QA cost reduction, security/privacy benefit and support cost. Decision должен быть explicit, а не эмоциональный.
+
+Calibration rubric:
+- **Raise now:** affected cohort мал или low-value, compatibility cost high, new baseline unlocks strategic/security value, support plan ready.
+- **Prepare:** cohort ещё значим, но cost растёт; назначены deprecation communication, data collection и removal milestone.
+- **Defer:** affected cohort large/strategic или support/QA/product not ready; compatibility debt получает explicit budget.
+- **Reject:** proposal driven only by convenience, без product/security/release evidence.
+
+#### Чеклист готовности решения
+Deployment target change не готов, пока:
+- **Evidence:** есть product-specific OS/device/user impact data.
+- **ADR/RFC:** decision, rationale, alternatives и approval owners зафиксированы.
+- **QA matrix:** CI/manual/smoke matrix покрывает oldest supported OS, newest OS, oldest supported device class, low-memory/low-storage cohorts where relevant, installability, archive, TestFlight и App Store validation.
+- **Code cleanup:** dead availability branches and workarounds имеют removal tasks.
+- **Dependencies:** package/vendor/toolchain minimums проверены.
+- **Persistence:** migrations и local data behavior безопасны для users, обновляющихся с очень старых app versions.
+- **Support:** release notes, support FAQ и user messaging готовы.
+- **Release:** App Store availability, TestFlight, build settings и deployment target в app/extensions/widgets/App Clips/test hosts/packages согласованы.
+- **Monitoring:** rollout metrics покажут unexpected drop-offs, support spikes или crash regressions.
+
+#### Case study с эталонным разбором
+**Сценарий:** команда хочет поднять deployment target с iOS N до iOS N+1, чтобы удалить legacy UI fallback и использовать новый navigation API.
+
+**Эталонный разбор:** Staff engineer не начинает с PR, меняющего project setting. Сначала собирается OS/device usage по active users, revenue cohorts и critical flows. Затем составляется inventory fallback code: какие screens используют legacy path, какие tests его покрывают, какие bugs он создаёт. Product и support оценивают affected users и messaging. QA обновляет matrix. Если decision принят, создаётся ADR, release branch получает target change отдельным reviewable PR без смешивания с широким feature refactor, compatibility branches удаляются отдельными PR, CI/build settings синхронизируются, release notes описывают minimum OS change и последнюю совместимую app version, а rollout monitors отслеживают adoption, crash rate и support tickets.
+
 ### 1.8. Обратная совместимость и обработка deprecation
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 1.9. Скрытая стоимость поддержки старых версий iOS
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 1.10. Стратегия освоения платформы уровня Staff
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ## 2. App lifecycle и поведение процесса
 ### 2.1. Холодный запуск
@@ -1497,44 +1632,44 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 2.2. Тёплый запуск
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 2.3. Активация foreground
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 2.4. Переход в background
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 2.5. Приостановка и завершение
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 2.6. Жизненный цикл scene
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 2.7. Поведение multi-window
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 2.8. Восстановление состояния
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -1554,21 +1689,21 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 2.11. Под капотом: main run loop и путь запуска приложения
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 2.12. Чеклист production-ready запуска
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 
 ## 3. Системные интеграции
 ### 3.1. Push-уведомления
@@ -1576,43 +1711,43 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.2. Ограничения silent push
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.3. Deep links
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.4. Universal Links
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.5. Widgets
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.6. App Intents
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.7. Live Activities
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.8. Background tasks
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -1625,26 +1760,26 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.10. Siri / Shortcuts
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.11. App Groups
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 3.12. Управление интеграциями уровня Staff
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ---
 
@@ -1656,27 +1791,27 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 4.2. Семантика ссылок
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 4.3. Идентичность и равенство
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 4.4. Контроль изменяемости
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 4.5. Контроль доступа и дизайн поверхности API
 #### Контракт и ownership данных
@@ -1690,13 +1825,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 4.7. Optionals за пределами основ
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 4.8. Сопоставление с образцом
 #### Модель угроз и защищаемые assets
 #### Механизмы платформы и entitlement surface
@@ -1709,19 +1844,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 4.10. Деинициализация и lifetime
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 4.11. Языковые возможности, которые выглядят простыми, но формируют архитектуру
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 5. Memory model Swift
@@ -1730,54 +1865,54 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.2. Value witness tables
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.3. Операции copy / destroy / move
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 5.4. Внутренности copy-on-write
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.5. `isKnownUniquelyReferenced`
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.6. Скрытые копии в hot paths
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 5.7. Подводные камни больших value types
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.8. Structs, которые не должны быть слишком большими
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 5.9. ARC retain/release traffic
 #### Operational goal и ownership
 #### Build, signing и environment constraints
@@ -1790,7 +1925,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.11. Crash-семантика `unowned`
 #### Operational goal и ownership
@@ -1804,14 +1939,14 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 5.13. Чеклист ревью владения памятью
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 6. Protocols, existentials и generics
@@ -1820,21 +1955,21 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.2. Protocols как архитектурные границы
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.3. Чрезмерное использование protocols и декоративные абстракции
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.4. Associated types
 #### Scope и граница test target
@@ -1848,80 +1983,80 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.6. Existential containers под капотом
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.7. Inline existential buffer
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.8. Witness tables
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 6.9. Opaque types: `some Protocol`
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.10. Generic constraints
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.11. Generic specialization
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.12. Conditional conformances
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 6.13. Type erasure
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 6.14. Phantom types
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 6.15. Полиморфизм compile-time vs runtime
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 6.16. Дизайн API с generics на уровне Staff
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 7. Dispatch, metadata и dynamic behavior
@@ -1930,70 +2065,70 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.2. Динамическая диспетчеризация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.3. Диспетчеризация через witness table
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.4. Диспетчеризация сообщений Objective-C
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.5. `final` и девиртуализация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.6. `@objc`, `dynamic`, KVO и стоимость bridging
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.7. Runtime metadata
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 7.8. Ограничения reflection
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 7.9. Стабильность ABI
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 7.10. Стабильность модулей
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 7.11. Режим library evolution
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 8. Продвинутые инструменты языка Swift
 ### 8.1. Property wrappers
@@ -2001,63 +2136,63 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.2. Result builders
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.3. Macros
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.4. Key paths
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.5. Dynamic member lookup
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.6. Пользовательские операторы и почему большинства из них стоит избегать
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.7. Внутренности Codable и кастомизация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 8.8. Аннотации Sendability на уровне языка
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 8.9. Поведение языка в Debug vs Release
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 8.10. Когда языковая изобретательность вредит maintainability
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ---
@@ -2112,7 +2247,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 9.8. Почему `await` не означает background thread
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -2134,7 +2269,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 10.3. Распространение cancellation
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -2175,13 +2310,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 10.9. Чеклист ownership для production tasks
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 11. Actors и executors
@@ -2190,21 +2325,21 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 11.2. Reentrancy actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 11.3. Инварианты actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 11.4. Nonisolated APIs
 #### Контракт и ownership данных
@@ -2218,14 +2353,14 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 11.6. Переходы между actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 11.7. Default executor
 #### Execution model и isolation boundary
@@ -2246,14 +2381,14 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 11.10. Антипаттерны actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 12. Sendable и готовность к Swift 6
@@ -2262,14 +2397,14 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 12.2. `@unchecked Sendable`
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 12.3. Предотвращение data races
 #### Execution model и isolation boundary
@@ -2283,7 +2418,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 12.5. Общее mutable state
 #### Rendering и lifecycle model
@@ -2304,7 +2439,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 12.8. План миграции concurrency уровня Staff
 #### Execution model и isolation boundary
@@ -2362,13 +2497,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 13.8. Счётчики поколений
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 13.9. Тестирование cancellation
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -2390,13 +2525,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 14.3. Backpressure
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 14.4. Мосты к delegate APIs
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -2409,7 +2544,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 14.6. Отмена streams
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -2423,7 +2558,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 14.8. Тестирование streams
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -2442,26 +2577,26 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 15.2. View values vs render tree
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 15.3. Инвалидация body
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 15.4. Структурная identity
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 15.5. Явная identity
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -2474,13 +2609,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 15.7. Ментальная модель diffing
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 15.8. Почему view structs дешёвые, а работа в body — нет
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2493,7 +2628,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 16. Ownership состояния в SwiftUI
@@ -2509,37 +2644,37 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.3. `@Observable`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.4. `@Bindable`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.5. `@Environment`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.6. `@EnvironmentObject`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.7. Legacy `ObservableObject`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.8. State на неверном уровне
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2559,13 +2694,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 16.11. Ревью state ownership уровня Staff
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 17. Layout и rendering internals в SwiftUI
@@ -2588,13 +2723,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 17.4. Preference keys
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 17.5. Ловушки измерения в ScrollView
 #### Rendering и lifecycle model
@@ -2608,7 +2743,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 17.7. Анимационные transactions
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2621,7 +2756,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 17.9. Core Animation bridge
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2634,7 +2769,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 18. SwiftUI performance
 ### 18.1. Форматирование в `body`
@@ -2656,7 +2791,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 18.4. `AnyView` и стоимость type erasure
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2669,19 +2804,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 18.6. Большие observable objects
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 18.7. Lazy containers
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 18.8. Подвисания при navigation transitions
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2694,7 +2829,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 19. UIKit и legacy interoperability
 ### 19.1. Жизненный цикл view controller
@@ -2709,7 +2844,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 19.3. Hit testing
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -2729,7 +2864,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 19.6. Layout pass
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2742,7 +2877,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 19.8. Core Animation transactions
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2755,7 +2890,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 19.10. `UIViewRepresentable`
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2775,7 +2910,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ---
@@ -2802,19 +2937,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 20.4. Стоимость изменений
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 20.5. Локальный оптимум vs глобальный оптимум
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 20.6. Архитектура как управление рисками
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -2878,38 +3013,38 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 21.8. Runtime coupling
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 21.9. Data coupling
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 21.10. Temporal coupling
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 21.11. Semantic coupling
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 21.12. Организационное coupling
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 22. Ownership состояния и side effects
 ### 22.1. Источник истины
@@ -2917,7 +3052,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 22.2. Derived state
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -2965,7 +3100,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 22.9. Navigation side effects
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3008,7 +3143,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 23.3. Architecture fitness functions
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3021,26 +3156,26 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 23.5. Путь миграции
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 23.6. Правила sunset
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 23.7. Governance без бюрократии
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ---
 
@@ -3080,13 +3215,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 24.6. Ownership navigation
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 24.7. Тестирование ViewModels
 #### Rendering и lifecycle model
@@ -3100,7 +3235,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 25. SwiftUI Native State / MV
@@ -3123,7 +3258,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 25.4. Local state vs domain state
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3166,13 +3301,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 26.5. Разделение lifecycle приложения и session
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 26.6. Антипаттерн side effect в Coordinator
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3187,7 +3322,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 27.2. Domain-слой
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3207,7 +3342,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 27.5. Boundary-контракты
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3229,19 +3364,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 28.2. Каркас приложения
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 28.3. Правила Shared/Core
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 28.4. Направление dependencies
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3254,21 +3389,21 @@ Platform release/adoption work не готово, пока:
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 28.6. Стратегия выделения модулей
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 28.7. Последствия для build time
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 29. Hexagonal / Ports & Adapters
 ### 29.1. Ports
@@ -3276,19 +3411,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 29.2. Driving adapters
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 29.3. Driven adapters
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 29.4. Чистота domain
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3308,7 +3443,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 30. Redux / Elm / UDF
@@ -3324,31 +3459,31 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 30.3. Mutations
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 30.4. Reducers
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 30.5. Effects
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 30.6. Store scope
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 30.7. Traceable feature state
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3377,7 +3512,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 31.4. Effects и cancellation
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -3413,7 +3548,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 32.2. Action / Mutation / State
 #### Rendering и lifecycle model
@@ -3427,13 +3562,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 32.4. `reduce`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 32.5. Rx vs async/await варианты
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -3446,7 +3581,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 33. MVC migration architecture
@@ -3462,7 +3597,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 33.3. Риски Massive ViewController
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3475,7 +3610,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 33.5. Когда MVC допустим
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -3497,21 +3632,21 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 34.3. Адаптация passive view для SwiftUI
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 34.4. Как избегать декоративных view protocols
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 35. VIP / Clean Swift
@@ -3527,26 +3662,26 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 35.3. Presenter
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 35.4. Router
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 35.5. Worker
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 35.6. Роли Request / Response / ViewModel
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3559,7 +3694,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 36. VIPER
 ### 36.1. View
@@ -3574,38 +3709,38 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 36.3. Presenter
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 36.4. Entity
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 36.5. Router
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 36.6. Builder
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 36.7. VIPER в SwiftUI
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 36.8. Антипаттерн с перегруженным Presenter
 #### Модель угроз и защищаемые assets
@@ -3621,26 +3756,26 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 37.2. Interactor
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 37.3. Builder
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 37.4. Component
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 37.5. Lifecycle attach/detach
 #### Модель угроз и защищаемые assets
 #### Механизмы платформы и entitlement surface
@@ -3660,7 +3795,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ---
@@ -3680,25 +3815,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 38.3. Структура Xcode-проекта
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 38.4. Управление build time
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 38.5. Командный ownership
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 38.6. Контроль public API
 #### Контракт и ownership данных
@@ -3712,8 +3847,8 @@ Platform release/adoption work не готово, пока:
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ## 39. Dependency management
 ### 39.1. SwiftPM
@@ -3721,7 +3856,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 39.2. Binary dependencies
 #### Scope и граница test target
@@ -3735,13 +3870,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 39.4. Политика обновлений
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 39.5. Security-ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3770,13 +3905,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 40.3. Theming
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 40.4. Accessibility по умолчанию
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -3789,14 +3924,14 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 40.6. Governance design system
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ---
 
@@ -3808,25 +3943,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 41.2. Моделирование requests
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 41.3. Валидация responses
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 41.4. Decoding
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 41.5. Cancellation
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -3839,13 +3974,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 41.7. Retries
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 42. URLSession под капотом
 ### 42.1. DNS
@@ -3853,13 +3988,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 42.2. TCP/TLS
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 42.3. HTTP/2 multiplexing
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -3872,7 +4007,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 42.5. URL cache
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -3885,13 +4020,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 42.7. Семантика timeout
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 42.8. Дорогие и сети с ограничениями
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -3927,25 +4062,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 43.5. Idempotency
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 43.6. Частичный успех
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 43.7. Versioning
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 43.8. Backward-compatible mobile APIs
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -3960,7 +4095,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 44.2. Хранение token
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -3980,25 +4115,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 44.5. Logout
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 44.6. Восстановление session
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 44.7. Поддержка нескольких аккаунтов
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 45. Network resilience
 ### 45.1. Поведение offline
@@ -4020,7 +4155,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 45.4. Circuit breakers
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -4033,13 +4168,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 45.6. Пользовательская обратная связь
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -4051,7 +4186,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 46.2. Keychain
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4064,13 +4199,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 46.4. SQLite
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 46.5. Core Data
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4083,14 +4218,14 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 46.7. App Groups
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 47. Глубокий разбор SwiftData / Core Data
 ### 47.1. Object graph
@@ -4098,32 +4233,32 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 47.2. Identity
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 47.3. Faulting
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 47.4. Ownership context
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 47.5. Отслеживание изменений
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 47.6. Concurrency context
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -4143,20 +4278,20 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 47.9. Производительность запросов
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 47.10. Индексация и ограничения fetch
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 48. Offline-first и sync
 ### 48.1. Локальный source of truth
@@ -4164,43 +4299,43 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.2. Ожидающие mutations
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.3. Ключи idempotency
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.4. Разрешение конфликтов
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.5. Tombstones
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.6. Local IDs vs server IDs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.7. Риски last-write-wins
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.8. Обзор CRDT
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -4213,13 +4348,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 48.10. Наблюдаемость sync
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 49. Data safety
@@ -4235,25 +4370,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 49.3. Разрушающие миграции
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 49.4. Поведение backup
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 49.5. Удаление данных
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 49.6. Требования в стиле GDPR/CCPA
 #### Модель угроз и защищаемые assets
 #### Механизмы платформы и entitlement surface
@@ -4286,19 +4421,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 50.4. App Groups
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 50.5. Secure Enclave
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 50.6. Biometrics
 #### Operational goal и ownership
 #### Build, signing и environment constraints
@@ -4320,7 +4455,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 51.3. Сетевой атакующий
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4340,13 +4475,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 51.6. Границы доверия к server
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 52. Secure coding
 ### 52.1. Lifecycle секретов
@@ -4368,31 +4503,31 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 52.4. TLS и ATS
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 52.5. Tradeoff-ы certificate pinning
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 52.6. Валидация ввода
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 52.7. Ограничения reverse engineering
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 53. Privacy engineering
 ### 53.1. Минимизация данных
@@ -4400,7 +4535,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 53.2. Permission prompts
 #### Модель угроз и защищаемые assets
 #### Механизмы платформы и entitlement surface
@@ -4447,13 +4582,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 54.2. Frame budgets
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 54.3. Бюджет main thread
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -4466,13 +4601,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 54.5. Предотвращение regressions
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 55. Launch performance
 ### 55.1. Холодный запуск
@@ -4481,7 +4616,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 55.2. Работа на main thread во время запуска
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -4501,20 +4636,20 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 55.5. Метрики запуска
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 55.6. dyld и загрузка библиотек
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 56. CPU profiling
 ### 56.1. Time Profiler
@@ -4523,37 +4658,37 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 56.2. Self weight vs total weight
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 56.3. Интерпретация stack trace
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 56.4. Symbolication
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 56.5. Алгоритмическая сложность в UI
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 56.6. Сортировка/фильтрация в hot paths
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 57. Memory performance
 ### 57.1. Рост heap
@@ -4561,13 +4696,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 57.2. Retain cycles
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 57.3. Дизайн cache
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4581,26 +4716,26 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 57.5. Data blobs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 57.6. Memory pressure
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 57.7. Jetsam
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 58. Image pipeline performance
 ### 58.1. Compressed vs decoded image
@@ -4608,19 +4743,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 58.2. Downsampling
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 58.3. Decompression
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 58.4. Стоимость cache
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4641,7 +4776,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 
 ## 59. Rendering и scrolling performance
 ### 59.1. Дерево слоёв Core Animation
@@ -4656,32 +4791,32 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 59.3. Offscreen rendering
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 59.4. Blending
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 59.5. Shadows and masks
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 59.6. Подвисания scrolling
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 59.7. Backpressure пагинации
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4704,25 +4839,25 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 60.3. Allocations
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 60.4. Leaks
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 60.5. Hangs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 60.6. Network-инструменты
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -4735,13 +4870,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 60.8. MetricKit
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -4753,13 +4888,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 61.2. Labels, hints, traits
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 61.3. Dynamic Type
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -4772,25 +4907,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 61.5. Tap targets
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 61.6. Reduce Motion
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 61.7. Contrast
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 61.8. Тестирование accessibility
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -4812,37 +4947,37 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 62.2. Plurals
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 62.3. Даты и числа
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 62.4. RTL
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 62.5. String interpolation
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 62.6. Pseudolocalization
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 62.7. QA локализации
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -4856,7 +4991,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 
 ---
 
@@ -4919,7 +5054,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 64.3. Async-тесты
 #### Контракт и ownership данных
@@ -4947,13 +5082,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 64.7. Диагностика flakiness
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 65. Architecture testing
 ### 65.1. Тесты ViewModel
@@ -4975,7 +5110,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 65.4. Тесты presenter
 #### Scope и граница test target
@@ -5047,13 +5182,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 66.6. Result bundles
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -5065,25 +5200,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 67.2. Schemes
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 67.3. Configurations
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 67.4. DerivedData
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 67.5. Module cache
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -5096,13 +5231,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 67.7. Анализ build logs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 68. Swift compiler и binary behavior
 ### 68.1. Производительность type-checker
@@ -5111,45 +5246,45 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 68.2. Взрывы compile time из-за result builders
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 68.3. Generic constraints и compile time
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 68.4. Dead stripping
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 68.5. Видимость символов
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 68.6. Размер binary
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 68.7. Производительность Debug vs Release
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 
 ## 69. CI pipelines
 ### 69.1. GitHub Actions / Bitrise / Xcode Cloud
@@ -5157,13 +5292,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 69.2. Статические gates
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 69.3. Линии unit-тестов
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -5183,13 +5318,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 69.6. Триаж failures
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 69.7. Стратегия cache
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -5204,26 +5339,26 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 70.2. Provisioning profiles
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 70.3. Entitlements
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 70.4. App Groups
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 70.5. Подпись в CI
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -5245,7 +5380,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 71.2. TestFlight
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -5286,7 +5421,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -5298,37 +5433,37 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 72.2. Redaction
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 72.3. Log levels
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 72.4. Структурированные logs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 72.5. Correlation IDs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 72.6. Supportability
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 73. Analytics
@@ -5337,7 +5472,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 73.2. Privacy-safe analytics
 #### Модель угроз и защищаемые assets
 #### Механизмы платформы и entitlement surface
@@ -5357,13 +5492,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 73.5. Эксперименты
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 74. Crash reporting
 ### 74.1. Символикация crash reports
@@ -5378,7 +5513,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 74.3. Триаж crash reports
 #### Operational goal и ownership
 #### Build, signing и environment constraints
@@ -5391,13 +5526,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 74.5. Обнаружение regressions
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 75. Runtime monitoring и incidents
 ### 75.1. MetricKit
@@ -5405,14 +5540,14 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 75.2. Дашборды производительности
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 75.3. Network-метрики
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -5432,13 +5567,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 75.6. Postmortems
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -5450,39 +5585,39 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 76.2. Выявление рисков
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 76.3. Техническое планирование
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 76.4. Коммуникация
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 76.5. Оценка
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 76.6. Контроль scope
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 77. Навыки Tech Lead
 ### 77.1. Декомпозиция работы
@@ -5490,13 +5625,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 77.2. Делегирование
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 77.3. Качество ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -5509,19 +5644,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 77.5. Cross-functional работа
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 77.6. Delivery без heroics
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 78. Навыки Staff engineer
 ### 78.1. Влияние без формальной authority
@@ -5529,47 +5664,47 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 78.2. Техническая стратегия
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 78.3. Engineering leverage
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 78.4. Standards и governance
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 78.5. RFC и ADR
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 78.6. Долгосрочная maintainability
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 78.7. Когда нужно сказать нет
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 79. Technical debt и strategy
 ### 79.1. Осознанный debt
@@ -5577,7 +5712,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 79.2. Случайный debt
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -5590,7 +5725,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 79.4. Эрозия архитектуры
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -5603,14 +5738,14 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 79.6. Стратегия погашения debt
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ---
 
@@ -5622,7 +5757,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 80.2. Архитектура
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -5643,7 +5778,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 80.5. Accessibility
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -5672,26 +5807,26 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 81.2. Что не документировать
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 81.3. Комментарии об ownership
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 81.4. Комментарии о side effects
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 81.5. API contracts
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -5704,13 +5839,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 81.7. Устаревание документации
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 82. Project documentation
 ### 82.1. README
@@ -5718,7 +5853,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 82.2. Документация по архитектуре
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -5745,13 +5880,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 82.6. Onboarding-документация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -5763,31 +5898,31 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 83.2. Non-goals
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 83.3. Пограничные случаи
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 83.4. Разрешение неоднозначностей
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 83.5. Product tradeoff-ы
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 84. Feature planning
 ### 84.1. Нарезка scope
@@ -5802,13 +5937,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 84.3. Технические milestones
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 84.4. Rollout flags
 #### Operational goal и ownership
 #### Build, signing и environment constraints
@@ -5821,7 +5956,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 85. Experimentation
 ### 85.1. Feature flags
@@ -5829,7 +5964,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 85.2. A/B-тесты
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -5842,19 +5977,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 85.4. Kill switches
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 85.5. Этичные эксперименты
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -5866,19 +6001,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 86.2. Минимальный repro
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 86.3. Детерминизм
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 86.4. Захват состояния
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -5891,7 +6026,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 87. LLDB
 ### 87.1. Breakpoints
@@ -5899,25 +6034,25 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 87.2. Условные breakpoints
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 87.3. Watchpoints
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 87.4. Вычисление expressions
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 87.5. Инспекция threads
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
@@ -5930,7 +6065,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ## 88. Log-driven debugging
@@ -5939,31 +6074,31 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 88.2. Redacted context
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 88.3. Breadcrumbs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 88.4. Support logs
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 88.5. Debugging без утечки пользовательских данных
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -5975,7 +6110,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 89.2. Реализация MVVM
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -5988,7 +6123,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 89.4. Реализация Clean
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -6008,7 +6143,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 90. Case study auth/session
 ### 90.1. Login
@@ -6016,7 +6151,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 90.2. Хранение token
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -6029,19 +6164,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 90.4. Logout
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 90.5. Восстановление session
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 90.6. Security-ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -6063,13 +6198,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 91.3. Разрешение конфликтов
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 91.4. Retry/backoff
 #### Контракт и ownership данных
 #### Request/response и правила mapping
@@ -6082,7 +6217,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 92. Case study modularization большого приложения
 ### 92.1. Исходный монолит
@@ -6090,7 +6225,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 92.2. Выявление границ
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -6103,20 +6238,20 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 92.4. Производительность сборки
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 92.5. Командный ownership
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 
 ---
@@ -6129,7 +6264,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 93.2. Concurrency
 #### Execution model и isolation boundary
@@ -6143,7 +6278,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 93.4. Архитектура
 #### Ответственности ролей
@@ -6179,7 +6314,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 
 ## 94. Темы Lead / Staff interview
 ### 94.1. System design
@@ -6187,7 +6322,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 94.2. Архитектура ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -6200,8 +6335,8 @@ Platform release/adoption work не готово, пока:
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 94.4. Обработка инцидентов
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -6214,14 +6349,14 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 94.6. Влияние между командами
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 
 ## 95. Банк вопросов
 ### 95.1. Теоретические вопросы
@@ -6229,19 +6364,19 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 95.2. Практические вопросы по коду
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 95.3. Сценарии debugging
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 95.4. Сценарии архитектуры
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -6254,7 +6389,7 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ## 96. Рубрики оценки ответов
 ### 96.1. Ответ Junior
@@ -6262,32 +6397,32 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 96.2. Ответ Middle
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 96.3. Ответ Senior
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 96.4. Ответ Staff
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 96.5. Red flags
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 
 ---
 
@@ -6299,13 +6434,13 @@ Platform release/adoption work не готово, пока:
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 97.2. Чеклист PR
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 97.3. Чеклист релиза
 #### Operational goal и ownership
 #### Build, signing и environment constraints
@@ -6333,7 +6468,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 97.7. Чеклист accessibility
 #### Rendering и lifecycle model
 #### Граница ownership состояния
@@ -6348,14 +6483,14 @@ Platform release/adoption work не готово, пока:
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 98.2. Шаблон RFC
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A prompts
+#### Примеры, упражнения и Q&A с ответами для добавления
 ### 98.3. Шаблон incident report
 #### Scope и граница test target
 #### Deterministic setup и fixture strategy
@@ -6391,15 +6526,15 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 99.2. Термины платформы iOS
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 99.3. Архитектурные термины
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -6428,7 +6563,7 @@ Platform release/adoption work не готово, пока:
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
+#### Production-ловушки и review Q&A с ответами
 #### Примеры и упражнения для добавления
 ### 100.2. Спроектировать offline sync
 #### Контракт и ownership данных
@@ -6443,7 +6578,7 @@ Platform release/adoption work не готово, пока:
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
-#### Interview и incident-review вопросы
+#### Interview/incident-review Q&A с ответами
 ### 100.4. Построить модульную feature
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
@@ -6456,8 +6591,8 @@ Platform release/adoption work не готово, пока:
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
-#### Review questions и calibration rubric
-#### Case studies и упражнения для добавления
+#### Review Q&A с ответами и calibration rubric
+#### Case studies и упражнения с эталонным разбором для добавления
 ### 100.6. Разобрать production-инцидент
 #### Rendering и lifecycle model
 #### Граница ownership состояния
