@@ -497,12 +497,217 @@ Senior-point не в маленькой структуре как таковой
 - [MetricKit](https://developer.apple.com/documentation/metrickit)
 
 ### 1.2. Ограничения памяти, батареи, теплового режима и сети
-#### Contract и ownership данных
+#### Назначение раздела
+Эта секция раскрывает четыре ограничения, которые чаще всего превращают корректный в simulator код в нестабильное production-приложение: **память**, **батарея**, **тепловой режим** и **сеть**. Их нельзя рассматривать как отдельные оптимизации в конце проекта. Они формируют contract фичи с платформой: сколько данных можно держать, когда можно работать, как долго можно ждать network, что делать при partial failure и какие promises UI имеет право давать пользователю.
+
+Ключевая мысль: iOS-приложение не владеет ресурсами безусловно. Оно временно получает memory pages, CPU time, radio access, background opportunities и thermal headroom. Система может в любой момент изменить доступность этих ресурсов, а пользователь всё равно ожидает, что продукт не потеряет данные, не зависнет, не израсходует батарею и честно покажет состояние.
+
+#### Ментальная модель
+Ограничения ресурсов лучше мыслить как **runtime budget**, а не как набор случайных edge cases.
+
+- **Память** ограничивает объём resident/dirty pages, decoded media, object graphs, caches и temporary peaks.
+- **Батарея** ограничивает частоту wakeups, network radio usage, sensor usage, CPU/GPU intensity, background work и logging.
+- **Тепловой режим** ограничивает длительную resource-intensive работу и требует graceful degradation.
+- **Сеть** ограничивает latency expectations, delivery guarantees, freshness, retry strategy, offline behavior и server consistency.
+
+Senior-level design не спрашивает только «помещается ли это в память сейчас?» или «работает ли запрос на Wi‑Fi?». Он спрашивает:
+1. какой worst realistic input;
+2. какой peak footprint во время decoding/mapping/rendering;
+3. какая работа user-visible, а какая speculative;
+4. что можно cancel, defer, batch или downsample;
+5. что должно быть durable до network acknowledgement;
+6. какое degraded поведение показывается пользователю;
+7. какие diagnostics докажут состояние в production.
+
+В `### 1.1. iOS как constrained runtime` была platform-level mental model: система владеет ресурсами и lifecycle. Здесь уровень ниже и практичнее: **feature-level contract under constraints**. Раздел отвечает не только «какие ограничения существуют», а «как конкретная фича должна проектировать данные, work, retries, cache, diagnostics и degradation, если эти ограничения сработают одновременно».
+
+#### Четыре бюджета фичи
+Чтобы не сваливать memory, battery, thermal и network в одну общую «производительность», полезно проверять feature по четырём отдельным бюджетам.
+
+| Бюджет | Что реально ограничено | Типичный failure mode | Production decision rule | Что измерять |
+| --- | --- | --- | --- | --- |
+| Память | resident/dirty pages, decoded buffers, object graphs, temporary peaks | jetsam, hitches из-за decoding, cache pressure | держать bounded state, downsample media, избегать whole-graph retention | peak/resident memory, memory terminations, cache size, decoded image footprint |
+| Батарея / energy | wakeups, radio use, CPU/GPU time, sensor lifetime, disk writes | быстрый battery drain, excessive background activity, throttling доверия пользователя | batch, defer, cancel speculative work, снижать polling и использовать system scheduling | wakeups, background time, upload frequency, sensor duration, energy diagnostics |
+| Тепловой режим | текущая способность устройства продолжать тяжёлую работу | serious/critical thermal state, sustained hangs, FPS drop | load shedding: отключать prefetch, снижать качество обработки, переносить nonessential work | thermal state, dropped frames, hangs, task duration, abandonment |
+| Сеть | reachability, latency, bandwidth, radio tail, server quotas, auth/session lifetime | stale UI, duplicate mutations, timeout storms, conflict/data loss | idempotency, backoff, local intent durability, explicit stale/conflict UI | error taxonomy, latency buckets, retry count, stale duration, conflict rate |
+
+Battery и thermal связаны, но не одинаковы. **Battery** — это стоимость работы во времени: частые timers, polling, мелкие uploads, repeated disk writes, sensor sessions и radio wakeups могут быть вредны даже при нормальной температуре. **Thermal** — это runtime feedback, что устройство уже находится под давлением; реакция должна быть быстрее и жёстче: остановить speculative work, снизить concurrency, отменить prefetch, уменьшить качество обработки там, где это допустимо, и не начинать тяжёлые background jobs.
+
+Staff-level tradeoff обычно выглядит так:
+
+| Цель | Соблазнительная оптимизация | Скрытая цена | Предпочтительное правило |
+| --- | --- | --- | --- |
+| Максимальная свежесть | refresh/poll чаще | battery drain, radio tail, server load | freshness SLA через opportunistic refresh, push, backoff и visible stale state |
+| Быстрый список | aggressive prefetch всех изображений | decoded memory peak, network waste, thermal pressure | bounded prefetch только для likely-visible content, cancellation on scroll-away |
+| Мгновенный save | optimistic UI без durable intent | data loss после kill/offline | сначала persist smallest user intent, затем best-effort delivery |
+| Меньше network latency | retry aggressively | duplicate mutations, battery/server load | retry только safe/idempotent operations с backoff и observability |
+| Богатая диагностика | логировать payload и context | PII/token leakage, compliance risk | redacted structured diagnostics и correlation ids |
+
+#### Контракт и ownership данных
+Feature contract должен явно отвечать, какие данные являются **source of truth**, какие являются derived/cache state, а какие существуют только как transient rendering state.
+
+Практическое правило ownership:
+- **user intent** принадлежит продуктовой feature и должен быть durable до попытки unreliable delivery;
+- **remote response** принадлежит backend contract, но app обязана валидировать mapping и compatibility;
+- **cache** принадлежит performance layer и не должен становиться единственным источником пользовательски значимого состояния;
+- **decoded media** принадлежит UI/runtime budget и должна иметь bounded lifetime;
+- **in-memory model** принадлежит rendering/coordination, но не durability;
+- **background work** принадлежит lifecycle policy и не имеет права быть единственным способом завершить critical state transition.
+
+Если пользователь поставил лайк, отправил форму, сохранил черновик, изменил настройку или начал upload, приложение должно сначала определить smallest durable fact. Обычно это не весь response DTO и не весь экранный state, а минимальная запись вида: intent id, affected entity id, desired value, idempotency key, timestamp, retry metadata и текущий sync status.
+
+Антипаттерн: считать, что локальная optimistic mutation безопасна, потому что network request «почти всегда успешен». Правильный contract: UI может быть optimistic, но underlying user intent должен пережить app suspension, process death, network loss и retry.
+
 #### Request/response и правила mapping
+Network payload нельзя напрямую превращать в unlimited app state. Mapping должен быть местом, где feature защищает memory, battery и correctness.
+
+Production mapping rules:
+- не храни whole DTO graph, если экрану нужны только несколько domain fields;
+- валидируй payload size до expensive decoding, где это возможно;
+- отделяй transport success от domain success: HTTP 200 с конфликтным business state не является полноценным успехом;
+- делай mapping streaming/incremental для больших ответов, если whole-array decoding создаёт peak memory risk;
+- нормализуй identity до попадания данных в UI state;
+- не запускай expensive formatting, image decoding или layout preparation внутри SwiftUI `body`;
+- не смешивай freshness metadata с domain truth: `lastUpdatedAt`, `isStale`, `syncStatus` и server version должны быть явными.
+
+Request contract должен включать cancellation. Screen-owned request отменяется, когда screen disappears или query устарела. Mutation request может быть отменён transport-level, но user intent не должен исчезать, если продукт обещал сохранить действие.
+
+Пример различия:
+- поиск по тексту можно отменить и забыть, если пользователь ввёл новый query;
+- сохранение профиля нельзя просто забыть, если UI уже показал, что изменение принято;
+- image prefetch можно отменить при scroll-away;
+- upload должен иметь durable progress/cleanup policy.
+
 #### Failure, retry, cancellation и idempotency behavior
+Failure taxonomy должна быть частью design, а не catch-all строкой для alert.
+
+Минимальная taxonomy:
+- **transport failure**: offline, timeout, DNS, TLS, connection reset;
+- **server failure**: 5xx, throttling, maintenance;
+- **client contract failure**: invalid request, auth expiry, permission mismatch;
+- **decoding/mapping failure**: backend response не соответствует app contract;
+- **domain conflict**: version conflict, duplicate mutation, stale state;
+- **resource failure**: memory pressure, disk full, background expiration, Low Power Mode constraints.
+
+Retry policy должна быть безопасной:
+- retry read-запросов обычно допустим с backoff и cancellation;
+- retry non-idempotent mutations без idempotency key может создать duplicate side effects;
+- retry в background не должен предполагать точное расписание;
+- retry не должен держать high-priority work бесконечно;
+- retry должен прекращаться, если пользовательский intent отменён или заменён.
+
+Idempotency — это не только backend feature. iOS client должен сохранять client-generated idempotency key рядом с durable intent. Если app killed после отправки request, но до обработки response, следующий launch должен уметь reconcile: проверить server state, повторить безопасно или показать conflict state.
+
+Cancellation не является failure. Это нормальный outcome lifecycle-aware работы. Ошибка senior-level implementation — превращать cancellation в пользовательский error message или retry storm.
+
 #### Offline, cache и persistence-последствия
+Offline support начинается не с красивого empty state, а с ответа на вопрос: **какое состояние пользователь имеет право считать сохранённым?**
+
+Уровни offline-поведения:
+1. **Read-only stale cache**: пользователь может читать старые данные, но UI явно показывает freshness.
+2. **Optimistic local mutation**: пользовательские изменения видны сразу и синхронизируются позже.
+3. **Local-first model**: локальное состояние является primary UX source, а server — sync peer.
+4. **Conflict-aware sync**: app умеет обнаруживать и разрешать server/client divergence.
+
+Cache rules:
+- cache должен быть bounded по memory и disk;
+- cache eviction не должен удалять unsynced user intent;
+- cache key должен учитывать user/account/environment/security scope;
+- image cache должен учитывать decoded footprint, а не только compressed file size;
+- persistence schema должна поддерживать migration и cleanup;
+- stale data должна быть видимой для product logic, а не спрятанной в repository.
+
+Persistence rules:
+- сохраняй critical intent до network delivery;
+- сохраняй checkpoints до long-running background work;
+- не используй UserDefaults как произвольную database для растущих структур;
+- не делай repeated whole-file rewrites для часто меняющегося structured state;
+- учитывай file protection, disk full, app group coordination и migration failure.
+
 #### Security, privacy и logging-ограничения
+Resource constraints не отменяют privacy/security; наоборот, under-pressure paths часто создают утечки.
+
+Недопустимые практики:
+- логировать raw request/response payloads с PII;
+- писать tokens, authorization headers, precise location, contacts, health data или sensitive filenames в logs/crash metadata;
+- хранить token-like значения в plain cache или UserDefaults;
+- использовать общий cache между users/accounts без scope separation;
+- оставлять temporary files после failed upload/import;
+- отправлять analytics events с user-entered text для диагностики failures.
+
+Privacy-safe diagnostics должны отвечать на engineering-вопрос без раскрытия sensitive data. Вместо payload логируются: redacted endpoint category, error class, retry count, idempotency key hash, payload size bucket, network type category, cache hit/miss, thermal state, Low Power Mode flag, duration bucket и correlation id.
+
+Security tradeoff: иногда хочется сохранить больше данных для offline/debug support. Staff-level решение требует data minimization: если данные не нужны для user value, recovery или compliance, они не должны сохраняться «на всякий случай».
+
 #### Test matrix и production diagnostics
+Полноценная проверка этой темы не ограничивается happy-path unit test.
+
+Минимальная test matrix для feature, чувствительной к памяти/батарее/сети:
+- cold launch после pending mutation;
+- app killed между local persistence и server acknowledgement;
+- offline при первом запросе и offline после stale cache;
+- timeout и retry с backoff;
+- duplicate mutation с тем же idempotency key;
+- cancellation при уходе со screen;
+- large response и large image set;
+- memory warning / high memory footprint scenario;
+- Low Power Mode;
+- serious/critical thermal state, если feature запускает heavy work;
+- disk full или persistence write failure;
+- auth expiry во время retry;
+- account switch и cache isolation;
+- background expiration во время sync/upload.
+
+Production diagnostics должны заранее отвечать, как команда увидит проблему после release:
+- memory termination rate by screen/flow;
+- launch time и time-to-interactive;
+- request latency/error taxonomy;
+- retry counts и retry exhaustion;
+- offline duration и stale data exposure;
+- cache hit ratio и eviction rate;
+- background task expiration rate;
+- battery/energy regressions через available system metrics;
+- thermal-state correlation с hangs/dropped frames;
+- redacted support logs с correlation ids.
+
+#### Типичные ошибки
+- Считать network success частью UI correctness без durable local intent.
+- Хранить весь response DTO вместо минимального domain/view state.
+- Декодировать большие изображения в размере source asset, а не display target.
+- Делать retry любой ошибки без idempotency и backoff.
+- Прятать stale state внутри repository и показывать UI как будто данные свежие.
+- Делать cache unbounded, потому что «iOS сама освободит память».
+- Писать detailed diagnostics в logs с PII.
+- Использовать background refresh как contractual scheduler.
+- Путать cancellation с failure.
+- Не иметь метрик, которые отличают server issue от client resource issue.
+
+#### Senior / Lead / Staff проверочные вопросы
+1. Какой maximum realistic memory footprint у feature на worst input?
+2. Где возникает peak memory: network buffering, decoding, mapping, rendering или image decompression?
+3. Что является smallest durable user intent?
+4. Какие requests можно отменить без product loss, а какие требуют recovery?
+5. Какие mutations idempotent, и где хранится idempotency key?
+6. Что пользователь увидит при stale cache, offline и retry exhaustion?
+7. Какие данные нельзя логировать даже при production incident?
+8. Как cache разделён между accounts/environments/security scopes?
+9. Как feature деградирует в Low Power Mode или serious thermal state?
+10. Какие metrics докажут, что release не ухудшил memory, battery и network behavior?
+
+#### Чеклист production-readiness
+Feature, зависящая от памяти, батареи, теплового режима или сети, не готова к production, пока нет ответов:
+- определён source of truth и durable user intent;
+- request cancellation не ломает product correctness;
+- retry policy безопасна и bounded;
+- mutations используют idempotency там, где возможна duplicate delivery;
+- cache bounded и scoped;
+- large payload/media не создают uncontrolled peak memory;
+- Low Power Mode и thermal state имеют degradation policy;
+- offline/stale/conflict states отражены в UI;
+- logs/analytics/crash metadata redacted;
+- persistence failures имеют recoverable behavior;
+- diagnostics позволяют отличить memory, network, server, auth и mapping failures.
+
 ### 1.3. App sandbox и границы файловой системы
 #### Threat model и защищаемые assets
 #### Platform mechanism и entitlement surface
@@ -747,7 +952,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
 ### 4.5. Контроль доступа и дизайн поверхности API
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -1155,7 +1360,7 @@ Senior-point не в маленькой структуре как таковой
 #### Debugging и instrumentation workflow
 #### Migration и code-review checklist
 ### 9.4. Async let
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -1275,7 +1480,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
 ### 11.4. Nonisolated APIs
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -1412,7 +1617,7 @@ Senior-point не в маленькой структуре как таковой
 #### Debugging и instrumentation workflow
 #### Migration и code-review checklist
 ### 13.5. Отмена network-операций
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -1447,7 +1652,7 @@ Senior-point не в маленькой структуре как таковой
 
 ## 14. AsyncSequence и streams
 ### 14.1. Ментальная модель AsyncSequence
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -1466,7 +1671,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 14.4. Мосты к delegate APIs
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2042,14 +2247,14 @@ Senior-point не в маленькой структуре как таковой
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
 ### 22.10. Network side effects
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
 #### Security, privacy и logging-ограничения
 #### Test matrix и production diagnostics
 ### 22.11. Persistence side effects
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2123,7 +2328,7 @@ Senior-point не в маленькой структуре как таковой
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
 ### 24.2. Явный intent API
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2137,7 +2342,7 @@ Senior-point не в маленькой структуре как таковой
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
 ### 24.4. Lifecycle async tasks
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2365,7 +2570,7 @@ Senior-point не в маленькой структуре как таковой
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
 ### 29.5. DTO/error mapping на границах
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2503,7 +2708,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 32.5. Rx vs async/await варианты
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2769,7 +2974,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
 ### 38.6. Контроль public API
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2929,7 +3134,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 42.3. HTTP/2 multiplexing
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2942,7 +3147,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 42.5. URL cache
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2961,7 +3166,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 42.8. Дорогие и сети с ограничениями
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2970,7 +3175,7 @@ Senior-point не в маленькой структуре как таковой
 
 ## 43. Проектирование API contract
 ### 43.1. DTOs
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -2984,7 +3189,7 @@ Senior-point не в маленькой структуре как таковой
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
 ### 43.3. Pagination
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3015,7 +3220,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 43.8. Backward-compatible mobile APIs
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3030,7 +3235,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 44.2. Хранение token
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3070,14 +3275,14 @@ Senior-point не в маленькой структуре как таковой
 
 ## 45. Network resilience
 ### 45.1. Поведение offline
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
 #### Security, privacy и logging-ограничения
 #### Test matrix и production diagnostics
 ### 45.2. Retryable vs non-retryable failures
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3121,7 +3326,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 46.2. Keychain
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3140,7 +3345,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 46.5. Core Data
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3343,7 +3548,7 @@ Senior-point не в маленькой структуре как таковой
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 50.2. Keychain
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3390,7 +3595,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 51.3. Сетевой атакующий
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3425,7 +3630,7 @@ Senior-point не в маленькой структуре как таковой
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
 ### 52.2. Хранение token
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3637,7 +3842,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 57.3. Дизайн cache
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3690,7 +3895,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 58.4. Стоимость cache
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3751,7 +3956,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры before/after validation
 #### Interview и incident-review вопросы
 ### 59.7. Backpressure пагинации
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3792,7 +3997,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 60.6. Network-инструменты
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -3990,7 +4195,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
 ### 64.3. Async-тесты
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -4067,7 +4272,7 @@ Senior-point не в маленькой структуре как таковой
 #### CI, artifacts и triage workflow
 #### Примеры тестов и упражнения для добавления
 ### 65.7. Тесты persistence
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -4153,7 +4358,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 67.5. Module cache
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -4259,7 +4464,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 69.7. Стратегия cache
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -4482,7 +4687,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры before/after validation
 #### Interview и incident-review вопросы
 ### 75.3. Network-метрики
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -4761,7 +4966,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 81.5. API contracts
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -5086,7 +5291,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 90.2. Хранение token
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -5139,7 +5344,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
 ### 91.4. Retry/backoff
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -5221,14 +5426,14 @@ Senior-point не в маленькой структуре как таковой
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
 ### 93.5. Networking
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
 #### Security, privacy и logging-ограничения
 #### Test matrix и production diagnostics
 ### 93.6. Persistence
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -5476,7 +5681,7 @@ Senior-point не в маленькой структуре как таковой
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
 ### 99.4. Термины networking
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
@@ -5499,7 +5704,7 @@ Senior-point не в маленькой структуре как таковой
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
 ### 100.2. Спроектировать offline sync
-#### Contract и ownership данных
+#### Контракт и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
