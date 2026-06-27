@@ -100,12 +100,402 @@ Use this outline as a granular content backlog, not only as a table of contents.
 
 ## 1. Apple ecosystem and platform constraints
 ### 1.1. iOS as a constrained runtime
+#### Content plan for this topic
+This topic establishes the platform mental model that should influence every later chapter. It is not a generic introduction to iOS. It is the baseline for senior-level engineering judgment: an iOS app runs in an environment where the system, not the app, owns final authority over memory, scheduling, background time, energy, thermal pressure, privacy boundaries, process lifetime, and user attention.
+
+Cover this topic in the following order:
+1. define what "constrained runtime" means on iOS;
+2. map the constraints to concrete engineering decisions;
+3. explain the lifecycle and process model that makes those constraints real;
+4. describe under-the-hood memory, scheduling, energy, and termination behavior;
+5. turn the model into production rules, examples, and review questions.
+
 #### Definition and mental model
-#### Syntax and API surface
-#### Compiler and runtime mechanics
-#### Edge cases and non-obvious behavior
-#### Production pitfalls and review questions
-#### Examples and exercises to add
+An iOS application is a **guest process** in a user-first, battery-powered, privacy-controlled operating system. The app can request resources; the system decides whether and when those resources remain available. The correct mental model is not "my app runs until it exits". The correct model is: **the system continuously arbitrates foreground priority, background eligibility, memory pressure, CPU scheduling, I/O, network access, thermal pressure, and privacy permission surfaces across all apps and system services**.
+
+The practical consequence is simple: production iOS code must be designed as if interruption is normal. A senior iOS engineer assumes that:
+- launch can happen cold, warm, after jetsam, after a crash, after an update, after permission changes, or after restored scene state;
+- foreground execution is privileged and user-visible, but still constrained by frame deadlines, memory, energy, and thermal pressure;
+- background execution is exceptional, limited, and policy-driven;
+- suspension can happen when the user leaves the app and the app has no approved reason to continue running;
+- termination may happen without a final callback;
+- memory warnings and diagnostics are signals to reduce footprint, not optional notifications;
+- CPU, disk, network, location, Bluetooth, camera, audio, and GPU work all have energy and thermal cost;
+- privacy prompts, entitlements, background modes, and sandboxing are part of runtime design, not release paperwork.
+
+A useful senior-level shorthand is: **iOS rewards apps that are interruptible, resumable, lazy, incremental, cancellable, observable, and honest about background work**. It penalizes apps that assume continuous execution, own global mutable state casually, block launch, decode large assets eagerly, write repeatedly to disk, poll in the background, keep sensors active without clear value, or hide side effects behind innocent-looking UI code.
+
+#### Constraint categories
+The runtime constraints are easier to reason about when grouped by the owner of the decision.
+
+| Constraint | System owner | What the app controls | Common senior failure |
+| --- | --- | --- | --- |
+| Process lifetime | iOS scheduler and memory manager | state restoration, persistence, cancellation, idempotency | assuming `applicationWillTerminate` or `scenePhase` transitions will always arrive before death |
+| Foreground responsiveness | main run loop, display pipeline, UIKit/SwiftUI rendering | main-thread work, view invalidation, task priorities, layout complexity | treating "works on simulator" as proof that UI work is cheap |
+| Memory footprint | kernel, jetsam, memory compressor | allocations, image decoding, caches, data lifetimes, object graphs | measuring object count instead of dirty/resident memory and decoded buffers |
+| Background time | UIKit lifecycle, BackgroundTasks, declared modes | background eligibility, task expiration handling, batching, persistence checkpoints | building product behavior around unreliable or user-hostile background assumptions |
+| Energy and thermal behavior | power management, thermal management | CPU/GPU/network/I/O/sensor intensity, QoS, batching, Low Power Mode adaptation | optimizing latency by increasing wakeups, polling, and write frequency |
+| Privacy and sandboxing | TCC, entitlements, App Sandbox, App Review policy | permission timing, data minimization, local storage, logging, explainability | treating permission grants as permanent or treating logs as harmless |
+| Distribution/runtime policy | App Store, provisioning, OS version, device class | feature gating, availability checks, rollout, observability | testing only one device/iOS version and assuming platform behavior is uniform |
+
+#### Lifecycle states and process states
+Do not collapse app lifecycle, scene lifecycle, and process lifetime into one concept.
+
+At a high level:
+- **Process lifetime** answers whether the app process exists in memory.
+- **Application lifecycle** answers whether the app is launching, active, inactive, backgrounded, suspended, or terminated.
+- **Scene lifecycle** answers whether a particular UI scene is connected, foreground, background, or discarded.
+- **Task lifecycle** answers whether async work is active, suspended, cancelled, expired, or orphaned.
+- **Data lifecycle** answers whether user-visible state is durable enough to survive process loss.
+
+Senior-level mistake: storing critical product state only in memory because a SwiftUI `@State`, `@Observable`, singleton, actor, cache, coordinator, or store "currently has it". In-memory state is a rendering and coordination convenience; it is not durability. If the user would reasonably expect the state to survive relaunch, interruptions, or background eviction, it needs an explicit persistence or restoration policy.
+
+Practical lifecycle rules:
+- Treat foreground activation as an opportunity to reconcile state, not as proof that previous in-memory work completed.
+- Treat background transition as a checkpoint opportunity, not as a long-running work window.
+- Treat suspension as invisible: no code runs while suspended.
+- Treat termination as non-cooperative: final cleanup callbacks are not a durable persistence mechanism.
+- Treat scene disconnection as normal on iPadOS and multi-window-capable apps.
+- Treat force quit as a user intent signal that can affect background behavior.
+- Treat background task expiration handlers as mandatory correctness paths, not best-effort logging hooks.
+
+#### Foreground execution constraints
+Foreground apps get the most opportunity to run, but they are still constrained by user perception and rendering deadlines. A 60 Hz display gives roughly 16.67 ms per frame; 120 Hz devices cut that to roughly 8.33 ms. SwiftUI diffing, layout, image decoding, JSON mapping, persistence fetches, logging, analytics, and network callbacks can all compete with rendering if they land on the main actor at the wrong time.
+
+Important distinction:
+- **MainActor correctness** prevents UI data races.
+- **MainActor performance** requires keeping expensive work off the main actor.
+
+Correct code can still be a bad app if it monopolizes the main actor. Senior review should ask:
+- Does this view compute derived collections during `body` evaluation?
+- Does this screen decode images, parse JSON, format many dates, or perform persistence fetches on the main actor?
+- Does this observation boundary invalidate a large view tree for a small state change?
+- Does this async task resume on the main actor with too much post-processing work?
+- Does the UI show partial progress and cancellation, or does it block on an all-or-nothing operation?
+
+SwiftUI-specific implication: a view body is a description, not a work queue. Any operation that would be suspicious inside `tableView(_:cellForRowAt:)` is also suspicious inside SwiftUI `body`, computed view properties, formatters allocated per row, or broad observable state that causes full-list invalidation.
+
+#### Background execution constraints
+Background execution on iOS is permissioned and purpose-based. The system may move an app to the background when the user leaves it and may later suspend it unless the app is finishing a limited task or using an allowed background capability. The BackgroundTasks framework can schedule refresh or processing work, but it does not grant arbitrary daemon-like execution. Timing is system-controlled, affected by power, usage patterns, device conditions, user settings, and policy.
+
+Design implications:
+- Background refresh is suitable for opportunistic freshness, not contractual deadlines.
+- Long-running background work must have a declared platform reason and an expiration path.
+- Background tasks must be idempotent because they can be retried, skipped, interrupted, or run after partial previous work.
+- Any background task that mutates local state should checkpoint progress in small, recoverable units.
+- UI should communicate freshness and last-success state instead of pretending background refresh always happened.
+- Network sync should be conflict-aware; "last write wins" is often a data-loss bug disguised as simplicity.
+
+Bad product requirement: "sync every 5 minutes in the background". Good requirement: "when the system grants background time, attempt an idempotent sync; preserve local mutations durably; surface stale state; retry with backoff; never block foreground usage on background success".
+
+#### Memory model at app level
+At the app level, memory is not just "how many objects exist". iOS memory pressure is influenced by resident pages, dirty pages, compressed memory, decoded image buffers, mapped files, frameworks, caches, autorelease pools, and retained object graphs. Apple’s memory material distinguishes clean memory that the system can discard or reload from dirty memory that was written by the process and is more expensive to reclaim. WWDC memory guidance also highlights that images often have a much larger decoded footprint than their compressed file size.
+
+Senior-level memory rules:
+- Measure memory footprint with Instruments/Xcode tools, not intuition.
+- Treat decoded images, video frames, large JSON payloads, ML models, PDF pages, and attributed text layouts as first-class memory risks.
+- Use downsampling before creating UI images when the display size is much smaller than the source asset.
+- Prefer bounded caches with eviction and memory-pressure handling over global dictionaries.
+- Avoid retaining whole DTO payloads if the screen only needs mapped domain/view state.
+- Avoid retaining task closures that capture view models, controllers, coordinators, or large graphs longer than intended.
+- Be suspicious of "temporary" arrays in hot paths; temporary peak memory can trigger jetsam even if steady-state memory looks acceptable.
+
+A senior engineer distinguishes:
+- **leak**: memory that should be released but remains strongly referenced;
+- **growth**: memory increases because product state grows without bounds;
+- **peak**: temporary memory spike during decoding/parsing/rendering;
+- **fragmentation/allocator overhead**: memory shape is inefficient even if object lifetimes are correct;
+- **cache pressure**: memory is intentionally retained but not bounded by user value;
+- **dirty memory inflation**: pages become expensive because app code writes to them unnecessarily.
+
+#### CPU, QoS, scheduling, and energy
+CPU work is not free even when it is off the main actor. CPU time consumes battery and can increase thermal pressure. QoS is a scheduling hint, not a magic performance switch. Overusing high-priority queues can starve lower-priority work, increase contention, and waste energy. Underusing priority can delay user-visible work. The senior-level decision is to align QoS with user value.
+
+Practical mapping:
+- user input and immediate visual response: high priority, short work, cancellable;
+- screen data preparation: user-initiated or utility depending on visibility and latency expectations;
+- prefetching: utility, cancellable, bounded;
+- analytics upload: utility/background, batched;
+- cleanup, indexing, compaction: background, deferrable, expiration-aware;
+- speculative work: only if measured value exceeds battery, memory, and complexity cost.
+
+Energy cost often comes from **wakeups and repeated small work**, not only from one expensive algorithm. Timers, polling loops, frequent disk writes, chatty networking, small location updates, repeated Bluetooth scans, and excessive logging can prevent the system from staying idle. Apple’s energy guidance emphasizes reducing and prioritizing work, minimizing background activity, batching I/O, and deferring networking when possible.
+
+#### Thermal constraints
+Thermal pressure is a runtime input. `ProcessInfo.thermalState` exposes states such as nominal, fair, serious, and critical. At elevated thermal states, the app should reduce resource usage: pause nonessential prefetching, lower rendering intensity, reduce camera/video processing quality where product-acceptable, stop speculative indexing, decrease polling, and avoid starting heavy background processing.
+
+Senior-level thermal design is not "show an alert when hot". It is adaptive work shedding:
+- define which work is essential for correctness;
+- define which work is user-visible but degradable;
+- define which work is speculative and should stop first;
+- make work cancellable so thermal adaptation can take effect quickly;
+- record telemetry that correlates thermal state with hangs, dropped frames, battery, and session abandonment.
+
+#### I/O and file-system constraints
+Disk I/O can hurt latency, energy, and data integrity. Small repeated writes are especially costly because they wake storage and can interact badly with app lifecycle transitions. File writes should be batched where safe, atomic where correctness matters, and moved off the main actor. Structured mutable data that grows beyond trivial size usually belongs in SQLite/Core Data/SwiftData or another database layer rather than repeated whole-file rewrites.
+
+Rules:
+- Never do avoidable file I/O on the main actor during launch or scrolling.
+- Use atomic writes for user-critical documents/configuration where partial writes would corrupt state.
+- Persist checkpoints before relying on background work continuation.
+- Avoid writing analytics/log files at high frequency; batch and bound them.
+- Do not invent a cache that fights the OS file cache unless the product has a measured reuse pattern.
+- Keep app group/shared container writes coordinated when extensions/widgets are involved.
+
+#### Network constraints
+Network access is variable, energy-expensive, privacy-sensitive, and often unavailable at the moment product code wants it. Mobile networking has radio wakeup costs, captive portals, Low Data Mode, constrained networks, metered plans, packet loss, server throttling, authentication expiry, and app suspension boundaries.
+
+Senior network behavior:
+- model request cancellation explicitly when screens disappear or tasks become obsolete;
+- make mutations idempotent with client-generated keys where duplicate delivery is possible;
+- avoid tying UI correctness to immediate server acknowledgement when offline support or optimistic UI is required;
+- separate transport errors, decoding errors, domain conflicts, auth failures, and user-safe display messages;
+- retry only when retrying is safe and useful; never blindly retry non-idempotent mutations;
+- batch low-priority network work and respect system/user constraints;
+- preserve local user intent before attempting background sync.
+
+#### Privacy, permission, and sandbox constraints
+The iOS sandbox is a product feature, not an obstacle. Permissions are user-mediated access grants to sensitive capabilities. A production app must assume permissions can be denied, revoked, restricted, unavailable on some devices, or changed while the app is not running.
+
+Senior-level rules:
+- Ask for permission at the point of user-understandable value, not at cold launch by habit.
+- Design denied/restricted states as first-class UI states.
+- Do not log raw PII, tokens, precise location, contacts, health data, clipboard contents, or sensitive file names.
+- Store secrets in Keychain with an explicit accessibility class; do not put token-like values in plain user defaults, logs, crash metadata, or analytics properties.
+- Treat pasteboard, URL schemes, universal links, document imports, push payloads, and app groups as external input boundaries.
+- Minimize data retention because data that is never stored cannot leak, go stale, or require migration.
+
+#### Runtime interruptions and failure modes
+A constrained runtime produces failure modes that do not appear in happy-path simulator testing:
+- app killed between writing local state and acknowledging remote sync;
+- background task expires while a database transaction is open;
+- scene disconnected while a navigation transition is pending;
+- async task resumes after the view disappeared;
+- memory pressure kills the app during image-heavy scrolling;
+- network retry duplicates a mutation;
+- permission is revoked after onboarding;
+- thermal pressure slows processing enough to expose timing assumptions;
+- Low Power Mode makes polling or prefetching unacceptable;
+- process restarts with stale in-memory cache assumptions;
+- crash report shows memory termination rather than Swift exception.
+
+A senior engineer designs state machines around these failures. A junior implementation often adds `if isLoading { return }` and assumes the problem is solved. The senior version defines ownership, cancellation, durability, idempotency, and recovery.
+
+#### Under-the-hood details that change engineering decisions
+Important internal mechanics that should influence design:
+- **Run loop and main actor are bottlenecks**: UI event handling, layout, drawing coordination, and many framework callbacks converge on the main thread/main actor. Moving work off-main is necessary but not sufficient; post-processing on return can still hitch.
+- **Suspension freezes execution**: timers do not keep running just because a Swift object exists. Any design depending on in-process timers during suspension is wrong unless backed by an approved background mechanism.
+- **Jetsam is not a Swift crash**: memory termination may not produce a normal exception path. Investigate memory reports, organizer metrics, and device logs rather than only crash stack traces.
+- **Decoded media dominates memory**: a compressed image file can expand into a large pixel buffer. Display size, scale, color format, and intermediate processing buffers matter.
+- **Clean vs dirty memory matters**: memory-mapped read-only resources are easier for the system to reclaim than app-written heap pages. Runtime modification of framework data, unnecessary mutation, and large writable buffers increase pressure.
+- **QoS propagates imperfectly through abstraction layers**: async/await, operation queues, dispatch queues, URLSession callbacks, actors, and third-party SDKs can obscure priority. Review the end-to-end path.
+- **Background execution is expiration-driven**: every meaningful background operation needs a plan for the expiration handler and partial progress.
+- **OS policy evolves**: behavior can change across iOS versions. Production code should rely on documented guarantees and observable fallback behavior, not folklore from one release.
+
+#### Senior/staff design heuristics
+Use these heuristics when reviewing features:
+1. **Can the app be killed at every `await`?** If not literally, assume the user-visible operation can be interrupted between steps and design persistence/recovery around that.
+2. **What is the smallest durable fact?** Persist user intent and irreversible decisions before large derived state.
+3. **What is the bounded resource?** For every feature, identify whether the real limit is memory, CPU, network, disk, battery, privacy, user attention, server quota, or team comprehension.
+4. **What work can be cancelled?** Work that is no longer user-visible should usually be cancellable unless it is preserving data integrity.
+5. **What work can be deferred?** Anything not needed for the next user-visible state should be lazy, incremental, or scheduled.
+6. **What is the degraded behavior?** Define behavior under offline, denied permission, Low Power Mode, thermal pressure, memory pressure, and stale server state.
+7. **What proves this works in production?** Decide which metrics, logs, diagnostics, and support signals demonstrate health after release.
+
+#### Production checklist
+A feature is not production-ready in a constrained runtime unless these questions have defensible answers:
+- What survives process death?
+- What happens if the app is suspended mid-operation?
+- What is cancelled when the screen disappears?
+- What is persisted before network acknowledgement?
+- What is retried, with what idempotency key, and what backoff?
+- What is the maximum memory footprint for the largest realistic input?
+- What is the main-actor work during launch, navigation, and scrolling?
+- What happens in Low Power Mode or serious/critical thermal state?
+- What happens when permissions are denied, revoked, or restricted?
+- What happens when disk is full or file protection delays access?
+- What is logged, and can any log line leak sensitive data?
+- How will hangs, launch regressions, memory terminations, disk writes, and high energy usage be detected after release?
+
+#### Practical Swift examples
+Example: make screen-owned work cancellable and avoid assuming the task outlives the view.
+
+```swift
+@MainActor
+@Observable
+final class ArticleListModel {
+    private let repository: ArticleRepository
+    private var loadTask: Task<Void, Never>?
+
+    private(set) var articles: [ArticleSummary] = []
+    private(set) var isLoading = false
+    private(set) var userMessage: String?
+
+    init(repository: ArticleRepository) {
+        self.repository = repository
+    }
+
+    func appeared() {
+        loadTask?.cancel()
+        loadTask = Task { [repository] in
+            isLoading = true
+            defer { isLoading = false }
+
+            do {
+                // Fetching is off-main inside the repository; only final UI state is assigned here.
+                let loadedArticles = try await repository.fetchVisibleArticles()
+                try Task.checkCancellation()
+                articles = loadedArticles
+            } catch is CancellationError {
+                // Cancellation is expected when the view disappears or a newer load replaces this one.
+            } catch {
+                userMessage = "Unable to load articles. Check your connection and try again."
+            }
+        }
+    }
+
+    func disappeared() {
+        loadTask?.cancel()
+        loadTask = nil
+    }
+}
+```
+
+Example: persist user intent before attempting a network mutation.
+
+```swift
+struct FavoriteMutation: Codable, Equatable {
+    let idempotencyKey: UUID
+    let articleID: Article.ID
+    let isFavorite: Bool
+    let createdAt: Date
+}
+
+actor FavoriteMutationQueue {
+    private var pending: [FavoriteMutation] = []
+
+    func enqueueFavoriteChange(articleID: Article.ID, isFavorite: Bool) async throws {
+        let mutation = FavoriteMutation(
+            idempotencyKey: UUID(),
+            articleID: articleID,
+            isFavorite: isFavorite,
+            createdAt: Date()
+        )
+
+        // In production this write must be durable before the UI/server path depends on it.
+        pending.removeAll { $0.articleID == articleID }
+        pending.append(mutation)
+        try await persistPendingMutations(pending)
+    }
+
+    private func persistPendingMutations(_ mutations: [FavoriteMutation]) async throws {
+        // Use SwiftData/Core Data/SQLite/file storage appropriate to the product.
+        // The important rule is durability before best-effort server delivery.
+    }
+}
+```
+
+Example: adapt optional work to thermal state.
+
+```swift
+import Foundation
+
+struct OptionalWorkPolicy {
+    func allowsImagePrefetch(thermalState: ProcessInfo.ThermalState, isLowPowerModeEnabled: Bool) -> Bool {
+        guard !isLowPowerModeEnabled else { return false }
+
+        switch thermalState {
+        case .nominal, .fair:
+            return true
+        case .serious, .critical:
+            return false
+        @unknown default:
+            return false
+        }
+    }
+}
+```
+
+Example: avoid repeated expensive work in a SwiftUI hot path.
+
+```swift
+struct ArticleRowViewState: Equatable, Identifiable {
+    let id: Article.ID
+    let title: String
+    let subtitle: String
+    let formattedDate: String
+}
+
+struct ArticleRowView: View {
+    let state: ArticleRowViewState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(state.title)
+                .font(.headline)
+            Text(state.subtitle)
+                .font(.subheadline)
+            Text(state.formattedDate)
+                .font(.caption)
+        }
+    }
+}
+```
+
+The senior point is not the small struct itself. The point is that date formatting, localization decisions, and DTO mapping should be done once at the state-building boundary, not repeatedly during body evaluation for every invalidation.
+
+#### Debugging and verification workflow
+Use a layered workflow:
+1. **Static review**: identify main-actor heavy work, unbounded caches, eager decoding, polling, missing cancellation, non-idempotent retries, and persistence gaps.
+2. **Local measurement**: use Instruments/Xcode memory, time profiler, hangs, energy, and network tools on real devices where possible.
+3. **Lifecycle testing**: test cold launch, background/foreground transitions, task cancellation, permission changes, offline mode, Low Power Mode, and relaunch after termination.
+4. **Stress inputs**: use large images, long lists, slow network, server errors, disk pressure, denied permissions, and interrupted sync.
+5. **Release telemetry**: use MetricKit/Xcode Organizer/App Store diagnostics for launch time, hangs, memory, disk writes, energy, and crashes.
+6. **Regression gates**: add unit or performance tests for deterministic hot paths; keep real-device profiling for behavior that cannot be proven in unit tests.
+
+#### Common anti-patterns
+- Treating the simulator as representative for memory, thermal, radio, camera, and background behavior.
+- Starting network requests in view bodies or broad lifecycle hooks without cancellation ownership.
+- Using global singletons as hidden durability or hidden lifecycle owners.
+- Updating UI only after full success when partial progress would preserve user trust.
+- Assuming background refresh is a scheduler with deadlines.
+- Retrying every error with the same policy.
+- Decoding full-size images for thumbnail UI.
+- Writing a full JSON file on every small state change.
+- Logging raw request/response bodies in production diagnostics.
+- Ignoring Low Power Mode because "the feature is important".
+- Adding a cache without a cost limit, eviction policy, or memory-pressure response.
+- Confusing `@MainActor` safety with performance safety.
+- Building architecture diagrams that omit cancellation, persistence, and background expiration paths.
+
+#### Senior interview and review questions
+Use these questions to separate surface familiarity from production judgment:
+1. Explain why an iOS app cannot assume it will receive a final termination callback.
+2. What is the difference between scene lifecycle, process lifetime, and task lifetime?
+3. How can a feature remain correct if the app is killed between local mutation and server acknowledgement?
+4. Why can a compressed 200 KB image cause multi-megabyte memory pressure?
+5. What should happen to image prefetching in Low Power Mode or serious thermal state?
+6. How do you decide whether retry is safe for a failed network request?
+7. What makes a background task idempotent?
+8. What does a memory termination report tell you that a Swift stack trace may not?
+9. Why is a broad `@Observable` model risky for large SwiftUI lists?
+10. How would you prove that a launch optimization improved real user experience after release?
+11. What should be persisted before starting a long-running sync?
+12. Which constraints are product constraints rather than purely technical constraints?
+
+#### Source anchors for later chapter expansion
+Use these official Apple references when expanding this topic into a full chapter:
+- [Managing your app's life cycle](https://developer.apple.com/documentation/uikit/managing-your-app-s-life-cycle)
+- [Background Tasks](https://developer.apple.com/documentation/backgroundtasks)
+- [Reducing your app's memory use](https://developer.apple.com/documentation/xcode/reducing-your-app-s-memory-use)
+- [Making changes to reduce memory use](https://developer.apple.com/documentation/xcode/making-changes-to-reduce-memory-use)
+- [iOS Memory Deep Dive — WWDC18](https://developer.apple.com/videos/play/wwdc2018/416/)
+- [Improving Battery Life and Performance — WWDC19](https://developer.apple.com/videos/play/wwdc2019/417/)
+- [Energy Efficiency Guide for iOS Apps: Work Less in the Background](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/WorkLessInTheBackground.html)
+- [Energy Efficiency Guide for iOS Apps: Minimize I/O](https://developer.apple.com/library/archive/documentation/Performance/Conceptual/EnergyGuide-iOS/MinimizeIO.html)
+- [ProcessInfo.ThermalState](https://developer.apple.com/documentation/foundation/processinfo/thermalstate-swift.enum)
+- [MetricKit](https://developer.apple.com/documentation/metrickit)
+
 ### 1.2. Memory, battery, thermal, and network constraints
 #### Contract and data ownership
 #### Request/response and mapping rules
