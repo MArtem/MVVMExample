@@ -41,6 +41,9 @@ Entry point for active project documentation, production standards, prompt prese
 ### Reusable Skills
 - `./.codex/skills/`
 
+### Learning / Handbook Plans
+- `./docs/IOS_SENIOR_LEAD_ARCHITECT_STAFF_HANDBOOK_OUTLINE.md`
+
 ### App-Specific Docs
 - `./docs/PACKAGE_USAGE_IN_MVVMEXAMPLE.md`
 Add app-specific docs here after the product shape is known.
