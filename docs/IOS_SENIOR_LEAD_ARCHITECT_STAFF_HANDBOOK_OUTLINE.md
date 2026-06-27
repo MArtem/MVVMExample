@@ -1606,11 +1606,139 @@ Deployment target change не готов, пока:
 **Эталонный разбор:** Staff engineer не начинает с PR, меняющего project setting. Сначала собирается OS/device usage по active users, revenue cohorts и critical flows. Затем составляется inventory fallback code: какие screens используют legacy path, какие tests его покрывают, какие bugs он создаёт. Product и support оценивают affected users и messaging. QA обновляет matrix. Если decision принят, создаётся ADR, release branch получает target change отдельным reviewable PR без смешивания с широким feature refactor, compatibility branches удаляются отдельными PR, CI/build settings синхронизируются, release notes описывают minimum OS change и последнюю совместимую app version, а rollout monitors отслеживают adoption, crash rate и support tickets.
 
 ### 1.8. Обратная совместимость и обработка deprecation
+#### Назначение раздела
+Обратная совместимость — это способность приложения сохранять корректное поведение на поддерживаемых OS versions, devices, data states, server contracts и ранее выпущенных app versions. Deprecation — это сигнал от платформы или dependency owner, что текущий API/behavior больше не является стратегическим path и требует migration planning. Senior engineer не воспринимает deprecation warning как косметический шум, но и не превращает каждое предупреждение в emergency rewrite.
+
+Mental model: compatibility — это **managed divergence**, то есть управляемое расхождение. Пока приложение поддерживает несколько OS versions или app versions, часть поведения неизбежно расходится. Задача команды — сделать это расхождение явным, bounded, tested и removable.
+
 #### Scope и prerequisites
+Перед работой с backward compatibility нужно определить:
+- supported deployment target и фактическую OS/device matrix;
+- API availability boundaries;
+- persisted data versions и migration paths;
+- server API versions и backward-compatible contracts;
+- dependency minimum versions;
+- feature flags / remote config defaults;
+- App Store/TestFlight release lanes;
+- ownership для fallback paths и removal milestones.
+
+Compatibility scope шире, чем `if #available`. Он включает UI behavior, lifecycle assumptions, permission models, file formats, local database schema, push payloads, deep links, widgets/extensions, analytics events, server responses и support scripts.
+
 #### Core theory и mental model
+Есть несколько видов совместимости:
+
+| Вид совместимости | Что защищает | Типичный риск |
+| --- | --- | --- |
+| OS compatibility | app работает на supported iOS versions | API недоступен, behavior отличается, permission state другой |
+| Source compatibility | код компилируется с выбранным SDK/toolchain | deprecation warnings, Swift language changes, stricter diagnostics |
+| Binary/runtime compatibility | signed app запускается и вызывает frameworks корректно | weak linking, missing symbols, runtime availability crash |
+| Data compatibility | app читает старые persisted formats | destructive migration, orphaned data, rollback breakage |
+| Server compatibility | app и backend понимают contracts разных versions | старый app получает response, который не умеет обработать |
+| UX compatibility | user-visible behavior остаётся понятным | разные OS показывают разные flows без explanation |
+| Observability compatibility | metrics/logs остаются сопоставимыми | dashboards ломаются после event/schema rename |
+
+Deprecation — не всегда запрет. Иногда API deprecated, но поддерживается долго. Иногда не-deprecated behavior меняется фактически. Поэтому правильная реакция — triage:
+- **blocker:** API запрещён policy/App Review/security или ломает build/runtime;
+- **must plan:** API deprecated и replacement явно стратегический;
+- **observe:** warning есть, но migration risk выше immediate benefit;
+- **defer with owner:** миграция нужна, но не в текущем release;
+- **reject:** replacement не подходит продукту, documented rationale принят.
+
 #### Подкапотные детали
+Availability в Swift/iOS работает на нескольких уровнях:
+- compile-time SDK знает символы, доступные в текущем SDK;
+- deployment target определяет minimum OS, на которой binary должен запускаться;
+- `@available` и `if #available` защищают calls к API, доступным только на новых OS;
+- weak linking позволяет binary ссылаться на framework symbols, отсутствующие на старой OS, если runtime path защищён;
+- compiler не доказывает, что fallback behavior product-correct;
+- deprecation warning сообщает о recommended migration, но не описывает product impact.
+
+Типичная ошибка: добавить `if #available` вокруг нового API и считать задачу закрытой. На самом деле нужно определить fallback UX, data behavior, tests on old OS, telemetry segmentation, removal plan и owner. Runtime crash может возникнуть не только из-за прямого вызова недоступного API, но и через stored closures, type initialization, static initializers, storyboard/nib references, SwiftUI modifiers, property wrappers или dependency code, который не защищён availability boundary.
+
+Data compatibility подчиняется отдельной логике и требует различать три направления. **Upgrade compatibility** означает, что новая версия безопасно читает старый persisted state. **Downgrade/rollback compatibility** означает, что старый binary способен пережить state, уже изменённый новой версией. **One-way migration** означает, что downgrade не поддерживается; тогда migration должна быть явно gated, versioned, observable и иметь recovery plan. Если release process допускает emergency rollback binary, это нужно проверить до rollout, а не после data migration у пользователей.
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- не распыляй `if #available` по UI без архитектурной границы;
+- каждый fallback path должен иметь owner, tests и removal trigger;
+- deprecation warning triage должен иметь severity, target release и rationale;
+- migration PR не должен смешивать API replacement с unrelated refactor;
+- ветка для старой OS должна иметь реальную проверку, пока OS supported;
+- server contracts должны быть additive, tolerate old app versions и иметь explicit support/sunset policy;
+- analytics schema changes должны сохранять comparability или иметь migration plan;
+- release notes/support docs должны отражать changed compatibility behavior;
+- dependency upgrade должен проверять minimum OS и transitive SDK requirements.
+
+Ловушки:
+- **availability illusion:** код компилируется, но fallback UX не определён;
+- **testing illusion:** tests run only on newest simulator;
+- **deprecation panic:** команда мигрирует deprecated API без product reason и ломает stable behavior;
+- **permanent workaround:** временный branch переживает несколько лет без owner;
+- **silent server break:** backend начинает отдавать поля/enum cases, старый app падает или показывает invalid state;
+- **rollback trap:** новая local migration делает старый app binary несовместимым;
+- **analytics split-brain:** old/new event names делают release comparison невозможным.
+
+#### Compatibility directions
+Перед migration нужно назвать направление совместимости:
+- **new app ↔ old data:** новая версия читает старые базы, файлы, caches, preferences и pending operations;
+- **old app ↔ new data:** старый binary безопасно переживает данные, записанные новой версией, либо downgrade явно запрещён;
+- **old client ↔ new server:** уже установленные old app versions получают responses, которые умеют обработать;
+- **new client ↔ old server:** staged backend rollout не ломает новый app, который временно общается со старым backend behavior;
+- **old analytics ↔ new analytics:** dashboards и alerts остаются сопоставимыми или имеют documented schema transition.
+
+Для mobile release backward compatibility сервера — это не только additive schema. Backend должен иметь explicit support window для уже установленных app versions, sunset policy для слишком старых клиентов и rollout discipline, при которой old и new binaries сосуществуют во время staged release без forced breakage. Особо опасны removed/renamed fields, unknown enum cases, semantic changes без schema change, stricter validation, date/time format drift и server-side feature flags, меняющие meaning старого response.
+
+Подробная экономика поддержки старых iOS versions и стоимость compatibility debt раскрывается в `1.9`; здесь focus — correctness, ownership границ и безопасная migration semantics.
+
+#### Migration strategy
+Хорошая migration strategy содержит:
+1. **Inventory:** где используется deprecated API или старый behavior.
+2. **Impact classification:** build blocker, runtime risk, product change, performance/security/privacy benefit.
+3. **Boundary:** где будет находиться compatibility layer.
+4. **Fallback:** что видит пользователь на старой OS.
+5. **Tests:** old OS, new OS, data migration, server compatibility, critical flows.
+6. **Rollout:** feature flags, staged release, telemetry, support notes.
+7. **Removal:** trigger для удаления fallback после deployment target raise.
+
+Пример правильной границы: вместо scattered `if #available` в каждом view создать small compatibility adapter или view modifier boundary, если это реально уменьшает duplication и risk. Но не нужно создавать абстракцию ради одного вызова; простое локальное `if #available` допустимо, если fallback obvious, tested и не повторяется.
+
+#### Review Q&A с ответами
+1. **Почему deprecation warning нельзя автоматически считать срочным blocker?**
+   **Ответ:** deprecation означает, что API больше не preferred path, но urgency зависит от policy, replacement maturity, runtime risk, App Review risk и product roadmap. Нужен triage, а не panic rewrite.
+
+2. **Почему `if #available` не доказывает обратную совместимость?**
+   **Ответ:** он защищает только execution path от вызова недоступного API. Он не доказывает fallback UX, data correctness, analytics consistency, tests on old OS или migration safety.
+
+3. **Как понять, что fallback path можно удалить?**
+   **Ответ:** deployment target поднят выше affected OS, telemetry подтверждает отсутствие supported users on old path, tests/docs обновлены, data migrations безопасны, owner подтвердил removal, а release notes/support plan готовы.
+
+4. **Что делает server API backward-compatible для mobile apps?**
+   **Ответ:** additive changes, tolerant parsing, stable required fields, unknown enum handling, version negotiation where needed, explicit old app support window, sunset policy и no forced breaking response for installed old binaries.
+
+5. **Почему API migration нельзя смешивать с большим refactor?**
+   **Ответ:** иначе review не сможет отделить semantic change от mechanical migration, rollback станет сложнее, telemetry attribution ухудшится, а bugs будут казаться platform-related даже если они из refactor.
+
+6. **Как проверять data migration при backward compatibility work?**
+   **Ответ:** использовать fixtures старых versions, проверять upgrade path, launch after migration, rollback assumptions, partial migration failure, disk full и user data preservation. Успешный build не доказывает data compatibility.
+
+#### Чеклист готовности migration/deprecation work
+Compatibility/deprecation work не готово, пока:
+- **Inventory:** все usages deprecated/changed API найдены и classified.
+- **Triage:** severity и target release определены.
+- **Boundary:** availability/fallback code расположен в понятной ownership boundary.
+- **Fallback:** user-visible behavior на старой OS описан и протестирован.
+- **Data:** persisted formats/migrations backward/forward strategy documented.
+- **Server:** старые app versions не ломаются от backend changes; support window, sunset policy и staged rollout documented.
+- **Tests:** covered oldest supported OS, newest OS, migration fixtures and critical flows.
+- **Telemetry:** metrics сегментированы by OS/app version/path.
+- **Removal:** owner и removal trigger для fallback/workaround зафиксированы.
+- **Release:** support notes, known issues и rollout/rollback plan готовы.
+
+#### Практическое упражнение с эталонным разбором
+**Сценарий:** Apple deprecates старый navigation API, а новый API доступен только на iOS N+1. Продукт пока поддерживает iOS N.
+
+**Эталонный разбор:** команда не переписывает весь navigation layer в одном PR. Сначала делается inventory screens и flows, где используется deprecated API. Затем выбирается boundary: например, navigation coordinator или small view adapter, который выбирает new API на iOS N+1 и fallback на iOS N. QA получает matrix для oldest supported OS и newest OS. Telemetry сравнивает navigation failures и support tickets по OS version. ADR фиксирует, что fallback будет удалён после повышения deployment target до iOS N+1. Если migration затрагивает deep links или state restoration, их проверяют отдельно fixtures и manual smoke.
+
 ### 1.9. Скрытая стоимость поддержки старых версий iOS
 #### Scope и prerequisites
 #### Core theory и mental model
