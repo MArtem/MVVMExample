@@ -1144,12 +1144,148 @@ Feature с privacy-гейтом не готова к production, пока:
 - QA matrix включает denial, limited access, revocation, unavailable capability и managed/restricted devices.
 
 ### 1.5. Entitlements и системные возможности
-#### Определение и mental model
+#### Назначение раздела
+Entitlements — это signed contract между приложением, Apple platform services, provisioning profile и runtime policy. Они описывают, какие privileged capabilities приложение имеет право использовать: App Groups, Keychain Sharing, Push Notifications, Associated Domains, iCloud, HealthKit, Background Modes, Apple Pay, Sign in with Apple и другие системные поверхности. В senior-level iOS engineering entitlement нельзя воспринимать как checkbox в Xcode. Это изменение trust boundary, release process, privacy surface, testing matrix и incident risk.
+
+Простая mental model: **permission спрашивает пользователя**, а **entitlement разрешает app binary использовать capability на уровне платформы и signing identity**. Иногда feature требует оба слоя. Например, Camera требует usage description и runtime permission, а Associated Domains требует entitlement и корректный server-side association file, но не системный prompt. Push требует entitlement/provisioning/APNs environment и отдельно user authorization для notifications.
+
+Не каждая системная возможность является entitlement-backed. Camera, Microphone, Photos и Location обычно управляются через Info.plist usage descriptions, runtime authorization и privacy UX; entitlement может вообще не участвовать. Напротив, App Groups, Associated Domains, Keychain Sharing, iCloud containers и APNs environment зависят от signing/provisioning configuration. Senior review должен сначала классифицировать capability: **permission-only**, **entitlement-backed**, **server-configured**, или **multi-layer**.
+
+#### Определение и ментальная модель
+Entitlement включается в signed app binary и проверяется системой при доступе к protected service. Provisioning profile должен разрешать тот же capability для App ID. Если binary, profile, App ID, environment или server-side configuration не согласованы, feature может работать в Debug и ломаться в TestFlight/Release, либо работать на одном target и ломаться в extension.
+
+Staff-level правило: каждый entitlement должен иметь owner и lifecycle. Для него нужны:
+- product rationale: зачем capability нужна пользователю;
+- data flow: какие данные проходят через capability;
+- privacy/security review: какие новые trust boundaries открываются;
+- release verification: как проверить Debug, TestFlight и App Store builds;
+- rollback plan: как отключить feature, если capability misconfigured или создаёт incident;
+- documentation: где описаны required profile, identifiers, domains, containers и server dependencies.
+
+Entitlement не должен появляться «на будущее». Лишний capability увеличивает attack surface, App Review surface, privacy disclosure burden и operational complexity.
+
 #### Синтаксис и API surface
-#### Compiler и runtime-механика
+Технически entitlements обычно живут в `.entitlements` plist и управляются через Xcode Signing & Capabilities, Apple Developer portal, App ID capabilities и provisioning profiles. Но фактический runtime contract шире, чем один файл.
+
+Практическая цепочка:
+1. **App ID / Developer portal:** capability должен быть включён для конкретного bundle identifier.
+2. **Provisioning profile:** profile должен содержать entitlement, разрешённый App ID.
+3. **Target `.entitlements`:** app/extension target должен запрашивать нужное значение.
+4. **Code signing:** signed binary получает entitlement в embedded signature.
+5. **Runtime/API usage:** framework проверяет entitlement и additional configuration.
+6. **Server-side dependency:** Associated Domains, APNs, iCloud, Sign in with Apple и Apple Pay требуют внешнюю configuration consistency.
+
+Распространённые примеры:
+
+| Capability | Entitlement surface | Дополнительная зависимость | Типичная ошибка |
+| --- | --- | --- | --- |
+| App Groups | group identifier | shared container schema/locking | extension читает больше данных, чем нужно |
+| Keychain Sharing | access group | Keychain item accessibility/account policy | token доступен не тому target или переживает logout |
+| Push Notifications | APS environment | APNs auth, notification permission, backend routing | dev/prod environment mismatch |
+| Associated Domains | domains/services | `apple-app-site-association`, HTTPS, paths | Universal Links работают локально, но не после release |
+| iCloud / CloudKit | container identifiers | container setup, schema, account state | production container не совпадает с debug assumptions |
+| Background Modes | mode declarations | lifecycle/expiration handling | app ведёт себя как daemon и теряет data under expiration |
+| HealthKit / Apple Pay | capability + merchant/container config | review policy, user authorization, server contracts | capability есть, но privacy/payment flow не готов |
+
+#### Compiler, signing и runtime-механика
+Compiler обычно не доказывает корректность entitlement configuration. Код может компилироваться, даже если capability отсутствует в profile или production environment настроен неверно. Ошибка проявится на signing, install, launch, API call, server callback или App Review stage.
+
+Runtime failure patterns:
+- API возвращает authorization/availability error;
+- container URL для App Group возвращает nil;
+- Keychain item не виден между targets из-за access group mismatch;
+- Universal Link открывается в Safari вместо app;
+- push token выдаётся для wrong APNs environment;
+- background mode запускается, но work expires без completion;
+- iCloud/CloudKit работает в development container, но не в production;
+- extension и app подписаны разными profiles и не разделяют expected capability.
+
+Senior-level verification должен проверять не только code path, но и signed artifact. Для release-critical capabilities полезны проверки:
+- inspect entitlements у built app/extension;
+- сверить bundle identifiers, App Groups, Keychain access groups и Associated Domains;
+- проверить provisioning profile и configuration environment;
+- выполнить TestFlight-like build verification, а не только Debug run;
+- иметь diagnostic screen/logs, которые показывают redacted capability state без secrets, private URLs, payload bodies, auth headers и private user content.
+
+#### Trust boundaries и ownership
+Entitlement часто создаёт новый trust boundary между app и системой, app и extension, app и backend, app и website, app и Apple service. Ownership должен быть явным.
+
+Примеры ownership:
+- **App Groups:** data owner отвечает за schema, migration, locking, cleanup, privacy scope и account separation.
+- **Associated Domains:** mobile и web/platform teams совместно владеют domain association file, path policy, fallback behavior и incident response.
+- **Push:** backend, mobile и product владеют token lifecycle, user authorization, payload privacy, topic routing и opt-out behavior.
+- **Keychain Sharing:** security owner определяет access groups, accessibility class, logout/revocation и cross-target visibility.
+- **Background Modes:** feature owner доказывает user value, bounded work, expiration handling и observability.
+
+Staff-level anti-pattern — включить capability в app target, потому что одной feature «так проще», без owner для cleanup, migration, privacy manifest, support runbook и release verification.
+
 #### Edge cases и неочевидное поведение
-#### Production-ловушки и review-вопросы
-#### Примеры и упражнения для добавления
+Entitlement-related bugs часто появляются не в happy path, а на границах environment, target и distribution.
+
+Неочевидные cases:
+- Debug profile содержит capability, а Release/TestFlight profile — нет.
+- App target имеет App Group, а widget/share extension — другой group или другой Team ID prefix.
+- Keychain access group изменился после bundle/team migration, и старые tokens стали невидимы.
+- Associated Domains cached системой; исправление server file не всегда мгновенно видно на device.
+- APNs development token отправляется в production endpoint или наоборот.
+- Background mode разрешён, но system policy всё равно ограничивает timing и duration.
+- iCloud account disabled/restricted; entitlement есть, но service unavailable.
+- Managed device/MDM запрещает capability независимо от app configuration.
+- Capability есть в app, но отсутствует в extension, которая фактически выполняет работу.
+- Удаление entitlement из новой версии оставляет local data, Keychain items или server registrations от старого behavior.
+
+Правило: entitlement migration должна иметь backward compatibility plan. Если capability добавляется, меняется или удаляется, нужно описать effect на existing installs, stored data, tokens, server state, support docs и rollback.
+
+#### Security, privacy и compliance последствия
+Entitlements расширяют не только технические возможности, но и обязанности.
+
+Security/privacy checks:
+- capability не должен давать broader data access, чем feature реально использует;
+- shared containers не должны становиться dump ground для private state;
+- push payloads не должны содержать private content, видимый на lock screen или в logs;
+- Associated Domains не должны открывать unsafe deep link routing;
+- Keychain Sharing не должен раскрывать credentials лишним targets;
+- Background Modes не должны использоваться для hidden tracking, polling или user-hostile behavior;
+- iCloud/CloudKit data flow должен иметь retention, deletion и account-state behavior;
+- third-party SDK, требующий capability, должен пройти privacy/security review.
+
+Compliance implication: включённая capability может требовать Info.plist usage description, App Privacy labels, App Review notes, export compliance/payment review или policy-specific UI. Privacy manifest обновляется там, где это реально следует из SDK/API usage, required reason APIs или declared data use. Если capability не отражена в docs/release checklist, команда рискует получить App Review rejection или privacy incident.
+
+#### Production-ловушки и Q&A с ответами
+1. **Почему entitlement нельзя добавлять “на всякий случай”?**
+   **Ответ:** он расширяет attack surface, signing/release complexity, App Review scope и privacy obligations. Неиспользуемый capability создаёт risk без user value и должен удаляться или быть explicitly justified.
+
+2. **Почему feature может работать в Debug, но ломаться в TestFlight?**
+   **Ответ:** Debug и Release/TestFlight могут использовать разные provisioning profiles, APNs environments, iCloud containers, associated domains и signing identities. Нужно проверять signed artifact и production-like configuration.
+
+3. **Как отличить permission bug от entitlement bug?**
+   **Ответ:** permission bug связан с user/system authorization state; entitlement bug — с тем, что signed binary/profile/App ID не имеет права использовать capability. Feature может иметь entitlement, но получить denied permission; или иметь permission UI, но runtime API fail из-за missing entitlement.
+
+4. **Что доказывает корректность App Group setup?**
+   **Ответ:** app и extension подписаны profiles с одним group id, видят один shared container, используют versioned schema, atomic/ coordinated writes, account-scoped data и cleanup при logout/account deletion.
+
+5. **Что должно быть в release checklist для Associated Domains?**
+   **Ответ:** entitlement values, server `apple-app-site-association`, HTTPS validity, path matching, fallback behavior, universal link tests на installed TestFlight build, web/mobile owner и incident rollback path.
+
+6. **Как безопасно удалить capability из существующего app?**
+   **Ответ:** сначала оценить persisted data, server registrations, tokens, user flows и extensions, затем выполнить migration/cleanup, обновить disclosures, отключить backend paths и проверить rollback. Простое удаление entitlement может оставить orphaned data или сломать recovery.
+
+#### Review checklist с ожидаемыми ответами
+Feature с entitlement/system capability не готова к production, пока:
+- **Rationale:** documented user value и owner capability существуют; capability не добавлена speculative.
+- **Signing consistency:** App ID, provisioning profile, `.entitlements`, app target и extension targets согласованы.
+- **Environment consistency:** Debug/TestFlight/App Store paths проверены для APNs, iCloud, Associated Domains и backend dependencies.
+- **Data flow:** sensitive data inventory и privacy/security review покрывают capability.
+- **Runtime states:** unavailable/restricted/misconfigured states имеют diagnostics и user-safe behavior.
+- **Shared state:** App Groups/Keychain Sharing имеют минимальный scope, migration, cleanup и account separation.
+- **Release docs:** privacy manifest, App Store labels, review notes и support docs обновлены там, где применимо.
+- **Incident response:** есть rollback/kill switch/migration plan для misconfiguration или privacy issue.
+
+#### Практическое упражнение с эталонным разбором
+**Задание:** команда хочет добавить App Groups, чтобы widget показывал последние private user documents.
+
+**Эталонный разбор:** безопасный design не кладёт всю database в shared container. Main app создаёт минимальный widget snapshot: document id, redacted title или user-approved display title, timestamp, account scope, schema version и expiration. Запись atomic, с file protection, backup exclusion для regenerable snapshot, bounded retention/expiration, cleanup при logout/account switch и fallback UI, если snapshot недоступен. Widget перед render валидирует schema version, account scope и expiration. Widget не получает access к tokens, full document contents, pending mutations или unrelated cache. Review проверяет App Group id в app и widget targets, signed entitlements, privacy/logging policy, backup behavior, retention policy и migration path.
+
 ### 1.6. Цикл платформенных релизов и эволюция через WWDC
 #### Operational goal и ownership
 #### Build, signing и environment constraints
