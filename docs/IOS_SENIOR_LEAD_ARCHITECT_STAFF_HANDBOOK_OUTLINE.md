@@ -496,35 +496,35 @@ Senior-point не в маленькой структуре как таковой
 - [ProcessInfo.ThermalState](https://developer.apple.com/documentation/foundation/processinfo/thermalstate-swift.enum)
 - [MetricKit](https://developer.apple.com/documentation/metrickit)
 
-### 1.2. Ограничения memory, battery, thermal и network
+### 1.2. Ограничения памяти, батареи, теплового режима и сети
 #### Contract и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
 #### Security, privacy и logging-ограничения
 #### Test matrix и production diagnostics
-### 1.3. App sandbox и границы file-system
+### 1.3. App sandbox и границы файловой системы
 #### Threat model и защищаемые assets
 #### Platform mechanism и entitlement surface
 #### Data lifecycle, retention и deletion behavior
 #### Logging, analytics и crash-reporting ограничения
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
-### 1.4. Privacy gates и модель permissions
+### 1.4. Privacy-гейты и модель разрешений
 #### Threat model и защищаемые assets
 #### Platform mechanism и entitlement surface
 #### Data lifecycle, retention и deletion behavior
 #### Logging, analytics и crash-reporting ограничения
 #### Review checklist и incident response
 #### Примеры и adversarial questions для добавления
-### 1.5. Entitlements и системные capabilities
+### 1.5. Entitlements и системные возможности
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 1.6. Цикл платформенных релизов и эволюция, driven by WWDC
+### 1.6. Цикл платформенных релизов и эволюция через WWDC
 #### Operational goal и ownership
 #### Build, signing и environment constraints
 #### Telemetry, logging и alerting signals
@@ -538,7 +538,7 @@ Senior-point не в маленькой структуре как таковой
 #### Escalation, alignment и communication risks
 #### Review questions и calibration rubric
 #### Case studies и упражнения для добавления
-### 1.8. Backward compatibility и обработка deprecation
+### 1.8. Обратная совместимость и обработка deprecation
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -550,7 +550,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 1.10. Стратегия platform adoption уровня Staff
+### 1.10. Стратегия освоения платформы уровня Staff
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
@@ -559,39 +559,39 @@ Senior-point не в маленькой структуре как таковой
 #### Case studies и упражнения для добавления
 
 ## 2. App lifecycle и поведение процесса
-### 2.1. Cold запуск
+### 2.1. Холодный запуск
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
 #### Interview и incident-review вопросы
-### 2.2. Warm запуск
+### 2.2. Тёплый запуск
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
 #### Interview и incident-review вопросы
-### 2.3. Foreground activation
+### 2.3. Активация foreground
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 2.4. Background transition
+### 2.4. Переход в background
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 2.5. Suspension and termination
+### 2.5. Приостановка и завершение
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 2.6. Scene lifecycle
+### 2.6. Жизненный цикл scene
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -610,14 +610,14 @@ Senior-point не в маленькой структуре как таковой
 #### Accessibility и localization-соображения
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
-### 2.9. Стоимость dependency graph во время запуска
+### 2.9. Стоимость графа зависимостей во время запуска
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
 #### Tradeoff-ы, failure modes и стоимость миграции
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
-### 2.10. Под капотом: dyld, загрузка Swift metadata, static initializers
+### 2.10. Под капотом: dyld, загрузка Swift metadata и static initializers
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
@@ -639,7 +639,7 @@ Senior-point не в маленькой структуре как таковой
 #### Interview и incident-review вопросы
 
 ## 3. Системные интеграции
-### 3.1. Push notifications
+### 3.1. Push-уведомления
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -657,7 +657,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 3.4. Universal links
+### 3.4. Universal Links
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -706,7 +706,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 3.12. Governance интеграций уровня Staff
+### 3.12. Управление интеграциями уровня Staff
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
@@ -719,34 +719,34 @@ Senior-point не в маленькой структуре как таковой
 # Часть II. Глубокий разбор языка Swift
 
 ## 4. Основы Swift на уровне Senior+
-### 4.1. Value semantics
+### 4.1. Семантика значений
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 4.2. Reference semantics
+### 4.2. Семантика ссылок
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 4.3. Identity vs equality
+### 4.3. Идентичность и равенство
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 4.4. Контроль mutability
+### 4.4. Контроль изменяемости
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 4.5. Контроль доступа и дизайн API surface
+### 4.5. Контроль доступа и дизайн поверхности API
 #### Contract и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
@@ -759,13 +759,13 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 4.7. Optionals beyond basics
+### 4.7. Optionals за пределами основ
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 4.8. Pattern matching
+### 4.8. Сопоставление с образцом
 #### Threat model и защищаемые assets
 #### Platform mechanism и entitlement surface
 #### Data lifecycle, retention и deletion behavior
@@ -778,7 +778,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 4.10. Deinitialization и lifetime
+### 4.10. Деинициализация и lifetime
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -793,7 +793,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры и упражнения для добавления
 
 ## 5. Memory model Swift
-### 5.1. Stack vs heap в практическом Swift
+### 5.1. Стек и heap в практическом Swift
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
@@ -860,21 +860,21 @@ Senior-point не в маленькой структуре как таковой
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 5.11. `unowned` crash semantics
+### 5.11. Crash-семантика `unowned`
 #### Operational goal и ownership
 #### Build, signing и environment constraints
 #### Telemetry, logging и alerting signals
 #### Rollout, rollback и incident workflow
 #### Compliance и support handoff checklist
 #### Runbook-примеры для добавления
-### 5.12. Autorelease pools in mixed Swift/UIKit code
+### 5.12. Autorelease pools в смешанном Swift/UIKit-коде
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 5.13. Чеклист ревью memory ownership
+### 5.13. Чеклист ревью владения памятью
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
@@ -977,7 +977,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 6.15. Compile-time vs runtime polymorphism
+### 6.15. Полиморфизм compile-time vs runtime
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
@@ -993,37 +993,37 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры и упражнения для добавления
 
 ## 7. Dispatch, metadata и dynamic behavior
-### 7.1. Static dispatch
+### 7.1. Статическая диспетчеризация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 7.2. Dynamic dispatch
+### 7.2. Динамическая диспетчеризация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 7.3. Witness table dispatch
+### 7.3. Диспетчеризация через witness table
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 7.4. Objective-C message dispatch
+### 7.4. Диспетчеризация сообщений Objective-C
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 7.5. `final` and devirtualization
+### 7.5. `final` и девиртуализация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 7.6. `@objc`, `dynamic`, KVO, and bridging cost
+### 7.6. `@objc`, `dynamic`, KVO и стоимость bridging
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -1147,7 +1147,7 @@ Senior-point не в маленькой структуре как таковой
 #### Priority, executor и main-thread последствия
 #### Debugging и instrumentation workflow
 #### Migration и code-review checklist
-### 9.3. Task groups
+### 9.3. Группы tasks
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
 #### Actor, Sendable и data-race ограничения
@@ -1231,7 +1231,7 @@ Senior-point не в маленькой структуре как таковой
 #### Priority, executor и main-thread последствия
 #### Debugging и instrumentation workflow
 #### Migration и code-review checklist
-### 10.7. Tasks, принадлежащие lifecycle
+### 10.7. Tasks, принадлежащие жизненному циклу
 #### Execution model и isolation boundary
 #### Task lifecycle и cancellation semantics
 #### Actor, Sendable и data-race ограничения
@@ -1253,21 +1253,21 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры и упражнения для добавления
 
 ## 11. Actors и executors
-### 11.1. Actor isolation
+### 11.1. Изоляция actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 11.2. Actor reentrancy
+### 11.2. Reentrancy actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 11.3. Actor invariants
+### 11.3. Инварианты actors
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
@@ -1446,14 +1446,14 @@ Senior-point не в маленькой структуре как таковой
 #### Migration и code-review checklist
 
 ## 14. AsyncSequence и streams
-### 14.1. Mental model для AsyncSequence
+### 14.1. Ментальная модель AsyncSequence
 #### Contract и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
 #### Offline, cache и persistence-последствия
 #### Security, privacy и logging-ограничения
 #### Test matrix и production diagnostics
-### 14.2. Buffering
+### 14.2. Буферизация
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -1537,13 +1537,13 @@ Senior-point не в маленькой структуре как таковой
 #### Coverage expectations и missing-case checklist
 #### CI, artifacts и triage workflow
 #### Примеры тестов и упражнения для добавления
-### 15.6. `.id()` pitfalls
+### 15.6. Ловушки `.id()`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 15.7. Mental model для diffing
+### 15.7. Ментальная модель diffing
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -1628,7 +1628,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 16.11. Review state ownership уровня Staff
+### 16.11. Ревью state ownership уровня Staff
 #### Определение и mental model
 #### Синтаксис и API surface
 #### Compiler и runtime-механика
@@ -1651,7 +1651,7 @@ Senior-point не в маленькой структуре как таковой
 #### Accessibility и localization-соображения
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
-### 17.3. GeometryReader myths
+### 17.3. Мифы о GeometryReader
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -1732,7 +1732,7 @@ Senior-point не в маленькой структуре как таковой
 #### Accessibility и localization-соображения
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
-### 18.5. Overusing `.id()`
+### 18.5. Чрезмерное использование `.id()`
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -1765,7 +1765,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры, упражнения и Q&A prompts
 
 ## 19. UIKit и legacy interoperability
-### 19.1. Lifecycle view controller
+### 19.1. Жизненный цикл view controller
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
@@ -1811,7 +1811,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 19.8. Core Анимационные transactions
+### 19.8. Core Animation transactions
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
@@ -1851,7 +1851,7 @@ Senior-point не в маленькой структуре как таковой
 # Часть V. Основы архитектурного мышления
 
 ## 20. Архитектурное мышление
-### 20.1. Что такое architecture и чем она не является
+### 20.1. Что такое архитектура и чем она не является
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
@@ -1865,7 +1865,7 @@ Senior-point не в маленькой структуре как таковой
 #### Tradeoff-ы, failure modes и стоимость миграции
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
-### 20.3. Reversibility
+### 20.3. Обратимость
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -1877,20 +1877,20 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 20.5. Локальный optimum vs глобальный optimum
+### 20.5. Локальный оптимум vs глобальный оптимум
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 20.6. Architecture как управление рисками
+### 20.6. Архитектура как управление рисками
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
 #### Tradeoff-ы, failure modes и стоимость миграции
 #### Review-чеклист и антипаттерны
 #### Упражнения по reference implementation
-### 20.7. Architecture как средство коммуникации
+### 20.7. Архитектура как средство коммуникации
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
@@ -1980,7 +1980,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры, упражнения и Q&A prompts
 
 ## 22. Ownership состояния и side effects
-### 22.1. Source of truth
+### 22.1. Источник истины
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -2426,7 +2426,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры, previews и упражнения для добавления
 
 ## 31. TCA-style architecture
-### 31.1. Mental model для TCA
+### 31.1. Ментальная модель TCA
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
@@ -2502,7 +2502,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 32.5. Rx vs async/await variants
+### 32.5. Rx vs async/await варианты
 #### Contract и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
@@ -2755,7 +2755,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 38.4. Управление build-time
+### 38.4. Управление build time
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -2810,7 +2810,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 39.5. Security ревью
+### 39.5. Security-ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
@@ -2960,7 +2960,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 42.8. Дорогие и constrained сети
+### 42.8. Дорогие и сети с ограничениями
 #### Contract и ownership данных
 #### Request/response и правила mapping
 #### Failure, retry, cancellation и idempotency behavior
@@ -3102,7 +3102,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 45.6. User feedback
+### 45.6. Пользовательская обратная связь
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -3437,7 +3437,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 52.4. TLS and ATS
+### 52.4. TLS и ATS
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -3543,7 +3543,7 @@ Senior-point не в маленькой структуре как таковой
 #### Примеры, упражнения и Q&A prompts
 
 ## 55. Launch performance
-### 55.1. Cold запуск
+### 55.1. Холодный запуск
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
 #### Hot-path риски и static red flags
@@ -3577,7 +3577,7 @@ Senior-point не в маленькой структуре как таковой
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
 #### Interview и incident-review вопросы
-### 55.6. dyld and library loading
+### 55.6. dyld и загрузка библиотек
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -3887,7 +3887,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 62.3. Dates and numbers
+### 62.3. Даты и числа
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4010,7 +4010,7 @@ Senior-point не в маленькой структуре как таковой
 #### Coverage expectations и missing-case checklist
 #### CI, artifacts и triage workflow
 #### Примеры тестов и упражнения для добавления
-### 64.6. Determinism
+### 64.6. Детерминизм
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4180,7 +4180,7 @@ Senior-point не в маленькой структуре как таковой
 #### Optimization tradeoff-ы и regression guardrails
 #### Примеры before/after validation
 #### Interview и incident-review вопросы
-### 68.2. Взрывы compile-time из-за result builders
+### 68.2. Взрывы compile time из-за result builders
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4532,14 +4532,14 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 76.4. Communication
+### 76.4. Коммуникация
 #### Decision context и stakeholders
 #### Technical tradeoff и organizational impact
 #### Governance artifact или process to produce
 #### Escalation, alignment и communication risks
 #### Review questions и calibration rubric
 #### Case studies и упражнения для добавления
-### 76.5. Estimation
+### 76.5. Оценка
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4559,7 +4559,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 77.2. Delegation
+### 77.2. Делегирование
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4572,7 +4572,7 @@ Senior-point не в маленькой структуре как таковой
 #### Accessibility и localization-соображения
 #### Failure cases и debugging workflow
 #### Примеры, previews и упражнения для добавления
-### 77.4. Mentorship
+### 77.4. Менторство
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4685,13 +4685,13 @@ Senior-point не в маленькой структуре как таковой
 # Часть XVII. Code review, documentation и knowledge sharing
 
 ## 80. Code review
-### 80.1. Correctness
+### 80.1. Корректность
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 80.2. Architecture
+### 80.2. Архитектура
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
@@ -4929,7 +4929,7 @@ Senior-point не в маленькой структуре как таковой
 # Часть XIX. Debugging mastery
 
 ## 86. Debugging mental models
-### 86.1. Reproduction
+### 86.1. Воспроизведение
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -4941,7 +4941,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 86.3. Determinism
+### 86.3. Детерминизм
 #### Scope и prerequisites
 #### Core theory и mental model
 #### Подкапотные детали
@@ -5110,7 +5110,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 90.6. Security ревью
+### 90.6. Security-ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
@@ -5213,7 +5213,7 @@ Senior-point не в маленькой структуре как таковой
 #### Edge cases и неочевидное поведение
 #### Production-ловушки и review-вопросы
 #### Примеры и упражнения для добавления
-### 93.4. Architecture
+### 93.4. Архитектура
 #### Ответственности ролей
 #### Направление зависимостей и ownership boundaries
 #### Размещение состояния, side effects и navigation
@@ -5256,7 +5256,7 @@ Senior-point не в маленькой структуре как таковой
 #### Подкапотные детали
 #### Production-правила и ловушки
 #### Примеры, упражнения и Q&A prompts
-### 94.2. Architecture ревью
+### 94.2. Архитектура ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
@@ -5381,7 +5381,7 @@ Senior-point не в маленькой структуре как таковой
 #### Rollout, rollback и incident workflow
 #### Compliance и support handoff checklist
 #### Runbook-примеры для добавления
-### 97.4. Чеклист architecture ревью
+### 97.4. Чеклист архитектура ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
@@ -5445,7 +5445,7 @@ Senior-point не в маленькой структуре как таковой
 #### Coverage expectations и missing-case checklist
 #### CI, artifacts и triage workflow
 #### Примеры тестов и упражнения для добавления
-### 98.6. Шаблон architecture ревью
+### 98.6. Шаблон архитектура ревью
 #### Rendering и lifecycle model
 #### Граница ownership состояния
 #### Layout, invalidation и performance-риски
