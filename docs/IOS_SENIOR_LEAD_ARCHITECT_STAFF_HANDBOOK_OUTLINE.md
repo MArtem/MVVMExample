@@ -4199,39 +4199,277 @@ Multi-window behavior не готов к production, пока:
 
 
 ### 2.8. Восстановление состояния
+#### Назначение раздела
+Восстановление состояния — это способность приложения после relaunch, scene recreation, process death, update, auth/session transition или route handoff вернуть пользователя в корректный, безопасный and meaningful context. Это не “сохранить всё, что было на экране”. Правильное восстановление отделяет domain source of truth, pending user intent, scene UI context, transient rendering state and regenerable cache.
+
+Senior-level ошибка — serializing entire view model or navigation stack без validation. Staff-level mental model: **state restoration is a contract between lifecycle, persistence, navigation, privacy and product expectations**. Восстановленное состояние должно быть valid now, not merely valid when it was captured.
+
+Scope boundary: этот раздел покрывает restoration contract, validation, payload compatibility and recovery behavior. Он не раскрывает глубоко storage engines, Core Data/SwiftData migration internals, multi-window product policy or full sync conflict resolution. Эти темы принадлежат persistence/data migration, multi-window and sync sections; здесь они рассматриваются только как constraints for restoration correctness.
+
 #### Rendering и lifecycle model
+Restoration happens through several paths:
+- cold launch after termination or update;
+- warm scene recreation;
+- scene restoration after system discarded session;
+- deep link / push / handoff after auth gate;
+- draft/document recovery after crash/jetsam;
+- app reinstall/upgrade where local data may or may not survive;
+- account switch/logout where old restoration state becomes invalid.
+
+Rendering model: UI should first show a safe shell, then restore validated context incrementally. Do not block the first frame on full restoration of every nested screen if a lightweight shell can show progress, conflict, auth gate or fallback.
+
+Lifecycle rule: restoration data is input to a state machine, not command to blindly recreate UI. Every restored route/state must pass validation:
+- account/session still matches;
+- domain entity exists and user can access it;
+- permission/capability still available;
+- app version can decode restoration payload;
+- feature flag still allows route;
+- privacy/security policy allows showing content;
+- scene target still makes sense.
+
+Validation matrix:
+
+| Validation axis | Required check | Safe fallback |
+| --- | --- | --- |
+| Account | restored account matches current/available account | auth/account chooser/home |
+| Session/security | session valid or lock gate can protect content | redacted shell/auth gate |
+| Permission | capability still granted/limited/available | denied/restricted UI state |
+| Feature flag | route still enabled in current build/config | home/list with message |
+| Entity existence | document/item still exists and user can access it | list/search/recovery state |
+| Schema version | payload decodes or migrates safely | quarantine entry and fallback |
+| Privacy lock | content can be shown to current user/device state | redacted state until unlock |
+| File protection | protected data available or deferred until unlock | waiting/unavailable state without data deletion |
+
 #### Граница ownership состояния
+State categories:
+
+| Category | Purpose | Owner | Restoration policy |
+| --- | --- | --- | --- |
+| Source of truth | durable product data | persistence/domain owner | load through domain layer |
+| Pending user intent | unsent mutation, draft, import/export | feature/sync owner | must restore or explain |
+| Scene restoration hint | selected tab, route, document ID, scroll position | scene coordinator | restore after validation |
+| UI transient state | focus, hover, animation, temporary alert | view/scene owner | usually no |
+| Regenerable cache | thumbnails, decoded media, derived layout | cache/media owner | rebuild lazily |
+| Diagnostic breadcrumb | recovery journal, last failure category | observability owner | use for recovery/debug only |
+
+Rule: restoration payload should usually store identifiers and small hints, not full objects. Store `documentID`, `route`, `draftID`, `scrollAnchor`, `selectedTab`, not entire DTOs, decoded images, tokens or view model graphs.
+
+`@SceneStorage` boundary: use it for small scene-local hints supported by the mechanism and safe for restoration, such as selected tab, lightweight route identifier or UI preference. Do not store secrets, large payloads, full document bodies, DTO graphs, token-like values or complex migration-sensitive objects there. Complex restoration should use a typed envelope with schema/version, validation and cleanup policy.
+
+#### Schema, versioning и migration
+Restoration state is shipped data. If you persist it, you own compatibility.
+
+Rules:
+- include schema/version for restoration payloads;
+- decode unknown/missing fields safely;
+- preserve compatibility for shipped restoration data unless destructive reset is explicitly accepted;
+- clear only invalid restoration entries, not unrelated user data;
+- app update must migrate or gracefully ignore old restoration payload;
+- rollback/re-release must understand data written by pulled release where possible;
+- new versions should avoid writing restoration payload that older rollback version turns into a launch loop;
+- app group/shared restoration data must consider extensions/widgets separately.
+
+Example envelope:
+
+```swift
+struct SceneRestorationEnvelope: Codable, Equatable {
+    static let currentSchemaVersion = 1
+
+    let schemaVersion: Int
+    let sceneKind: String
+    let accountID: Account.ID?
+    let route: RestorableRoute
+    let selectedTab: String?
+    let updatedAt: Date
+}
+
+enum RestorableRoute: Codable, Equatable {
+    case home
+    case document(id: Document.ID)
+    case search(queryID: UUID)
+}
+```
+
+Do not put raw auth tokens, full profile payloads, full document bodies or sensitive free-text search queries into restoration payload unless product/security explicitly approves storage, retention and protection policy.
+
 #### Layout, invalidation и performance-риски
+Restoration can create launch regressions if it eagerly rebuilds heavy UI.
+
+Performance risks:
+- decoding large restoration graph before first usable screen;
+- immediately fetching all data for restored nested route;
+- restoring scroll position by materializing entire list;
+- restoring media-heavy gallery and decoding full-size images;
+- broad SwiftUI invalidation when route/session restoration updates global state;
+- old restoration payload causing migration on main actor;
+- invalid route repeatedly failing and retrying on launch.
+
+Performance rules:
+- restore shell first, data second;
+- use identifiers and lazy domain fetch;
+- validate route before loading expensive content;
+- show placeholder/skeleton with stable layout if content is loading;
+- downsample media and restore only visible range;
+- make failed restoration terminal until user/action changes state;
+- instrument restoration duration and failure category.
+
+Restoration must not cause a relaunch loop. If payload is corrupt, unauthorized, too old or repeatedly fails, app should quarantine/drop that restoration entry and open safe fallback.
+
+Deterministic corrupt-payload policy: decode failure marks only that restoration entry invalid with reason; app opens one safe fallback; invalid entry is not retried on every launch; cleanup affects only restoration metadata, not source-of-truth user data.
+
+#### Safe decode and fallback pattern
+Minimal restoration pipeline:
+
+```swift
+enum RestorationFailureReason {
+    case decodeFailed
+    case unsupportedFutureSchema
+    case invalidCurrentContext
+}
+
+struct RestorationValidationContext {
+    func canAccess(route: RestorableRoute, accountID: Account.ID?) -> Bool {
+        // Validate account/session/permission/entity/feature flag/privacy lock.
+        true
+    }
+}
+
+enum RestorationDecision {
+    case restore(SceneRestorationEnvelope)
+    case fallback(reason: RestorationFailureReason)
+}
+
+func decodeAndValidateRestoration(
+    data: Data,
+    context: RestorationValidationContext
+) -> RestorationDecision {
+    guard let envelope = try? JSONDecoder().decode(SceneRestorationEnvelope.self, from: data) else {
+        return .fallback(reason: .decodeFailed)
+    }
+
+    guard envelope.schemaVersion <= SceneRestorationEnvelope.currentSchemaVersion else {
+        return .fallback(reason: .unsupportedFutureSchema)
+    }
+
+    guard context.canAccess(route: envelope.route, accountID: envelope.accountID) else {
+        return .fallback(reason: .invalidCurrentContext)
+    }
+
+    return .restore(envelope)
+}
+```
+
+Production implementation should record privacy-safe failure reason, quarantine invalid entry if needed and avoid retry loops.
+
 #### Accessibility и localization-соображения
+Restored UI must be understandable to assistive technologies and localized users.
+
+Rules:
+- VoiceOver focus should land on meaningful restored context or safe fallback, not invisible stale element.
+- If restored content is unavailable, announce actionable state: document moved, permission denied, account changed, draft recovered. After a payload is quarantined, fallback announcement should not repeat on every launch as if it were a new event.
+- Dynamic Type/layout changes since last session should not make restored route unusable.
+- Locale/language changes can invalidate formatted search filters, dates, sorting and cached display strings.
+- RTL layout can change navigation/sidebar assumptions.
+- Restored alerts/sheets should be shown only if still actionable; do not resurrect old modal noise.
+- Privacy-sensitive restored screens may require redaction/auth before accessibility exposes content.
+
+Accessibility restoration is not only focus. It includes state explanation, announcement timing, reduced motion, input focus, keyboard navigation and avoiding repeated announcements on launch.
+
 #### Failure cases и debugging workflow
+Common failure cases:
+- entity deleted or moved;
+- user logged out or switched account;
+- permission revoked;
+- feature flag disabled route;
+- restoration payload from older schema fails decode;
+- scene restored into wrong account/window;
+- draft restored but source file unavailable due to file protection;
+- app loops because corrupted route retries every launch;
+- sensitive content restored before auth gate;
+- scroll position restored before list data is available.
+
+Debugging workflow:
+1. Capture restoration source: scene session, `@SceneStorage`, file/UserDefaults/DB record, recovery journal, deep link or pending intent.
+2. Decode payload with schema/version and log privacy-safe failure category.
+3. Validate account/session/permission/entity/feature flag.
+4. Identify owner: scene coordinator, domain layer, persistence, sync or feature model.
+5. Check performance: what restoration work runs before first usable screen.
+6. Check accessibility: focus, announcements, redaction and fallback message.
+7. Confirm cleanup: invalid payload is quarantined or removed without deleting user data.
+
+Observability should include restoration kind, schema version, route kind, validation result, failure category, duration and fallback used. Avoid raw document titles, queries, content or PII in logs.
+
 #### Примеры, previews и упражнения для добавления
-### 2.9. Стоимость графа зависимостей во время запуска
-#### Ответственности ролей
-#### Направление зависимостей и ownership boundaries
-#### Размещение состояния, side effects и navigation
-#### Tradeoff-ы, failure modes и стоимость миграции
-#### Review-чеклист и антипаттерны
-#### Упражнения по reference implementation
-### 2.10. Под капотом: dyld, загрузка Swift metadata и static initializers
-#### Определение и mental model
-#### Синтаксис и API surface
-#### Compiler и runtime-механика
-#### Edge cases и неочевидное поведение
-#### Production-ловушки и review Q&A с ответами
-#### Примеры и упражнения для добавления
-### 2.11. Под капотом: main run loop и путь запуска приложения
-#### Scope и prerequisites
-#### Core theory и mental model
-#### Подкапотные детали
-#### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
-### 2.12. Чеклист production-ready запуска
-#### Performance budget и measurement target
-#### Instrumentation setup и trace interpretation
-#### Hot-path риски и static red flags
-#### Optimization tradeoff-ы и regression guardrails
-#### Примеры before/after validation
-#### Interview/incident-review Q&A с ответами
+**Пример 1: восстановление удалённого документа**
+
+Проблема: restoration payload points to `documentID`, but document was deleted on another device. App crashes because route assumes document exists.
+
+Целевое состояние: route validation detects missing entity, removes invalid restoration hint, opens document list with localized message and optional recovery/support action.
+
+Проверка:
+- open document;
+- persist scene restoration;
+- delete document through another path;
+- relaunch;
+- verify safe fallback and no crash.
+
+**Пример 2: account switch invalidates restoration**
+
+Проблема: user logs out and different user logs in. App restores previous user's private route.
+
+Целевое состояние: restoration envelope includes account/context identity. On account mismatch, payload is rejected or quarantined, sensitive content not shown, and scene opens safe home/auth state.
+
+Проверка:
+- save restoration under account A;
+- logout/login account B;
+- relaunch;
+- verify no private content leak and clear fallback.
+
+**Пример 3: restoration causes launch jank**
+
+Проблема: app restores image gallery by decoding all thumbnails and full images before first frame.
+
+Целевое состояние: restoration stores gallery route and scroll anchor only. UI restores shell, lazily loads visible thumbnails, downsampled by target size, with bounded cache.
+
+Проверка:
+- large gallery on old device;
+- terminate/relaunch;
+- compare launch/first interaction metrics;
+- verify memory peak and no jetsam loop.
+
+#### Review Q&A с ответами
+1. **Почему нельзя просто сериализовать весь ViewModel для restoration?**
+   **Ответ:** ViewModel often contains services, tasks, transient UI, stale domain snapshots and private data. Restoration should store small validated identifiers/hints and rebuild current state through owners.
+
+2. **Чем restoration отличается от persistence?**
+   **Ответ:** persistence stores product truth. Restoration stores UI context hints that help return user to a place. Restoration must validate against current domain/session/permission reality.
+
+3. **Что делать с invalid restoration payload?**
+   **Ответ:** reject or quarantine it, open safe fallback, log privacy-safe failure category and avoid deleting unrelated user data. Repeated invalid payload should not cause relaunch loop.
+
+4. **Как restoration взаимодействует с migration?**
+   **Ответ:** persisted restoration payload needs schema/version compatibility. App update should migrate, ignore or safely drop old restoration hints without corrupting source-of-truth data.
+
+5. **Какие restoration данные нельзя хранить?**
+   **Ответ:** raw tokens, full sensitive payloads, decoded media buffers, unbounded DTOs, private free-text queries without policy, and data that belongs in secure persistence or domain store.
+
+6. **Как проверить restoration quality?**
+   **Ответ:** test relaunch after kill, update, account switch, permission revocation, deleted entity, corrupt payload, large data and accessibility focus. Verify fallback, performance and privacy.
+
+#### Чеклист production-readiness для state restoration
+State restoration не готово к production, пока:
+- restoration data inventory separates domain truth, pending intent, scene hints, cache and diagnostics;
+- payloads use schema/version and safe decode behavior;
+- account/session/permission/entity validation happens before showing restored content;
+- invalid payload has safe fallback and cleanup/quarantine policy;
+- restoration does not block first usable screen with heavy work;
+- sensitive content is not restored before auth/privacy policy allows it;
+- `@SceneStorage` is limited to small non-sensitive UI hints;
+- migrations/updates handle shipped restoration payloads;
+- accessibility focus and localized fallback messages are tested;
+- observability records privacy-safe restoration result and duration;
+- QA covers kill/relaunch, update, account switch, deleted entity, revoked permission and corrupt payload.
+
 
 ## 3. Системные интеграции
 ### 3.1. Push-уведомления
