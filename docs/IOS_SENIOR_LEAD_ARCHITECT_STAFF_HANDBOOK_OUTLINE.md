@@ -3380,11 +3380,260 @@ Background transition handling не готово к production, пока:
 
 
 ### 2.5. Приостановка и завершение
+#### Назначение раздела
+Приостановка и завершение процесса — это граница, где iOS окончательно напоминает: приложение не владеет своим lifetime. После background transition процесс может быть frozen, позже resumed, killed by jetsam, terminated by user/system, replaced after update or restarted after crash. Production app должна быть correct across these outcomes без надежды на финальный callback.
+
+Senior-level ошибка — считать suspension “паузой, после которой всё продолжится как было”, а termination — “редким edge case”. Staff-level mental model: **process death is a normal recovery scenario; suspension means no code runs; termination is often non-cooperative**.
+
 #### Scope и prerequisites
+Этот раздел продолжает `2.4`: background transition уже произошёл или происходит. Здесь фокус:
+- что означает suspension;
+- почему timers/tasks/network callbacks не продолжают выполняться во время suspension;
+- какие виды termination существуют;
+- почему `applicationWillTerminate` is not a durability mechanism;
+- как проектировать recovery after jetsam/crash/force quit/update;
+- как memory pressure and cache policy влияют на process lifetime;
+- какие diagnostics нужны для расследования process death.
+
+Не раскрывается глубоко scene restoration (`2.8`), detailed crash reporting, memory profiling, BackgroundTasks или release operations. Они связаны, но здесь рассматриваются только как факторы корректности process lifetime.
+
 #### Core theory и mental model
+Состояния процесса нужно отделять от UI state:
+
+| State | Что означает | Инженерное следствие |
+| --- | --- | --- |
+| Foreground active | process выполняется, UI interactive | user-visible work has priority, but must stay responsive |
+| Background running | process still executing with limited eligibility | finish/checkpoint bounded work; respect expiration |
+| Suspended | process frozen in memory; app code does not run | timers/tasks do not progress; only durable state matters |
+| Terminated | process no longer exists | next launch must recover from persisted facts |
+| Jetsam killed | process killed by memory pressure | no normal Swift error path; investigate memory diagnostics |
+| Crashed | process ended due to fault | crash recovery and data integrity required |
+| Force quit | user explicitly removed app | treat as user intent; background behavior may be affected |
+
+Key rule: in-memory state is only a cache/coordination convenience. If state должно пережить suspension + termination, it needs persistence, restoration, pending operation queue or explicit rebuild path.
+
 #### Подкапотные детали
+Suspension freezes execution. `Timer`, `Task.sleep`, async tasks, Combine pipelines, operation queues and in-process polling do not keep making progress just because their Swift objects exist. When the suspended process resumes, time has passed, network/auth/permissions/data may have changed, and stale continuations may resume into a different product context. После termination/relaunch in-memory continuations do not continue; recovery happens only from durable state, journal, pending queue or rebuilt domain state.
+
+Termination is not always cooperative:
+- **Jetsam:** kernel/system kills app under memory pressure. No Swift exception, no guaranteed cleanup callback.
+- **Crash:** app faults; crash reporter may capture stack, but durability must already exist.
+- **Watchdog termination:** app blocks launch/foreground/background deadlines or main thread badly enough.
+- **User force quit:** user intent may suppress or alter some background launches until user opens app again.
+- **System update/reboot:** process disappears; next start is cold launch with old assumptions invalidated.
+- **App update:** binary and schema may change; recovery must handle migration.
+
+Update rule: app update is a cold launch with new binary/schema. Recovery and migration must be idempotent, restart-safe and independent from any pre-update callback. If update happens after interrupted work, the new version must understand old pending records or migrate them safely.
+
+`applicationWillTerminate(_:)` is not a reliable production hook for saving user data. It may be called in some controlled paths, but design must assume it will not be called before jetsam, crash, suspension or many real-world terminations.
+
+#### Diagnostics для process death
+Investigation must distinguish symptoms:
+
+| Termination type | Useful signals | Typical evidence |
+| --- | --- | --- |
+| Crash | crash reports, stack traces, exception type | reproducible fault, assertion, fatal error |
+| Jetsam / memory termination | Organizer metrics, MetricKit, device logs, memory footprint/peak | no Swift exception, high resident/dirty memory, media/cache spike |
+| Watchdog | launch/foreground/background deadline symptoms, main-thread stall traces | app killed while blocking lifecycle deadline |
+| Force quit | user action context, absence of expected background continuation | product expectation conflicts with user intent |
+| Update/reboot | version/build transition, migration logs, pending journal state | cold launch recovery with new binary/schema |
+
+Do not collapse all process deaths into “crash”. Different termination classes require different fixes: memory reduction, launch path deferral, main-thread unblocking, recovery journal, migration repair or product requirement correction.
+
+#### Memory pressure, jetsam и cache policy
+Jetsam risk is process-lifetime risk, not only memory optimization concern.
+
+Memory-related rules:
+- use bounded caches with eviction and memory pressure handling;
+- release decoded images, video frames, PDF pages, thumbnails and media buffers when no longer visible;
+- do not keep full-resolution media across repeated rows or inactive scenes;
+- separate source-of-truth data from regenerable cache;
+- treat temporary memory peaks during parsing/decoding/migration as jetsam risks;
+- observe memory warnings/pressure as action signals, not logging trivia;
+- test old devices and large data states, not only latest simulator.
+
+Recovery rule: if process was killed by memory pressure, next launch should not repeat the exact same eager allocation path. Otherwise app can enter a jetsam loop: launch → load too much → killed → relaunch → killed.
+
+#### Durability model
+Correct durability starts before background/suspension. The app should know which facts должно пережить process death.
+
+| Data / state | Durability expectation | Correct mechanism |
+| --- | --- | --- |
+| User draft/edit | должно пережить relaunch if product promises it | incremental local checkpoint |
+| Pending mutation | должно пережить until server reconciliation | durable queue with idempotency key |
+| Navigation intent | should survive auth/session transition or relaunch if user action requires | route intent store with expiry/validation |
+| UI selection/tab | may be restored if useful | scene/session restoration state |
+| Cached feed/content | can be stale but useful | bounded cache with freshness metadata |
+| Decoded media/thumbnail | regenerable | memory/disk cache with eviction |
+| Analytics event | best effort unless compliance-critical | batched queue, not launch/background blocker |
+| Temporary import/export | depends on user expectation | explicit ownership, retention and cleanup policy |
+
+Staff-level review rule: every important state must be classified as source of truth, pending user intent, derived cache, UI convenience or diagnostic artifact. Each category has different persistence, privacy and cleanup rules.
+
+Staff-level ownership matrix:
+
+| Category | Owner | Review rule |
+| --- | --- | --- |
+| Durable source of truth | persistence/domain owner | schema, migration, backup/file protection and corruption recovery defined |
+| Pending user intent | sync/feature owner | idempotency, retry, conflict and user-visible pending state defined |
+| Recoverable operation | operation owner | journal entry, resume/cancel policy and expiry defined |
+| Regenerable cache | cache/media owner | memory/disk bounds, eviction and rebuild path defined |
+| Diagnostics artifact | observability owner | privacy redaction, retention and incident usefulness defined |
+
+#### Recovery after process death
+Recovery must be explicit and testable.
+
+Recovery flow:
+1. Detect launch context: normal launch, after crash indicator, after update, large local data, pending operations, last known session state.
+2. Load minimal durable state needed for safe shell.
+3. Reconcile pending operations without duplicate irreversible effects.
+4. Validate auth/session/permission state.
+5. Restore scene/navigation only if still valid.
+6. Rebuild caches lazily; do not eagerly recreate previous memory pressure.
+7. Surface user-safe recovery UI: pending sync, conflict, draft restored, previous operation incomplete.
+8. Emit privacy-safe diagnostics for recovery path.
+
+Do not hide recovery behind a generic spinner. If user intent survived but server sync is pending, say so through UI state. If previous operation failed mid-way, make retry/cancel/resume policy explicit.
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- Do not rely on termination callbacks for critical persistence.
+- Persist user intent at mutation boundary, not only on background/termination.
+- Make pending operations idempotent and resumable.
+- Treat suspension as no-code-execution; do not design around in-process timers.
+- Make async continuations validate current ownership/session/scene before applying results.
+- Bound caches and release media resources before memory pressure becomes jetsam.
+- Handle app update/migration as recovery path, not only release paperwork.
+- Segment diagnostics by crash, jetsam/memory termination, watchdog, user force quit and normal relaunch where possible.
+- Do not promise background behavior after force quit; product requirements should assume user launch may be required to resume.
+
+Ловушки:
+- **Final callback fantasy:** saving everything in `applicationWillTerminate`.
+- **Timer illusion:** assuming timer continues while suspended.
+- **Stale continuation:** async task resumes after process/scene/session context changed.
+- **Cache as source of truth:** only in-memory cache contains user-visible state.
+- **Jetsam loop:** next launch eagerly reloads the same huge media/data set.
+- **Force-quit confusion:** product expects background work after user explicitly killed app.
+- **Crash-only diagnostics:** team sees no Swift crash and misses memory termination.
+
+#### Practical recovery journal
+Для high-value operations полезен lightweight recovery journal: durable breadcrumbs that describe in-flight user intent, not full logs.
+
+Example:
+
+```swift
+struct RecoveryJournalEntry: Codable, Equatable {
+    enum Kind: String, Codable {
+        case draftCheckpoint
+        case pendingMutation
+        case importInProgress
+        case migrationStep
+    }
+
+    let id: UUID
+    let kind: Kind
+    let createdAt: Date
+    let operationKey: String
+    let safeUserVisibleSummary: String
+}
+
+actor RecoveryJournal {
+    private let store: RecoveryJournalStore
+
+    func record(_ entry: RecoveryJournalEntry) async throws {
+        try await store.upsert(entry)
+    }
+
+    func complete(id: UUID) async throws {
+        try await store.remove(id: id)
+    }
+
+    func entriesForNextLaunch() async throws -> [RecoveryJournalEntry] {
+        try await store.loadPendingEntries()
+    }
+}
+```
+
+Rules:
+- journal must not contain raw PII, tokens or full payloads;
+- entries need expiry/cleanup policy;
+- completion must be idempotent;
+- next launch must know how to resume, retry, cancel or explain each entry.
+
+#### Примеры, упражнения и Q&A с ответами
+**Пример 1: draft exists only in memory**
+
+Проблема: user writes long note, app backgrounds, process is jetsam killed. Next launch loses note because draft lived only in `@State`.
+
+Целевое состояние: draft checkpoints at edit boundary or debounce interval, not only on background. Next launch restores draft or explains recovery state. Sensitive content uses appropriate file protection and privacy policy.
+
+Проверка:
+- type draft;
+- background app;
+- simulate kill/relaunch;
+- verify draft restored and no sensitive content logged.
+
+**Пример 2: suspended timer drives product logic**
+
+Проблема: countdown, upload retry or polling loop depends on in-process timer while app suspended. User returns later; UI shows impossible state.
+
+Целевое состояние: store absolute deadlines/timestamps and recompute on foreground/launch. Retry uses scheduler/pending queue, not suspended timer illusion.
+
+Проверка:
+- start countdown/retry;
+- background for longer than interval;
+- return or relaunch;
+- verify state derived from wall-clock/domain truth, not missed timer ticks.
+
+**Пример 3: jetsam loop after media-heavy launch**
+
+Проблема: app restores previous gallery and eagerly decodes full-resolution images. Old device gets jetsam killed repeatedly.
+
+Целевое состояние: restore lightweight gallery shell, downsample visible images only, bound cache, lazy-load thumbnails and record memory termination diagnostics.
+
+Проверка:
+- large gallery on oldest supported device;
+- relaunch after memory termination;
+- verify app does not eagerly decode all assets;
+- monitor memory footprint and cache eviction.
+
+#### Review Q&A с ответами
+1. **Почему `applicationWillTerminate` нельзя использовать как основной save hook?**
+   **Ответ:** many real terminations are non-cooperative: jetsam, crash, watchdog, suspension followed by kill. Critical state must be durable before termination, ideally at mutation/checkpoint boundaries.
+
+2. **Что реально происходит во время suspension?**
+   **Ответ:** process remains in memory but code is frozen. Timers, tasks and callbacks do not progress. When app resumes, elapsed time and external state must be reconciled explicitly.
+
+3. **Чем jetsam отличается от crash для расследования?**
+   **Ответ:** jetsam is memory-pressure termination, often without Swift exception stack. Нужно смотреть memory reports, device logs, Organizer metrics, memory footprint and allocation peaks, not only crash stack traces.
+
+4. **Как защититься от stale async continuation после resume/activation?**
+   **Ответ:** task result must validate current owner, session, scene identity, request generation and cancellation state before applying changes. After cold relaunch there is no old in-memory continuation; durable operations resume only through journal/pending queue and should be idempotent and versioned.
+
+5. **Что должно переживать process death?**
+   **Ответ:** user intent, user-created content, pending mutations, required recovery breadcrumbs, and product-promised restoration state. Regenerable caches and decoded media usually should not be treated as durable truth.
+
+6. **Что проверять после жалобы “приложение иногда открывается пустым после возврата”?**
+   **Ответ:** whether process was suspended/killed, whether state was only in memory, launch recovery path, scene restoration, pending operations, cache eviction, memory termination evidence and stale auth/permission state.
+
+7. **Почему next launch после jetsam должен быть cheaper/lazier than previous launch?**
+   **Ответ:** если relaunch eagerly recreates the same memory-heavy state that caused jetsam, app can enter a kill loop. Recovery should load lightweight shell, rebuild caches lazily, downsample visible media only and avoid repeating previous peak allocation.
+
+#### Чеклист production-readiness для suspension/termination
+Process lifetime handling не готово к production, пока:
+- critical user state is persisted before termination callbacks would be needed;
+- in-memory state is classified as cache/coordination, not durability;
+- pending operations are durable, idempotent and resumable;
+- timers use absolute time/domain state, not suspended ticks;
+- async results validate current ownership before applying state;
+- cache and media memory are bounded and evictable;
+- jetsam diagnostics are distinguishable from crash diagnostics;
+- next launch has explicit recovery path for pending journal entries;
+- app update/migration path handles interrupted prior work;
+- force quit assumptions are product-reviewed;
+- tests cover kill/relaunch during edit, sync, import, migration and media-heavy flows.
+
+
 ### 2.6. Жизненный цикл scene
 #### Scope и prerequisites
 #### Core theory и mental model
