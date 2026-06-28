@@ -3112,11 +3112,273 @@ Foreground activation handling не готово к production, пока:
 
 
 ### 2.4. Переход в background
+#### Назначение раздела
+Переход в background — это момент, когда приложение теряет foreground priority и должно быстро привести state, tasks, persistence, privacy-состояние и использование ресурсов в безопасное состояние перед suspension или дальнейшей system-managed background execution. Это не “последний шанс сделать всё” и не универсальное окно для sync. Это lifecycle boundary, где iOS ожидает, что app прекратит user-visible work, сохранит минимально необходимый durable state, освободит ненужные ресурсы и не будет бороться с системой за CPU, battery и attention.
+
+Senior-level ошибка — использовать background transition как dumping ground: “когда app уходит, синхронизируем всё, пишем всё на диск, обновляем всё, отправляем analytics”. Staff-level mental model: **background transition is a checkpoint and shedding point, not a hidden execution budget**.
+
 #### Scope и prerequisites
+Этот раздел раскрывает именно переход foreground → background:
+- `sceneWillResignActive` / `sceneDidEnterBackground`;
+- `applicationWillResignActive` / `applicationDidEnterBackground` где применимо;
+- checkpointing user-visible and durable state;
+- cancellation/shedding of foreground-only work;
+- privacy redaction / snapshot concerns;
+- short background task completion windows;
+- handoff to approved background mechanisms.
+
+Не раскрывается глубоко:
+- suspension and termination mechanics — это `2.5`;
+- scene lifecycle and restoration — это `2.6` и `2.8`;
+- multi-window ownership — это `2.7`;
+- detailed `BackgroundTasks`, background modes, push, widgets and extensions — они должны иметь отдельные capability sections.
+
+Практическая формула: **on background transition save what must survive, stop what no longer has foreground value, mark what must continue through an approved mechanism, and leave enough evidence to recover on next launch**.
+
 #### Core theory и mental model
+Background transition has three responsibilities:
+
+1. **Durability:** сохранить smallest durable facts, которые пользователь ожидает увидеть после relaunch.
+2. **Resource shedding:** остановить foreground-only work: animations, camera preview, polling, visible refresh, expensive rendering, speculative prefetch.
+3. **Coordination:** определить, какая работа должна завершиться сейчас, какая отменяется, какая переносится в sanctioned background path, а какая остаётся pending до следующего foreground.
+
+Ключевое различие:
+- **Checkpoint:** быстрое сохранение локального state/progress, чтобы пережить suspension/process death.
+- **Sync:** network/server reconciliation, который может быть delayed, interrupted, denied или retried later.
+- **Cleanup:** освобождение ресурсов, cache trimming, temporary state boundary.
+- **Background execution:** отдельная capability/policy, а не automatic right после `didEnterBackground`.
+
+Senior rule: if user-visible state matters, persist intent/progress before relying on background time. If work is only nice-to-have, cancel/defer it. If work must continue, it needs declared reason, expiration handling and recovery plan.
+
 #### Подкапотные детали
+Когда app/scene уходит в background, система может вскоре suspend процесс. Во время suspension app code не выполняется. Перед suspension может быть короткое время для завершения ограниченной работы, но оно не является reliable product deadline. Если app просит additional background time через `beginBackgroundTask`, она получает bounded opportunity with expiration handler, not daemon privileges. Такой task должен быть завершён через `endBackgroundTask` both on normal completion and on expiration; иначе app тратит background budget некорректно и рискует termination.
+
+Lifecycle signals differ by architecture:
+- scene-based apps получают scene-level background callbacks per scene;
+- app-level callbacks may still exist for process-wide events;
+- SwiftUI `scenePhase == .background` is a high-level signal, not a persistence guarantee;
+- multi-scene apps can have one scene backgrounded while another remains foreground active;
+- system UI interruptions may pass through inactive without full background.
+
+Important mechanics:
+- **App snapshot:** iOS may capture UI for app switcher; sensitive screens may need redaction before background/inactive based on policy.
+- **File protection:** protected files may become unavailable when device locks; critical writes should consider protection class and timing.
+  Практическое правило: write critical checkpoints before lock/background where possible, handle protected-data-unavailable on next launch/foreground, and never treat file-protection write failure as user intent to delete data.
+- **Task cancellation:** structured concurrency tasks do not automatically cancel because app backgrounds; owner must define policy.
+- **URLSession background configuration:** background transfers are separate from foreground tasks and require explicit design.
+- **BGTaskScheduler:** scheduling a future task is not the same as running work immediately.
+- **Extensions/widgets:** must not rely on app process memory; shared state needs durable app group ownership.
+
+#### Background transition decision table
+Каждая активная работа должна быть классифицирована при уходе в background.
+
+| Work type | Default decision | Production condition |
+| --- | --- | --- |
+| UI animation/rendering | stop | resume if scene becomes active again |
+| Visible screen refresh | cancel/defer | keep local content and freshness state |
+| User draft/edit | checkpoint | persist smallest durable edit state |
+| Pending mutation | persist queue | retry later with idempotency/conflict policy |
+| Analytics/log upload | batch/defer | do not block background transition |
+| Media recording/playback | continue only with declared mode/user value | handle interruption and privacy indicators |
+| Location/Bluetooth | continue only with entitlement/background mode/product reason | minimize energy and provide user value |
+| Large migration/indexing | defer or BGProcessing if appropriate | checkpoint progress and expiration handler |
+| Temporary import/export | finish only if bounded and user-critical | otherwise persist intent and recover later |
+
+Rule: “finish everything before suspension” is not a strategy. Correct strategy is “make every interrupted point recoverable”.
+
+#### Ownership и boundaries
+Background transition policy must be centralized enough to be consistent, but not so centralized that it owns every feature.
+
+Recommended boundaries:
+
+| Owner | Responsibility | Not responsible for |
+| --- | --- | --- |
+| App lifecycle owner | process-wide background signal, metrics, global policies | feature-specific save logic |
+| Scene owner | scene-specific navigation/selection checkpoint | global sync decisions |
+| Feature owner | save visible editing/progress state | scheduling all app background work |
+| Persistence owner | durable writes, transactions, migration checkpoints | deciding product semantics of drafts/conflicts |
+| Sync owner | pending mutation queue, retry/backoff/idempotency | direct UI navigation |
+| Privacy/security owner | redaction, lock policy, sensitive snapshot handling | generic performance cleanup |
+| Background capability owner | BGTask/background mode registration and expiration handling | pretending background time is guaranteed |
+
+Semantic signal example: lifecycle layer emits `sceneEnteredBackground(sceneID:)`. Feature layer decides whether it has visible draft, media session, pending upload or nothing to save.
+
+Multi-scene aggregation rule: process-wide cleanup, cache trimming, session teardown or sync throttling should depend on aggregate scene state, not one scene callback. If another scene remains foreground active, one backgrounded scene must not trigger global shutdown.
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- Persist user intent before attempting best-effort server sync.
+- Keep background transition work short, bounded and observable.
+- Do not start new broad refresh just because app is entering background.
+- Cancel foreground-only tasks explicitly.
+- Use expiration handlers for any requested background time.
+- Make writes idempotent or checkpointed; app may be suspended or killed mid-write.
+- Redact sensitive UI no later than inactive/background transition if product/security policy requires it, and define restore policy on foreground/auth.
+- Segment metrics by background reason and result: checkpoint saved, cancelled, scheduled, expired.
+- Track checkpoint duration, expired background task count, pending queue count and whether sensitive redaction was applied/missed.
+- Never rely on `applicationWillTerminate` as normal cleanup path.
+- In multi-scene apps, backgrounding one scene must not destroy global state needed by active scenes.
+
+Ловушки:
+- **Background sync fantasy:** команда обещает “sync on close”, но iOS may suspend before completion.
+- **Checkpoint too late:** draft saved only during `didEnterBackground`, but crash/jetsam loses data before that.
+- **Main actor file writes:** synchronous persistence blocks transition and causes hangs.
+- **No expiration path:** background task starts but expiration handler only logs.
+- **Privacy snapshot leak:** app switcher shows sensitive data.
+- **Scene overreach:** scene background clears shared session while another scene remains active.
+- **Analytics blocking:** app waits for event upload during background transition.
+
+#### `beginBackgroundTask` operational pattern
+`beginBackgroundTask` подходит только для bounded completion work. It does not make the app a daemon and does not guarantee network success.
+
+```swift
+@MainActor
+final class BackgroundCompletionRunner {
+    private var taskID: UIBackgroundTaskIdentifier = .invalid
+
+    func run(application: UIApplication, operation: @escaping () async -> Void) {
+        taskID = application.beginBackgroundTask(withName: "FinishCriticalCheckpoint") { [weak self, weak application] in
+            Task { @MainActor in
+                guard let self, let application else { return }
+                // Expiration path must cancel/checkpoint through owned state in production.
+                self.finish(application: application)
+            }
+        }
+
+        Task { [weak self, weak application] in
+            await operation()
+
+            await MainActor.run {
+                guard let self, let application else { return }
+                self.finish(application: application)
+            }
+        }
+    }
+
+    private func finish(application: UIApplication) {
+        guard taskID != .invalid else { return }
+        application.endBackgroundTask(taskID)
+        taskID = .invalid
+    }
+}
+```
+
+Production version needs cancellation token, idempotent operation, timeout, privacy-safe diagnostics and recovery on next launch. The essential invariant is non-negotiable: every started background task must be ended on completion and expiration.
+
+#### Swift Concurrency и cancellation
+Background transition should interact deliberately with tasks.
+
+Rules:
+- Screen-owned tasks should cancel when screen/scene is no longer visible unless they protect data integrity.
+- Data-integrity tasks should persist progress and continue only if allowed by lifecycle policy.
+- Detached tasks require strict justification; otherwise ownership and cancellation become unclear.
+- Main actor should only update state/checkpoint small values; heavy serialization, compression and DB work goes off-main.
+- Background expiration should cancel or checkpoint work, not simply log timeout.
+
+Example:
+
+```swift
+@MainActor
+final class DraftEditorModel {
+    private let draftStore: DraftStore
+    private var autosaveTask: Task<Void, Never>?
+    private var draft: Draft
+
+    init(draft: Draft, draftStore: DraftStore) {
+        self.draft = draft
+        self.draftStore = draftStore
+    }
+
+    func sceneEnteredBackground() {
+        autosaveTask?.cancel()
+        let snapshot = draft
+
+        autosaveTask = Task { [draftStore, snapshot] in
+            do {
+                try await draftStore.saveCheckpoint(snapshot)
+            } catch {
+                // Production path: record privacy-safe diagnostic and keep local in-memory state.
+                // Recovery policy must be owned by the feature/persistence layer.
+            }
+        }
+    }
+}
+```
+
+Important caveat: this example shows ownership shape, not a guarantee that async work finishes before suspension. User-critical writes should already be durable at mutation boundaries or before risky transitions. A final async save during background transition is opportunistic safety net, not the primary durability mechanism.
+
+#### Примеры, упражнения и Q&A с ответами
+**Пример 1: “sync on close” loses user changes**
+
+Проблема: user changes favorite, app backgrounds, app tries network sync in `didEnterBackground`. System suspends before response; on next launch UI assumes server is source of truth and loses local intent.
+
+Целевое состояние: favorite mutation is persisted locally with idempotency key before network attempt. Background sync is best-effort. Next launch resumes pending queue and reconciles server response.
+
+Проверка:
+- kill app after local mutation before network acknowledgement;
+- relaunch shows local intent pending/synced state;
+- duplicate delivery does not duplicate mutation;
+- conflict policy is explicit.
+
+**Пример 2: sensitive data visible in app switcher**
+
+Проблема: banking/health/private document screen remains visible in app snapshot after user backgrounds app.
+
+Целевое состояние: security policy defines when to redact. App/scene applies redaction before snapshot timing where possible, restores content after auth/foreground policy, and does not destroy navigation unnecessarily.
+
+Проверка:
+- background app from sensitive screen;
+- inspect app switcher snapshot;
+- return within and beyond lock timeout;
+- verify VoiceOver/accessibility state does not announce hidden sensitive content.
+
+**Пример 3: scene background clears shared state**
+
+Проблема: on iPadOS one scene enters background and clears selected account/session/global cache; another scene still active breaks.
+
+Целевое состояние: scene background only checkpoints scene-specific navigation/selection. Process-level session/cache remains while any scene or policy still needs it.
+
+Проверка:
+- open two windows with different documents;
+- background one scene;
+- active scene remains usable;
+- returning scene restores its own state without overwriting the other.
+
+#### Review Q&A с ответами
+1. **Почему background transition нельзя считать надёжным временем для sync?**
+   **Ответ:** система может быстро suspend процесс, background time ограничен and policy-controlled, network may be unavailable, and expiration can interrupt work. Correct path persists local intent and retries through approved mechanisms.
+
+2. **Что обязательно нужно делать при уходе в background?**
+   **Ответ:** checkpoint user-critical local state, cancel or pause foreground-only work, apply privacy redaction if required, persist pending operations and leave recovery evidence. Broad refresh/sync is not mandatory and often harmful.
+
+3. **Чем checkpoint отличается от sync?**
+   **Ответ:** checkpoint сохраняет локальный durable fact или progress, чтобы пережить interruption. Sync пытается согласовать state с server and may be delayed, retried or conflict-prone. Checkpoint is correctness; sync is reconciliation.
+
+4. **Как использовать `beginBackgroundTask` безопасно?**
+   **Ответ:** only for bounded completion work with clear expiration handler. The handler must cancel/checkpoint/recover, not only log. It must not turn feature logic into assumed long-running daemon work.
+
+5. **Почему `scenePhase == .background` не должен делать всю persistence?**
+   **Ответ:** signal может прийти поздно, не прийти для crash/jetsam, быть scene-specific and repeated. User-critical persistence should happen at mutation boundaries and use background transition only as additional checkpoint opportunity.
+
+6. **Что проверять в incident review после потери данных при уходе из app?**
+   **Ответ:** where user intent became durable, whether sync was treated as durability, lifecycle sequence, write atomicity, pending queue state, background expiration, app kill timing and next-launch recovery path.
+
+#### Чеклист production-readiness для background transition
+Background transition handling не готово к production, пока:
+- user-critical state is persisted before relying on background time;
+- foreground-only tasks are cancelled or paused;
+- pending mutations are durable and idempotent;
+- background work has trigger, deadline, cancellation, retry and user-visible effect;
+- expiration handlers have real recovery behavior;
+- sensitive snapshot/redaction policy is defined where needed;
+- analytics/log upload does not block transition;
+- multi-scene background does not corrupt active scene state;
+- file writes are atomic/checkpointed where correctness matters;
+- metrics show checkpoint/scheduled/cancelled/expired outcomes;
+- next launch can recover from partial background work;
+- QA covers backgrounding during edit, sync, import/export and sensitive screens.
+
+
 ### 2.5. Приостановка и завершение
 #### Scope и prerequisites
 #### Core theory и mental model
