@@ -2552,12 +2552,299 @@ Cold launch не готов к production, пока:
 
 
 ### 2.2. Тёплый запуск
+#### Назначение раздела
+Тёплый запуск — это возвращение пользователя в приложение, когда app process уже существует или недавно был suspended, а часть runtime state, caches, tasks, scenes и navigation state может оставаться в памяти. Он кажется проще cold launch, потому что dyld/static initialization уже позади, но production-риск часто выше: приложение должно быстро вернуть usable UI и одновременно reconcile stale state, session, permissions, network reachability, background results, deep links и scene lifecycle.
+
+Senior-level ошибка — считать warm launch “просто продолжением того же состояния”. Staff-level mental model: **warm launch — это foreground reactivation path with stale assumptions**. Всё, что было истинно до ухода в background, могло измениться: auth token, permissions, local database, remote state, feature flags, device time, network, Low Power Mode, thermal state, widgets/extensions data, push payloads и user expectations.
+
+#### Определение и границы scope
+Warm launch включает несколько сценариев:
+- пользователь возвращается из app switcher;
+- suspended process становится active;
+- backgrounded app получает foreground scene;
+- новая scene подключается к уже живому process на iPadOS;
+- приложение открывается через push/Universal Link/widget/App Intent, пока process уже существует;
+- app возвращается после system UI: permission prompt, Share Sheet, document picker, Sign in with Apple, StoreKit, camera/photos/files flow;
+- app возвращается после короткого background task или interrupted operation.
+
+Scope boundary: этот раздел не повторяет cold launch и не раскрывает полностью background execution. Здесь фокус — **warm return path**: пользовательское восприятие возвращения, stale local UI, быстрый first interaction, bounded reconciliation, deduplicated refresh и безопасное восстановление route/session/permission state. Формальная семантика foreground activation callbacks, ordering, inactive/active transitions и различия app vs scene events раскрываются в `2.3`. Глубокий multi-window scene ownership остаётся для отдельных scene lifecycle разделов.
+
+Практическая формула: **warm launch должен восстановить visible local state immediately, затем выполнить bounded reconciliation without blocking first interaction**.
+
 #### Performance budget и measurement target
+Warm launch target обычно строже cold launch по user perception: пользователь ожидает почти мгновенного возвращения туда, где остановился. Даже если remote state устарел, UI должен показать local visible content quickly и честно обозначить refresh/freshness.
+
+Основные milestones:
+- **Foreground activation received:** app/scene получила signal возвращения.
+- **Previous UI visible:** последний meaningful screen снова отображён.
+- **Interaction ready:** scroll/tap/input работают без main actor stall.
+- **Reconciliation started:** refresh/session/permission checks запущены без blocking UI.
+- **Reconciliation settled:** UI обновил freshness, auth, errors, conflicts или pending operations.
+
+Warm launch budget должен измеряться не одним удачным run, а p50/p95/p99 на одинаковом device/scenario before-after. Matrix для сравнения:
+- short background interval vs long background interval;
+- same scene vs recreated/disconnected scene;
+- single-window vs multi-window iPadOS;
+- logged-in vs expired session;
+- unchanged permissions vs revoked permissions;
+- pending sync/mutation exists vs no pending work;
+- notification/deep link entry vs simple app switcher return;
+- old device / lowest supported OS / large visible dataset.
+
+Rule: warm launch не должен синхронно блокировать previous UI на network refresh, remote config, full database reload, media decoding или auth refresh, если можно показать безопасный local state and reconcile after activation.
+
+Sensitive UI exception: если session expired, app lock включён, device/security policy требует re-auth, account switched или screen содержит privacy-sensitive data, previous UI нельзя безусловно показывать immediately. Target state — redacted shell, lock gate или skeleton, который сохраняет navigation context, но не раскрывает protected content.
+
+#### Lifecycle states и reactivation flow
+Warm launch нельзя сводить к одному `scenePhase == .active`.
+
+Relevant layers:
+- **Process state:** process alive, suspended, backgrounded, active.
+- **Application state:** active/inactive/background transitions.
+- **Scene state:** connected, foreground active, foreground inactive, background, discarded.
+- **Feature task state:** running, suspended, cancelled, obsolete, expired.
+- **Data state:** fresh, stale, locally mutated, conflict-prone, invalidated.
+- **Session state:** valid, expired, locked, revoked, unknown.
+
+Типовой warm activation flow:
+1. Capture activation context: simple return, deep link, notification, system UI return, scene recreation.
+2. Render previous local UI state immediately if safe.
+3. Reconcile session/security state.
+4. Re-check permissions and external inputs that can change outside the app.
+5. Resume or cancel feature tasks based on visibility and ownership.
+6. Start bounded refresh/sync with cancellation and deduplication.
+7. Update UI with freshness, errors, conflicts or pending state.
+8. Emit privacy-safe metrics for activation latency and reconciliation outcome.
+
+Важно: app may become active multiple times quickly. Activation handler must be idempotent, deduplicated and scene-aware.
+
 #### Instrumentation setup и trace interpretation
+Warm launch measurement differs from cold launch measurement. You are not measuring dyld; you are measuring foreground activation, UI continuity and reconciliation cost.
+
+Recommended instrumentation:
+- `scenePhase` / lifecycle signposts for `.inactive -> .active` and `.background -> .active`;
+- signposts around session restore/check, permission recheck, visible screen refresh and pending mutation sync;
+- Time Profiler for main actor work during foreground activation;
+- Hangs instrument for interaction stalls after app switcher return;
+- MetricKit/Organizer trends for hangs, app responsiveness and crash-free foreground sessions;
+- privacy-safe logs for activation reason, route intent presence, reconciliation result and error category.
+
+Пример signpost для activation interval:
+
+```swift
+import os
+
+private let lifecycleLog = OSLog(subsystem: "com.example.app", category: "Lifecycle")
+
+@MainActor
+final class ForegroundActivationMetrics {
+    private var activationID: OSSignpostID?
+
+    func activationStarted(reason: String) {
+        let id = OSSignpostID(log: lifecycleLog)
+        activationID = id
+        os_signpost(.begin, log: lifecycleLog, name: "ForegroundActivation", signpostID: id, "%{public}@", reason)
+    }
+
+    func activationFinished(result: String) {
+        guard let id = activationID else { return }
+        os_signpost(.end, log: lifecycleLog, name: "ForegroundActivation", signpostID: id, "%{public}@", result)
+        activationID = nil
+    }
+}
+```
+
+Interpretation rules:
+- если previous UI visible быстро, но first scroll/tap зависает, это warm launch regression;
+- если every activation запускает full refresh, ищи missing deduplication;
+- если refresh race overwrites local pending mutation, это data correctness bug, не performance-only issue;
+- если p95 warm activation плохой, сегментируй by scene recreation, session expiration, permission changes and data size;
+- если app возвращается из system UI и теряет state, проблема в lifecycle ownership, а не в “пользователь свернул приложение”.
+
 #### Hot-path риски и static red flags
+Warm launch hot path часто скрыт в lifecycle handlers.
+
+Red flags:
+- `onChange(of: scenePhase)` запускает heavy refresh каждый раз при `.active`;
+- foreground activation делает fetch-all database reload;
+- screen `.task` перезапускает work при каждом появлении без deduplication;
+- auth/session refresh блокирует весь UI instead of sensitive operations;
+- notification/deep link routing directly mutates SwiftUI navigation before session/domain checks;
+- permissions assumed stable после первоначального grant;
+- foreground refresh overwrites local pending mutations;
+- background result and foreground refresh write same domain state without version/vector/timestamp/conflict policy;
+- timers/polling resume aggressively without Low Power Mode/thermal awareness;
+- multiple scenes share one mutable navigation state;
+- background task completion and manual foreground refresh write same state concurrently;
+- in-memory cache treated as durable state after long suspension;
+- `@MainActor` repository/service performs parsing, sorting, image decoding or DB work during activation;
+- analytics logs “app opened” on every transient active transition without user-visible context.
+
+Static review rule for each activation task: task должен иметь явное поведение для rapid double activation, scene recreation, session expiration, permission revocation и immediate backgrounding. Если ответ сводится к “ничего особенного не предусмотрено”, task не готов к production warm launch path.
+
+#### Ownership model for warm activation
+Warm launch needs explicit ownership, otherwise every feature adds its own `.active` observer.
+
+Recommended responsibility split:
+
+| Owner | Responsibility | Common anti-pattern |
+| --- | --- | --- |
+| `LifecycleCoordinator` | centralizes activation reason, deduplication, metrics | every screen observes `scenePhase` independently |
+| `SessionController` | checks auth/lock/revocation without blocking non-sensitive shell | global spinner while token refresh waits |
+| `PermissionStateStore` | re-reads permissions and publishes meaningful state changes | assuming permission grant is permanent |
+| `RouteIntentCoordinator` | preserves and reconciles notification/deep-link intents | direct view navigation from push handler |
+| `SyncScheduler` | coordinates foreground refresh, pending mutations and background results | duplicate sync from launch + screen + scene handler |
+| Feature model | refreshes visible data if owned and still relevant | refresh all features on every activation |
+
+Rule: feature-level refresh can be triggered by activation, but ownership must remain feature-specific and cancellable. Central lifecycle code should coordinate signals; it should not become a god object that knows every feature’s business rules.
+
+Route intent ownership in multi-scene apps: intent должен иметь target policy. Возможные варианты: route to currently active scene, create/reuse scene by document/account/context, ask user to choose, or reject intent with safe explanation. Intent must be consumed or rejected exactly once; shared process-level storage не должен напрямую мутировать navigation path всех scenes.
+
+Conflict rule: foreground refresh and background result must merge through domain policy, not last-writer-wins by accident. Minimum options: server version, local mutation version, vector/timestamp, idempotency key, conflict state or product-specific merge rule. If policy is unknown, refresh must not overwrite pending local user intent.
+
 #### Optimization tradeoff-ы и regression guardrails
+Warm launch optimization is mostly about **not doing unnecessary work at the exact moment the user returns**.
+
+Tradeoffs:
+- **Immediate stale UI vs blocking refresh:** showing stale local content with freshness indicator is often better than blank blocking spinner.
+- **Session security vs continuity:** sensitive content may require lock/auth gate; non-sensitive shell can remain visible.
+- **Deduplication vs missed refresh:** avoid duplicate work, but preserve explicit user refresh and important invalidation signals.
+- **Cache reuse vs correctness:** in-memory cache improves speed, but must be invalidated on logout, permission revocation, account switch, migration or external data change.
+- **Foreground sync vs battery/thermal:** refresh should respect Low Power Mode, thermal state, network constraints and user-visible priority.
+- **Multi-scene consistency vs isolated scene state:** shared domain state must be consistent, but each scene needs its own navigation/selection lifecycle.
+
+Guardrails:
+- activation handlers are idempotent and scene-aware;
+- refresh work is deduplicated by key/purpose, not by accidental boolean flags;
+- pending local mutations are protected from foreground refresh overwrite;
+- session/permission changes produce explicit UI states;
+- long work is cancellable when app backgrounds again;
+- route intents are persisted until consumed or rejected with user-safe explanation;
+- metrics segment warm activation by reason and result;
+- PR adding `scenePhase`, app delegate activation logic or root `.task` must state warm-launch impact.
+
 #### Примеры before/after validation
+**Пример 1: duplicated refresh on every activation**
+
+Before:
+```swift
+.onChange(of: scenePhase) { _, phase in
+    if phase == .active {
+        Task {
+            await viewModel.reloadEverything()
+        }
+    }
+}
+```
+
+Проблема: каждый foreground transition запускает full reload. Несколько screens могут сделать то же самое одновременно, создавая network burst, database contention and UI invalidation.
+
+After:
+```swift
+enum RefreshPurpose: Hashable {
+    case foregroundVisibleFeed
+    case manualUserRefresh
+    case pendingMutationSync
+}
+
+actor RefreshDeduplicator {
+    private var runningPurposes: Set<RefreshPurpose> = []
+
+    func runOnce(
+        purpose: RefreshPurpose,
+        operation: @Sendable () async throws -> Void
+    ) async rethrows {
+        guard !runningPurposes.contains(purpose) else { return }
+        runningPurposes.insert(purpose)
+        defer { runningPurposes.remove(purpose) }
+        try await operation()
+    }
+}
+```
+
+Validation:
+- two rapid active transitions produce one refresh per typed purpose;
+- manual pull-to-refresh still works and has separate priority;
+- foreground refresh does not overwrite pending local mutations;
+- logs show skipped duplicate reason;
+- cancellation/result policy is documented by caller, because this helper only deduplicates execution and is not a universal sync engine.
+
+**Пример 2: permission revoked while app was backgrounded**
+
+Before: app assumes camera/photos/location permission still granted and crashes or shows broken UI when user changed Settings.
+
+After: activation re-checks permission state, maps denied/restricted/limited into first-class UI state and disables only affected features.
+
+Validation:
+- revoke permission in Settings, return to app;
+- previous screen remains stable;
+- affected feature shows actionable localized state;
+- no raw sensitive data is logged.
+
+**Пример 3: push deep link while process is alive**
+
+Before: push handler directly changes navigation path while app is inactive, then scene activation triggers another route, causing duplicate navigation.
+
+After: push handler stores route intent; activation reconciles it once after session/domain validation.
+
+Validation:
+- tap push while app suspended;
+- tap push while app inactive but process alive;
+- expired session shows auth gate then continues route;
+- invalid route produces safe message and consumes intent once.
+
+#### Testing strategy
+Warm launch testing must simulate interruption, not only app icon launch.
+
+Minimum matrix:
+- app switcher return after short background interval;
+- return after long suspension;
+- return after permission revoked in Settings;
+- return after auth token/session expiration;
+- return from system UI: photo picker, file picker, StoreKit, Sign in with Apple, camera;
+- push/Universal Link/widget/App Intent while process alive;
+- foreground while pending mutation exists;
+- foreground after background task partially completed;
+- multi-window iPadOS scene activation where relevant;
+- Low Power Mode / constrained network for refresh behavior.
+
+Automated tests should cover activation state machines, route intent preservation, refresh deduplication and pending mutation protection. Manual/device QA is needed for app switcher behavior, Settings permission changes, system UI returns, push/deep link flows and old-device responsiveness.
+
 #### Interview/incident-review Q&A с ответами
+1. **Почему warm launch может быть сложнее cold launch?**
+   **Ответ:** при warm launch process state уже существует, но может быть stale. Нужно reconcile session, permissions, pending tasks, caches, scene state and route intents без потери UI continuity и без duplicate work.
+
+2. **Что должно происходить первым при возвращении в foreground?**
+   **Ответ:** безопасное восстановление visible local UI и interaction readiness. Refresh, sync and remote checks должны запускаться ограниченно и с поддержкой cancellation, не блокируя весь UI, если нет security/correctness причины.
+
+3. **Почему нельзя просто запускать reload на каждый `scenePhase == .active`?**
+   **Ответ:** `.active` может происходить часто и для разных scenes. Без deduplication это создаёт network bursts, DB contention, broad UI invalidation, race с pending mutations and battery cost.
+
+4. **Как warm launch должен обрабатывать revoked permissions?**
+   **Ответ:** permission state нужно re-read on activation for affected capabilities. UI должен иметь denied/restricted/limited states, не crash-иться, не показывать stale privileged UI и не логировать sensitive context.
+
+5. **Как защититься от deep link duplication при warm launch?**
+   **Ответ:** route intent нужно хранить отдельно от SwiftUI navigation path, reconcile once after session/domain validation, mark consumed или rejected, and make scene ownership explicit.
+
+6. **Что проверять в incident review после жалоб “приложение зависает при возвращении”?**
+   **Ответ:** activation signposts, main actor work, foreground refresh duplication, session refresh blocking, database reloads, permission checks, pending mutation races, scene recreation and old-device traces.
+
+#### Чеклист production-readiness для warm launch
+Warm launch не готов к production, пока:
+- visible local UI восстанавливается быстро и безопасно;
+- foreground refresh не блокирует first interaction без security/correctness причины;
+- activation handlers idempotent, deduplicated and scene-aware;
+- session expiration/revocation имеет explicit UI path, including redacted/locked state for sensitive screens;
+- permission changes outside app handled;
+- route intents from push/deep link/widget/App Intent preserved, target scene policy defined, consumed/rejected once;
+- pending local mutations protected from refresh overwrite by version/conflict/merge policy;
+- background task completion cannot race foreground manual refresh;
+- multi-scene navigation/state ownership defined where relevant;
+- long activation work cancellable if app backgrounds again;
+- metrics/signposts cover activation reason, duration and result;
+- release QA includes app switcher return, Settings permission change and system UI return scenarios.
+
+
 ### 2.3. Активация foreground
 #### Scope и prerequisites
 #### Core theory и mental model
