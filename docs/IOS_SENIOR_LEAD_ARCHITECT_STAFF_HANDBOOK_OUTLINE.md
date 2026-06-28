@@ -3635,11 +3635,273 @@ Process lifetime handling не готово к production, пока:
 
 
 ### 2.6. Жизненный цикл scene
+#### Назначение раздела
+Scene lifecycle — это модель владения видимой UI-сессией в iOS/iPadOS. После появления `UIScene` приложение перестало быть “один process = один window = один navigation state”. Один app process может иметь несколько scene sessions, каждая может подключаться, становиться foreground active/inactive, уходить в background, disconnect-иться и позже восстанавливаться. Production iOS architecture должна отличать app-wide state от scene-scoped state.
+
+Senior-level ошибка — хранить navigation, selection, draft UI state и pending route в глобальном singleton, потому что “сейчас у нас один экран”. Staff-level mental model: **scene is a UI ownership boundary**. Scene owns presentation/navigation/selection context; app/domain layer owns shared durable data and session policy.
+
 #### Scope и prerequisites
+Этот раздел раскрывает:
+- что такое `UISceneSession`, `UIWindowScene`, подключение и отключение scene;
+- как scene lifecycle отличается от app/process lifecycle;
+- какие state categories должны быть scene-scoped;
+- как SwiftUI `WindowGroup`, `Scene`, `scenePhase`, `@SceneStorage` relate to UIKit scenes;
+- как маршрутизация, восстановление и external intents взаимодействуют со scenes;
+- какие production bugs возникают из-за неправильного scene ownership.
+
+Не раскрывается подробно:
+- multi-window product strategy, concurrent windows, conflict UX and document collaboration — это `2.7`;
+- full state restoration pipeline, encoding/decoding, versioning, migration and restoration tests — это `2.8`;
+- foreground activation semantics — это `2.3`;
+- suspension/termination — это `2.5`.
+
+Практическая формула: **если state описывает конкретное окно/scene, его owner должен быть scene-scoped; если state описывает domain/session/source of truth, он может быть process-wide или durable**.
+
 #### Core theory и mental model
+Scene lifecycle separates three layers:
+
+| Layer | Примеры | Owner |
+| --- | --- | --- |
+| Process/app | dependency graph, logging, app-wide session policy, push registration | app composition root / app services |
+| Domain/data | account, documents, sync queues, persisted content, permissions | domain/persistence/sync owners |
+| Scene/UI session | navigation stack, selected tab, focused document, modal presentation, transient editing UI | scene coordinator / scene model |
+
+Scene is not just “a window object”. It is a lifecycle and ownership boundary for visible interaction context. A scene can be disconnected while process lives. A new scene can be created for another document, activity or external display. A scene can be backgrounded while another remains active. Even if product currently supports one visible window, code should avoid preventable coupling that would break scene semantics later.
+
+Core rule: **app-level state can feed scenes; scene state must not accidentally become global state**.
+
 #### Подкапотные детали
+Key UIKit concepts:
+- `UISceneSession` represents a system record of a scene session that may outlive a concrete `UIScene`/`UIWindowScene` instance. App configures/receives sessions through scene configuration; it does not directly “own a window forever”.
+- `UIWindowScene` represents a concrete window scene used for UI.
+- `UISceneConfiguration` tells the system how to create a scene for a role.
+- `connectionOptions` can carry URL contexts, user activities, shortcut items and notification response context. It is one-shot input at scene connection, not a long-lived routing store; normalize required intents and hand them to scene coordinator.
+- `stateRestorationActivity(for:)` can provide scene-specific restoration information.
+- scene delegate callbacks describe scene connection, foreground/background and disconnection.
+- `application(_:didDiscardSceneSessions:)` tells the app that the system discarded scene sessions; use it to clean related restoration records that no longer have a system-owned session.
+
+Key SwiftUI concepts:
+- `WindowGroup` can create multiple windows/scenes for the same app role, even though code has one declarative entry point. If a root model owns navigation/presentation, create it on the scene boundary, not as accidental app-global singleton.
+- `@Environment(\.scenePhase)` reports high-level lifecycle phase but is not a routing store.
+- `@SceneStorage` stores small scene-specific UI state, not domain data.
+- `@State` and view-local state are convenient but not durable scene restoration by default.
+- SwiftUI app lifecycle still maps to platform scene lifecycle; hiding boilerplate does not remove ownership requirements.
+
+Important distinction:
+- **Scene disconnection** does not necessarily mean process death.
+- **Scene background** does not necessarily mean all app work should stop.
+- **Process termination** removes all scenes from memory, but restoration may recreate scene sessions from durable/restoration data.
+- **Scene identity** should be explicit when routing, restoring, logging or syncing scene-related UI state.
+
+Scene/session `persistentIdentifier` is useful for diagnostics and restoration bookkeeping, but it should not become permanent domain identity. Domain identity belongs to documents, accounts, entities or routes, not to a system scene session ID.
+
+#### Scene-scoped state taxonomy
+Use this taxonomy during design review:
+
+| State | Scene scope | Reason |
+| --- | --- | --- |
+| Navigation path | usually yes | different scenes can show different flows/documents |
+| Selected tab/sidebar item | usually yes | user context per window |
+| Presented sheet/alert | yes | presentation belongs to visible scene |
+| Focused document/item | yes or document-scoped | depends on product model |
+| Scroll position/filter/sort UI | usually yes | UI convenience, not global truth |
+| Draft edit text | scene-owned but durable if product promises recovery | one scene may edit independently |
+| Auth session | no, app/account-scoped | shared security policy |
+| Pending mutation queue | no, domain/sync-scoped | must survive scenes/process |
+| Cached content | no or shared cache | bounded regenerable data |
+| Permission state | app/capability-scoped | system grant shared, UI reaction scene-specific |
+
+Rule: when adding state, ask which scene owns it, how it is restored, and what happens if another scene exists. If answer is “we only have one scene”, document that as current product constraint, not platform truth.
+
+#### Routing и external intents
+External intents can arrive at scene connection or while scenes already exist:
+- Universal Links;
+- custom URL schemes;
+- push notification responses;
+- shortcuts / quick actions;
+- handoff / user activities;
+- document open requests;
+- App Intents handoff.
+
+Routing must choose target scene policy:
+- route into currently active compatible scene;
+- reuse existing scene showing same document/context;
+- create new scene if product supports it;
+- ask user to choose if ambiguity matters;
+- reject with safe explanation if route is invalid or unauthorized.
+
+Dangerous pattern: parse URL in app delegate and mutate global navigation path. Correct pattern: parse into domain route intent, validate auth/domain/permissions, then deliver to selected scene coordinator exactly once.
+
+Example shape:
+
+```swift
+struct SceneRouteIntent: Equatable, Codable {
+    enum Target: Equatable, Codable {
+        case activeScene
+        case document(Document.ID)
+        case newScene
+    }
+
+    let id: UUID
+    let target: Target
+    let route: AppRoute
+    let createdAt: Date
+}
+
+@MainActor
+final class SceneRouteCoordinator {
+    private let sceneID: String
+    private var consumedIntentIDs: Set<UUID> = []
+
+    init(sceneID: String) {
+        self.sceneID = sceneID
+    }
+
+    func handle(_ intent: SceneRouteIntent) {
+        guard !consumedIntentIDs.contains(intent.id) else { return }
+        guard canHandle(intent) else { return }
+
+        consumedIntentIDs.insert(intent.id)
+        // Apply route to this scene's navigation state only.
+    }
+
+    private func canHandle(_ intent: SceneRouteIntent) -> Bool {
+        // Check target policy, auth/session/domain validity and scene compatibility.
+        true
+    }
+}
+```
+
+#### Scene restoration boundaries
+This subsection defines boundaries and ownership only. Full restoration pipeline design — encoding/decoding, schema/versioning, migration, validation matrix and tests — remains in `2.8`. Scene restoration is not the same as persistence: restoration rebuilds UI context; persistence preserves domain truth.
+
+Good restoration candidates:
+- selected tab/sidebar section;
+- current document ID;
+- navigation route if still valid;
+- draft checkpoint reference;
+- scroll position where useful;
+- split view/sidebar visibility.
+
+Bad restoration candidates:
+- raw auth tokens;
+- full DTO payloads;
+- large decoded media buffers;
+- sensitive content that should require re-auth;
+- transient network response objects;
+- domain data that belongs in persistence layer.
+
+Restoration must validate current reality: document may be deleted, permission revoked, account switched, feature disabled, route unauthorized or app updated. Invalid restoration should degrade to safe fallback, not crash or show stale private content.
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- Keep scene navigation/presentation state scene-scoped.
+- Do not use one global navigation path for all scenes unless product explicitly forbids multiple scenes and documents why.
+- Route external intents through domain validation and scene target policy.
+- Use `@SceneStorage` only for small UI state; do not store domain truth there.
+- Preserve pending route intents through session/auth transitions and consume/reject once.
+- Make scene disconnection safe: cancel scene-owned tasks, checkpoint scene UI state, do not clear app-wide domain state blindly.
+- Include scene identity in lifecycle diagnostics and route logs.
+- Treat SwiftUI `scenePhase` as signal, not full scene session model.
+
+Ловушки:
+- **Global navigation singleton:** second scene corrupts first scene route.
+- **Scene disconnect data loss:** draft only in scene memory with no checkpoint.
+- **App delegate routing overreach:** app-level handler mutates UI before scene exists.
+- **Restoring stale private content:** old route shown after logout/account switch.
+- **SceneStorage abuse:** storing large or sensitive domain data in scene UI storage.
+- **Duplicate intent handling:** URL/push handled by app and scene both.
+- **No scene diagnostics:** incident logs cannot tell which scene received lifecycle event.
+
+#### SwiftUI-specific guidance
+SwiftUI apps should still make scene ownership explicit.
+
+Recommended patterns:
+- create a scene-scoped model/coordinator per `WindowGroup` scene where navigation or route ownership matters;
+- keep app-wide dependencies injected into scene model, not stored as mutable scene state;
+- use `@SceneStorage` for small restoration hints, not source-of-truth data;
+- use typed route intents and explicit scene target policy;
+- avoid passing one global view model into all windows if it owns navigation or presentation.
+
+Suspicious patterns:
+- root `@StateObject` used as global navigation owner for every window;
+- `.onOpenURL` directly mutates global path;
+- every scene observes same singleton and presents same alert/sheet;
+- `@SceneStorage` contains full serialized document/user profile;
+- scene lifecycle callback clears account/session state.
+
+#### Примеры, упражнения и Q&A с ответами
+**Пример 1: Universal Link before scene exists**
+
+Проблема: Universal Link arrives during scene connection. App tries to mutate a root view model that has not been created yet, so route is lost.
+
+Целевое состояние: connection options become durable/queued `SceneRouteIntent`. Scene coordinator consumes it after setup and validation.
+
+Проверка:
+- launch from Universal Link cold;
+- launch from Universal Link while app has existing scene;
+- require auth before route;
+- verify intent consumed once and safe fallback on invalid route.
+
+**Пример 2: two scenes share one navigation path**
+
+Этот пример нужен только для доказательства scene ownership. Product strategy for concurrent windows, conflict UX and document collaboration intentionally remains in `2.7`.
+
+Проблема: user opens document A in one window and document B in another. Global path changes when second scene navigates, first scene jumps unexpectedly.
+
+Целевое состояние: navigation path is scene-scoped; shared document data lives in domain/persistence layer. Each scene has separate selection/navigation and shared updates flow through domain state.
+
+Проверка:
+- open two scenes with different documents;
+- navigate independently;
+- update shared document content;
+- verify navigation remains isolated and data updates remain consistent.
+
+**Пример 3: `@SceneStorage` used as persistence**
+
+Проблема: app stores full draft text or DTO payload in `@SceneStorage`. Sensitive data leaks into inappropriate storage path and large state becomes fragile.
+
+Целевое состояние: `@SceneStorage` keeps small draft ID or UI hint. Draft body is persisted by feature/persistence owner with file protection, migration and cleanup policy.
+
+Проверка:
+- create large draft;
+- terminate/relaunch;
+- account switch/logout;
+- verify restoration references valid durable data and does not reveal unauthorized content.
+
+#### Review Q&A с ответами
+1. **Почему scene lifecycle нельзя заменить app lifecycle?**
+   **Ответ:** app lifecycle describes process/application state, while scene lifecycle describes конкретную UI-сессию. In multi-scene environment one scene can be active while another is backgrounded or disconnected.
+
+2. **Какие state обычно должны быть scene-scoped?**
+   **Ответ:** navigation path, selected tab/sidebar item, presentation state, scroll/filter UI, focused document context and scene-specific route handling. Domain source of truth and pending mutations обычно живут вне scene.
+
+3. **Почему `@SceneStorage` не подходит для domain data?**
+   **Ответ:** it is for small scene restoration hints. Domain data needs persistence, migration, privacy, backup/file protection and consistency policy.
+
+4. **Как route intent должен попадать в scene?**
+   **Ответ:** external input parses into typed intent, domain/session validation checks it, target scene policy selects scene, scene coordinator consumes or rejects intent once.
+
+5. **Что делать, если restoration route больше не valid?**
+   **Ответ:** degrade to safe fallback: home/document list/auth gate/error state with user-safe message. Do not crash, show stale private content or recreate deleted data.
+
+6. **Как расследовать баг “окно само переключилось на другой экран”?**
+   **Ответ:** inspect scene identity in logs, global navigation owners, external intent consumption, shared singleton mutations, scene connection/disconnection sequence and whether another scene changed shared UI state.
+
+#### Чеклист production-readiness для scene lifecycle
+Scene lifecycle handling не готово к production, пока:
+- scene-scoped and app-scoped state boundaries documented;
+- navigation/presentation state is not accidentally global;
+- external intents have target scene policy;
+- scene connection options are preserved until scene coordinator is ready;
+- scene disconnection cancels scene-owned tasks without clearing app-wide truth;
+- restoration validates auth, account, permissions, documents and feature availability;
+- `@SceneStorage` contains only small non-sensitive UI hints;
+- multi-scene diagnostics include scene/session identity;
+- scene lifecycle tests cover connection, foreground/background, disconnection and invalid restoration;
+- product explicitly documents if multi-scene is unsupported and code relies on that constraint.
+
+
 ### 2.7. Поведение multi-window
 #### Scope и prerequisites
 #### Core theory и mental model
