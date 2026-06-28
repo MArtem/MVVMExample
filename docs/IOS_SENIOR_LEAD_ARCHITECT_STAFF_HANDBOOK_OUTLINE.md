@@ -3903,11 +3903,301 @@ Scene lifecycle handling не готово к production, пока:
 
 
 ### 2.7. Поведение multi-window
+#### Назначение раздела
+Multi-window поведение — это продуктово-архитектурное lifecycle-решение, а не “iPad-only optional polish”. На iPadOS пользователь может открыть несколько окон одного приложения, работать с разными документами, сценами, split view/Stage Manager layouts, external display contexts и system-driven scene restoration. Даже если приложение формально не продвигает multi-window UX, оно должно понимать, что scene model делает случайный global UI state опасным.
+
+Senior-level цель — не сломать одну scene, когда появляется вторая. Staff-level цель — определить multi-window policy: поддерживаем, ограничиваем, запрещаем или поэтапно внедряем; какие domain entities могут быть открыты одновременно; как синхронизируются edits; как route intents выбирают окно; как QA/release доказывает корректность.
+
 #### Scope и prerequisites
+Этот раздел продолжает `2.6`. Там были scene lifecycle and ownership boundaries. Здесь фокус:
+- product policy для multi-window;
+- concurrent scene behavior;
+- document/entity ownership across scenes;
+- navigation and selection isolation;
+- shared domain state and conflict policy;
+- external intent target selection;
+- QA, observability and release risks.
+
+Не раскрывается подробно:
+- low-level scene lifecycle callbacks — `2.6`;
+- full state restoration — `2.8`;
+- document architecture, collaboration and sync conflict resolution in depth — будущие data/sync sections;
+- advanced iPad UI design patterns — отдельная UI/UX/accessibility topic.
+
+Практическая формула: **multi-window readiness means every state has explicit scope: process-wide, account-wide, document-wide, scene-wide or view-local**.
+
 #### Core theory и mental model
+Multi-window breaks hidden singletons.
+
+Single-window assumption:
+- one navigation path;
+- one selected item;
+- one visible document;
+- one current draft;
+- one active route intent;
+- one foreground scene;
+- one presentation stack.
+
+Multi-window reality:
+- multiple scenes can be active or visible;
+- each scene can show different navigation state;
+- two scenes can reference same domain entity;
+- one scene can be backgrounded while another remains active;
+- external intents need target policy;
+- domain updates should propagate consistently without hijacking UI context;
+- destructive actions in one window can invalidate content in another.
+
+Staff mental model: **UI context is scene-scoped; domain truth is shared and versioned; conflicts are product policy, not framework accidents**.
+
+#### Product policy matrix
+Before implementation, decide the product stance.
+
+| Policy | When appropriate | Engineering consequences |
+| --- | --- | --- |
+| No multi-window support | app has strict single-session UX or high risk | explicitly disable/limit scene creation where possible; still avoid accidental global corruption |
+| Passive compatibility | app may run multiple scenes but does not optimize UX | isolate navigation, prevent data loss, basic QA matrix |
+| Document/entity windows | documents/items can open in separate windows | document identity, route target policy, concurrent edit rules |
+| Power-user multi-window | users expected to compare/edit across windows | strong sync/conflict UX, drag/drop, keyboard, Stage Manager QA |
+| External display / special roles | presentation/control split or media/pro workflows | scene roles, privacy, performance, input routing |
+
+Policy must define non-goals. Example: “multiple windows may view different documents, but concurrent editing of same document is not supported; second editor opens read-only or asks user to switch”. Without this, engineers invent behavior ad hoc.
+
+Governance rule: enabling or materially changing multi-window support requires ADR/RFC when it changes document/entity window policy, external display roles, route target policy, concurrent editing, navigation ownership, session/account behavior, persistence/sync semantics or release QA matrix.
+
+Product examples:
+- **Banking app:** often limits multi-window or uses read-only duplicate views because privacy/session risk is high.
+- **Document editor:** usually benefits from document/entity windows, but needs edit locks, versioning and conflict UX.
+- **Media/presentation app:** may use external display roles, requiring privacy and input-routing policy.
+- **Commerce app:** may allow multiple browsing windows but keep checkout/session/payment state tightly scoped and protected.
+
 #### Подкапотные детали
+Relevant platform mechanics:
+- `WindowGroup` can create multiple scenes for same app role.
+- `DocumentGroup` and document-based apps naturally encourage multiple document scenes.
+- `UIApplication.requestSceneSessionActivation` can ask system to activate/create a scene.
+- `UISceneSession` has role and persistent identifier useful for bookkeeping, not domain identity.
+- `connectionOptions` can carry external intents at scene creation.
+- scene sessions can be discarded by system.
+- SwiftUI navigation and presentation state can accidentally become global if owned above scene boundary.
+
+Important principle: system owns window management. The app can request scene activation and provide configuration, but user/system may decide layout, visibility, size class, multitasking mode and restoration timing.
+
+#### State scope matrix
+Use this matrix to review every state variable:
+
+| Scope | Examples | Storage/owner | Multi-window risk |
+| --- | --- | --- | --- |
+| Process-wide | app services, analytics config, dependency container | app composition root | accidental UI ownership in singleton |
+| Account/session-wide | auth, account, entitlement state | session/account owner | logout/account switch impacts all scenes |
+| Domain/entity-wide | document content, task, article, pending mutation | persistence/domain/sync owner | two scenes edit/read same entity |
+| Scene-wide | navigation path, selected tab, presented sheet, focused document | scene coordinator/model | global path corrupts other scene |
+| View-local | text field focus, transient animation state | view/model | over-persisting temporary UI |
+| Capability-wide | permission state, background mode eligibility | capability owner | one scene assumes grant changed only for itself |
+
+Rule: if state affects what a particular window displays, default to scene-wide. If state affects source of truth, default to domain/account-wide with versioning and conflict policy.
+
+Review invariant: every new state variable, observable object or coordinator added to multi-window-capable code must be classified by scope before code review approval: process-wide, account/session-wide, domain/entity-wide, scene-wide, view-local or capability-wide.
+
+#### Concurrent data and edit policy
+Multi-window introduces same-entity concurrency inside one process.
+
+Decide explicitly through product rules:
+- **Same entity visibility:** define whether the same document/entity can be open in two scenes.
+- **Edit concurrency:** define whether both scenes can edit or only one scene is writer.
+- **Read-only duplicate:** define when duplicate scenes become read-only.
+- **Edit lock:** define whether editing is locked to one scene and how user sees that lock.
+- **Live propagation:** define whether changes are live-synced between scenes or require explicit refresh.
+- **Deletion handling:** define how a scene reacts when another scene deletes the entity it displays.
+- **Account/session change:** define how all scenes respond to logout, account switch, revocation or lock.
+
+Common policies:
+- **Single writer:** only one scene can edit; others view or navigate to existing editor.
+- **Optimistic shared editing:** both scenes edit and domain model broadcasts changes with conflict resolution.
+- **Read-only duplicates:** duplicate windows can view but not mutate.
+- **Document identity reuse:** opening same document activates existing scene instead of creating duplicate.
+- **Explicit conflict UI:** concurrent edits create conflict state user must resolve.
+
+Never let accidental last-writer-wins become product policy. If two scenes can mutate same state, persistence/sync layer needs versioning, idempotency and conflict rules.
+
+#### Routing and scene target policy
+General external-intent mechanics were introduced in `2.6`. Here the focus is multi-window-specific target choice: same entity, existing compatible scene, privacy, unsaved edits, duplicate editor, and new scene vs reuse. Every external intent needs target decision.
+
+Target options:
+- existing active scene;
+- existing scene showing same document/entity;
+- most recently used compatible scene;
+- new scene;
+- user choice;
+- reject route as unsupported/unauthorized.
+
+Routing policy must consider:
+- auth/session state;
+- account ownership;
+- document/entity availability;
+- current scene edit state;
+- whether opening route would destroy unsaved context;
+- privacy of showing content in another window;
+- platform capability: iPhone vs iPadOS, Stage Manager, external display.
+
+Example policy object:
+
+```swift
+struct SceneTargetPolicy {
+    enum Decision: Equatable {
+        case useExistingScene(sceneID: String)
+        case requestNewScene
+        case requireUserChoice
+        case reject(reason: RejectionReason)
+    }
+
+    func decide(
+        intent: SceneRouteIntent,
+        availableScenes: [OpenSceneSnapshot],
+        session: SessionState
+    ) -> Decision {
+        guard session.canAccess(intent.route) else {
+            return .reject(reason: .unauthorized)
+        }
+
+        if let scene = availableScenes.first(where: { $0.canHandle(intent) }) {
+            return .useExistingScene(sceneID: scene.id)
+        }
+
+        return .requestNewScene
+    }
+}
+```
+
+This is a policy example, not a required abstraction. The important part is that target choice is explicit and testable.
+
+#### UX, accessibility and localization implications
+Multi-window changes user experience:
+- titles and document names must clarify which window is which;
+- destructive actions need clear scope: current window, current document, all account data;
+- VoiceOver focus should not jump due to updates in another scene;
+- keyboard shortcuts may target active scene only;
+- drag/drop may create external intents or document copies;
+- localized window titles and conflict messages need enough context;
+- small split view widths can expose layout assumptions;
+- external display scenarios can expose privacy-sensitive content.
+
+Accessibility rule: when shared domain updates from another scene, current scene should announce meaningful changes only if they affect current user context. Do not spam VoiceOver with background-window updates.
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- Define product policy before enabling or relying on multi-window behavior.
+- Isolate navigation, selection and presentation per scene.
+- Share domain state through explicit owners, not UI singletons.
+- Use scene identity in logs and route diagnostics.
+- Decide same-entity concurrent edit behavior before shipping.
+- Make destructive actions propagate safely to other scenes.
+- Keep pending mutations process/domain-scoped, but UI pending indicators scene-specific.
+- Do not treat `UISceneSession.persistentIdentifier` as document/account identity.
+- Test old iPadOS versions and current iPadOS multitasking modes where supported.
+
+Ловушки:
+- **Accidental singleton UI:** one global view model owns navigation for all scenes.
+- **Implicit last writer wins:** two windows edit same object and later save silently overwrites.
+- **Route hijack:** push/deep link changes wrong scene.
+- **Delete ghost:** one scene deletes item, another continues showing stale editable screen.
+- **Logout blast radius unknown:** account change closes or corrupts scenes unpredictably.
+- **No scene observability:** support cannot identify which window had the bug.
+- **Unsupported but not audited:** app does not advertise/create extra windows, but configuration/restoration/external-intent paths still need audit so unexpected additional scene/session degrades safely instead of corrupting state.
+
+#### Testing strategy
+Minimum multi-window QA matrix:
+
+Required for any multi-window-capable app:
+- open two scenes with different entities;
+- background one scene while another remains active;
+- route Universal Link/push/document open while multiple scenes exist;
+- account logout/switch with multiple scenes;
+- process kill/relaunch with multiple scene restoration records;
+- verify scene/session diagnostics for target decisions.
+
+Conditional by product support:
+- open two scenes with same entity if allowed;
+- same-entity concurrent edit if allowed;
+- delete/mutate entity in one scene and observe the other;
+- permission revocation while multiple scenes show affected features;
+- Stage Manager / Split View / Slide Over sizes where supported;
+- external display if supported;
+- drag/drop if supported;
+- VoiceOver focus and keyboard shortcuts in active scene if interaction model supports them.
+
+Instrumentation should include privacy-safe `sceneRole`, scene/session identity, `routeIntentKind`, route intent ID, active scene count, target decision, rejection reason and hashed/non-PII document/entity identifier where needed.
+
+#### Примеры, упражнения и Q&A с ответами
+**Пример 1: same document opened twice**
+
+Проблема: app lets user edit same document in two windows. Each scene has local copy. Last save wins and silently discards changes from other scene.
+
+Целевое состояние: product policy decides single writer, shared live model, read-only duplicate or explicit conflict UI. Persistence layer stores versions and refuses silent overwrite.
+
+Проверка:
+- open same document in two scenes;
+- edit both;
+- save in different order;
+- verify policy outcome and user-visible conflict/read-only/merge behavior.
+
+**Пример 2: Universal Link targets wrong window**
+
+Проблема: user has document A in one window and document B in another. Universal Link to B activates A and changes its navigation unexpectedly.
+
+Целевое состояние: route policy finds existing compatible scene for B or creates/asks for target. Scene A remains unchanged unless user chose it.
+
+Проверка:
+- two windows with different documents;
+- route to each document;
+- route to missing/unauthorized document;
+- verify target decision logs.
+
+**Пример 3: product does not support multi-window**
+
+Проблема: team assumes iPhone-like single scene but does not document or test restrictions. A restored second scene appears with broken global state.
+
+Целевое состояние: product explicitly declares unsupported multi-window, app does not advertise/create extra windows, platform configuration is audited, and any restored/extra scene or untargetable route degrades safely without data loss/global corruption.
+
+Проверка:
+- try system paths that create/restore additional scenes;
+- verify safe fallback or refusal;
+- ensure global state is not corrupted;
+- document product limitation.
+
+#### Review Q&A с ответами
+1. **Почему multi-window — product decision, а не только UIKit detail?**
+   **Ответ:** it changes user workflow, document ownership, concurrent editing, routing, support and QA matrix. Framework can create scenes, but product must define what multiple windows mean.
+
+2. **Что должно быть scene-scoped in multi-window app?**
+   **Ответ:** navigation path, selected item, presentation state, focused document context, scroll/filter UI and scene-specific route consumption. Domain data, auth and pending mutation queue usually live outside scene.
+
+3. **Как избежать silent overwrite при двух окнах?**
+   **Ответ:** define same-entity edit policy, use versioning/conflict detection, preserve local pending intent and show explicit merge/read-only/conflict UI instead of accidental last-writer-wins.
+
+4. **Как external intent выбирает window?**
+   **Ответ:** через target scene policy: existing compatible scene, new scene, user choice or rejection. Direct mutation of global navigation path is unsafe.
+
+5. **Что делать, если multi-window не поддерживается продуктом?**
+   **Ответ:** document non-goal, limit scene creation/restoration where possible, handle unexpected extra scene safely, and test that unsupported path does not corrupt state or lose data.
+
+6. **Какие diagnostics нужны для multi-window bugs?**
+   **Ответ:** scene/session ID, active scene count, route intent ID, target decision, entity/document ID where privacy-safe, lifecycle sequence and owner that mutated navigation/domain state.
+
+#### Чеклист production-readiness для multi-window
+Multi-window behavior не готов к production, пока:
+- product policy and non-goals documented, with ADR/RFC for broad ownership or behavior changes;
+- scene/domain/account/process state scopes are explicit;
+- navigation and presentation are scene-scoped;
+- same-entity concurrent edit policy defined;
+- external intent target scene policy implemented and tested;
+- destructive actions propagate safely to other scenes;
+- unsupported multi-window behavior is intentionally limited and safe;
+- logs include privacy-safe scene identity and target decisions;
+- QA covers multiple scenes, same/different entities, account changes and restoration;
+- accessibility and localization cover window titles, focus and conflict states;
+- release notes/support guidance reflect supported multi-window behavior.
+
+
 ### 2.8. Восстановление состояния
 #### Rendering и lifecycle model
 #### Граница ownership состояния
