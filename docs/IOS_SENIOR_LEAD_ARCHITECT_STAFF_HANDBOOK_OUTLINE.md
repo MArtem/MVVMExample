@@ -2190,12 +2190,367 @@ Staff response: не блокировать innovation reflexively, а потр�
 
 ## 2. App lifecycle и поведение процесса
 ### 2.1. Холодный запуск
+#### Назначение раздела
+Холодный запуск — это путь от отсутствующего app process до первого используемого состояния интерфейса, когда пользователь может понять, что приложение живо, и начать осмысленное взаимодействие. В production iOS это не “быстро открыть экран на simulator”. Это lifecycle-critical path, где сходятся dyld, Swift runtime, static initializers, dependency creation, app/scene lifecycle, session restore, local persistence, feature flags, privacy prompts, logging, analytics, remote config и первый render.
+
+Senior-level ошибка — считать запуск одной функцией `main` или `App.body`. Staff-level mental model: **cold launch — это продуктовый SLA, архитектурный boundary и release gate**. Всё, что попадает до first usable screen, конкурирует за пользовательское внимание, main thread, memory peak, disk I/O, CPU, energy и crash-free startup.
+
+#### Определение и mental model
+Различай несколько видов запуска:
+- **Cold launch:** process не был в памяти; система создаёт процесс заново.
+- **Warm launch:** process уже существует или недавно был suspended; часть state может быть в памяти.
+- **Relaunch after jetsam:** внешне похож на cold launch, но должен восстановить durable state после memory termination.
+- **Relaunch after crash:** требует crash-safe recovery, а не только fast UI.
+- **Launch from notification/deep link/widget/App Intent:** запуск имеет routing intent и может требовать auth/session coordination.
+- **Launch after update/migration:** старт включает compatibility, migration и feature gating risk.
+
+Scope boundary: в этом разделе jetsam, crash recovery, scene recreation, background work и deep links рассматриваются только как **варианты входа в launch path и источники launch risk**. Глубокий разбор process lifetime, scene lifecycle, foreground/background transitions и background execution остаётся для следующих разделов части II.
+
+Важно также учитывать prewarming и non-user-visible launch scenarios. iOS может подготовить или запустить процесс не строго из-за tap по иконке, а launch code может выполниться до того, как пользователь явно увидел UI. Поэтому startup side effects должны быть безопасными: не отправлять неверные analytics events, не выполнять лишние network mutations, не показывать permission prompts без контекста и не считать любой старт доказательством user intent.
+
+Практическая формула: **на cold launch приложение должно сделать только минимально необходимое для безопасного, понятного и интерактивного первого состояния; всё остальное должно быть lazy, cancellable, отложено или выполняться инкрементально**.
+
+Первый usable screen не всегда равен “главный экран полностью загружен”. Для news/feed app usable state может быть cached content + visible refresh indicator. Для banking app — secure auth gate. Для editor app — restored document shell. Для media app — library skeleton with local metadata. Product должен определить, что считается usable, иначе performance work превращается в спор о субъективном ощущении.
+
 #### Performance budget и measurement target
+Не существует универсального launch budget, который можно честно применить ко всем приложениям, устройствам и рынкам. Но production-команда обязана иметь измеримый target.
+
+Минимальные launch targets:
+- **First process alive:** process создан, early crash не произошёл.
+- **First frame:** UI впервые представлен системой.
+- **Первый usable screen:** пользователь видит осмысленное состояние, не пустой blocking spinner без контекста.
+- **Interaction ready:** primary tap/scroll/input не блокируется heavy startup work.
+- **Critical background readiness:** deep link, notification или auth routing не потеряны.
+
+Budget задаётся по matrix:
+- device class: latest, median supported, oldest supported;
+- OS versions: newest, lowest supported, high-traffic previous versions;
+- install state: fresh install, logged-in, logged-out, large local data, after update;
+- entry point: icon tap, push notification, Universal Link, widget/App Intent handoff;
+- network state: online, offline, captive/slow network;
+- thermal/power state: normal vs Low Power Mode where relevant.
+
+Senior target: запуск не должен выполнять unnecessary synchronous network/database/media work before first usable screen. Staff target: launch path должен быть **ограничен по ресурсам, наблюдаем, имеет владельца и защищён от регрессий**.
+
+#### Launch decision gate
+Перед оптимизацией нужно классифицировать startup work:
+
+| Категория работы | Решение | Примеры |
+| --- | --- | --- |
+| Блокирует первый экран | Разрешено только при security/correctness necessity | auth lock state, critical schema compatibility check, required local snapshot |
+| Выполняется до first interaction | Допустимо, если коротко и не держит main actor | root view model setup, lightweight cached state mapping |
+| Выполняется после первого usable screen | Предпочтительно для refresh/prefetch/analytics | remote config refresh, feed sync, image prefetch, analytics upload |
+| Выполняется в фоне/по расписанию | Только с lifecycle/background constraints | cleanup, indexing, periodic sync, large cache maintenance |
+| Не должна запускаться на launch | Удалить из launch path | speculative SDK setup, full media decoding, unnecessary network mutation |
+
+Если команда не может объяснить, почему work находится в первой категории, work должна быть перенесена ниже по таблице или удалена из launch path.
+
+#### Launch phases под капотом
+Cold launch удобно разбирать по фазам:
+
+| Фаза | Что происходит | Типичный риск |
+| --- | --- | --- |
+| Process creation / dyld | загрузка executable, frameworks, symbols, ObjC/Swift metadata | тяжёлые dynamic frameworks, excessive initializers |
+| Static/global initialization | global variables, singletons, static properties, dependency registries | скрытая работа до app lifecycle |
+| `main` / SwiftUI `App` init | создание app object, environment, early services | synchronous DI graph, logging/analytics setup |
+| Application/scene lifecycle | `UIApplicationDelegate`, `SceneDelegate`, SwiftUI scene creation | смешивание lifecycle, routing и heavy services |
+| First render | построение initial view tree, layout, image/text preparation | heavy SwiftUI `body`, broad observation, media decoding |
+| First interaction | user taps/scrolls/types while startup tasks continue | main actor saturation, state races, duplicate refresh |
+| Post-launch отложенная работа | refresh, sync, migrations, prefetch, analytics | work не bounded, не cancellable, конкурирует с UI |
+
+Подкапотный принцип: even if work is “async”, она может вернуться на main actor, захватить locks, создать memory peak или вызвать broad invalidation в момент первого render. Поэтому launch review должен смотреть end-to-end path, а не только наличие `Task {}`.
+
 #### Instrumentation setup и trace interpretation
+Launch performance нельзя оценивать по ощущению на одном simulator run.
+
+Минимальный measurement setup:
+- использовать Release-like build configuration, а не debug-only assumptions;
+- тестировать на real device, если делается performance claim;
+- очищать или контролировать state: fresh install, logged-in, cached data, large data;
+- повторять сценарий несколько раз и сравнивать median/p95, а не один удачный run;
+- отдельно измерять icon launch, notification launch, Universal Link launch и after-update launch;
+- фиксировать device, OS, build number, data state, network state и tool.
+
+Инструменты:
+- **Xcode Organizer metrics:** high-level launch trends after release.
+- **Instruments App Launch template:** фазы startup, main thread work, dyld/static initializer cost.
+- **Time Profiler:** CPU hotspots during launch.
+- **Instruments Hangs / Time Profiler:** long blocking work, CPU hotspots and UI stalls.
+- **Main Thread Checker:** полезен для нарушений UIKit/AppKit main-thread contract, но не является основным инструментом измерения hangs.
+- **os_signpost / MetricKit:** product-specific launch milestones.
+- **Unified logging:** only privacy-safe, bounded startup diagnostics.
+
+Пример signpost strategy:
+
+```swift
+import os
+
+private let launchLog = OSLog(subsystem: "com.example.app", category: "Launch")
+
+enum LaunchSignpost {
+    static let firstUsableScreen = OSSignpostID(log: launchLog)
+
+    static func markFirstUsableScreen() {
+        os_signpost(.event, log: launchLog, name: "FirstUsableScreen", signpostID: firstUsableScreen)
+    }
+}
+```
+
+Для длительных фаз полезен не только event, но и interval signpost:
+
+```swift
+func measureSessionRestore(_ operation: () async throws -> Void) async rethrows {
+    let signpostID = OSSignpostID(log: launchLog)
+    os_signpost(.begin, log: launchLog, name: "SessionRestore", signpostID: signpostID)
+    defer {
+        os_signpost(.end, log: launchLog, name: "SessionRestore", signpostID: signpostID)
+    }
+
+    try await operation()
+}
+```
+
+Interpretation rules:
+- если trace показывает main thread blocked, сначала найти synchronous caller, а не “добавить ещё async”;
+- если dyld/static cost высокий, проверить frameworks, global initializers, static registries и eager dependency graphs;
+- если first frame быстрый, но interaction blocked, это всё равно launch regression;
+- если p95 плохой, а median хороший, искать data-size, device-class, migration, network или auth edge cases;
+- если launch after update медленный, отделить one-time migration от постоянной startup cost;
+- если simulator выглядит хорошо, не считать это доказательством для старых devices.
+
 #### Hot-path риски и static red flags
+Static review часто находит launch regressions до Instruments.
+
+Red flags:
+- synchronous network request, remote config, auth refresh или feature flag fetch before first usable screen;
+- database migration/fetch-all/save-all на main actor during launch;
+- image/PDF/video thumbnail decoding before first screen;
+- heavy JSON parsing, compression, hashing, encryption или search indexing на main actor;
+- global singleton, который создаёт весь dependency graph при первом access;
+- `@MainActor` service/repository только ради удобства UI calls;
+- SwiftUI `body`, который сортирует/filter/map large collections во время initial render;
+- broad observable app state, invalidating large view tree при каждом startup milestone;
+- eager analytics/logging SDK setup, который блокирует launch;
+- permission prompt на cold launch без user context;
+- migration без progress/recovery strategy;
+- unbounded `Task` launched from `App.init`, root view `task`, scene phase handler или dependency container;
+- duplicated refresh: launch refresh + foreground refresh + first screen refresh одновременно.
+
+Senior review должен требовать owner для каждого startup task:
+- кто запускает work;
+- почему она нужна до first usable screen;
+- где cancellation/timeout;
+- что происходит offline;
+- как защищены local state и user intent;
+- как work наблюдается в metrics/logs;
+- как она не запускается повторно из scene recreation.
+
+Пример распределения ответственности, не обязательная архитектура:
+
+| Компонент | Ответственность | Не должен делать |
+| --- | --- | --- |
+| `BootCoordinator` | минимальный boot sequence, ordering, launch milestones | загружать feature data целиком |
+| `SessionRestorer` | восстановить auth/session/security state | silently drop pending route intent |
+| `RouteIntentStore` | сохранить launch/deep-link/push intent до готовности route | напрямую управлять SwiftUI navigation без domain checks |
+| `MigrationRunner` | выполнить blocking compatibility migrations и запланировать deferred enrichment | делать необратимые изменения без recovery path |
+| `FeatureRefreshScheduler` | запускать post-launch refresh/prefetch с cancellation/backoff | блокировать first usable screen |
+
+#### Architecture rules for launch ownership
+Хороший launch design отделяет app boot, session restoration, routing и feature loading.
+
+Разделяй:
+- **Boot state:** минимальная инфраструктура, без которой app не может показать безопасный shell.
+- **Session state:** logged-in/logged-out/expired/locked/unknown.
+- **Navigation intent:** icon, deep link, push, widget, App Intent, handoff.
+- **Durable user state:** persisted drafts, pending mutations, selected document, auth tokens.
+- **Feature data:** content, feeds, recommendations, profile, remote state.
+- **Отложенная работа:** sync, prefetch, analytics upload, cleanup, indexing.
+
+Правило: feature data редко должна блокировать app shell. Session/security gate может блокировать sensitive content, но не обязан блокировать rendering всего приложения. Navigation intent должен сохраняться, если auth/session transition временно не позволяет выполнить route сразу.
+
+Migration rule: blocking launch migration допустима только для compatibility work, без которой приложение не может безопасно прочитать данные или показать корректный shell. Deferred enrichment — индексы, derived caches, thumbnails, search metadata, recommendations — должна выполняться после usable UI, инкрементально и с recovery path. Для каждой migration измеряй duration, failure rate, retry/rollback behavior и partial migration recovery. Если migration может быть interrupted by crash/jetsam, она должна быть idempotent и checkpointed.
+
+Пример безопасной модели launch routing:
+
+```swift
+indirect enum LaunchRouteIntent: Equatable {
+    case home
+    case article(id: Article.ID)
+    case pendingAuthThen(LaunchRouteIntent)
+}
+
+@MainActor
+final class LaunchCoordinator {
+    private var pendingIntent: LaunchRouteIntent?
+
+    func receiveLaunchIntent(_ intent: LaunchRouteIntent) {
+        pendingIntent = intent
+        reconcileRouteIfPossible()
+    }
+
+    func sessionStateChanged() {
+        reconcileRouteIfPossible()
+    }
+
+    private func reconcileRouteIfPossible() {
+        // В production здесь проверяются session/auth/permission/domain constraints.
+        // Важно: intent не теряется только потому, что app ещё не готова к route.
+    }
+}
+```
+
 #### Optimization tradeoff-ы и regression guardrails
+Launch optimization не должна ломать correctness.
+
+Tradeoffs:
+- **Lazy initialization vs first-use latency:** отложенная работа ускоряет launch, но не должна создавать hitch при первом tap.
+- **Cached UI vs stale content:** cached state ускоряет usable screen, но UI должен показывать freshness and refresh state.
+- **Deferred migration vs data correctness:** не все migrations можно отложить; user-critical schema changes требуют safe upfront path.
+- **Skeleton UI vs misleading readiness:** skeleton полезен, если пользователь понимает состояние; бесконечный blank spinner скрывает проблему.
+- **Feature flags vs startup blocking:** flags полезны, но synchronous flag fetch before UI часто хуже, чем безопасные значения по умолчанию + later update.
+- **SDK initialization vs observability:** analytics/crash SDKs важны, но не должны блокировать root UI без доказанной необходимости.
+
+Guardrails:
+- startup tasks имеют timeout/cancellation where applicable;
+- local cached state отображается до remote refresh, если это безопасно;
+- feature flag defaults production-safe and privacy-safe;
+- migrations idempotent and crash-safe;
+- startup signposts стабильны между releases;
+- launch metrics segment by device/OS/data size/entry point;
+- regression budget является release gate для primary flows;
+- PR, добавляющий SDK/dependency/global initializer/root task, обязан явно указать, попадает ли work в launch path;
+- `git diff`/review должен явно показывать, если новая dependency или initializer попадает в launch path.
+
 #### Примеры before/after validation
+**Пример 1: remote config блокирует первый экран**
+
+Before:
+```swift
+@MainActor
+func start() async throws {
+    let flags = try await remoteConfig.fetch()
+    appState.apply(flags)
+    rootScreen = .home
+}
+```
+
+Проблема: offline/slow network задерживает first usable screen, а failure remote config превращается в launch failure.
+
+After:
+```swift
+@MainActor
+func start() {
+    appState.apply(cachedOrDefaultFlags)
+    rootScreen = .home
+
+    Task { [remoteConfig] in
+        do {
+            let freshFlags = try await remoteConfig.fetchWithTimeout()
+            await MainActor.run {
+                appState.apply(freshFlags)
+            }
+        } catch {
+            // Launch остаётся usable; failure уходит в privacy-safe diagnostics.
+        }
+    }
+}
+```
+
+Validation:
+- offline launch shows usable safe default state;
+- slow network does not block first interaction;
+- flag update does not invalidate unrelated view tree;
+- failed fetch produces bounded diagnostic event.
+
+**Пример 2: database fetch-all during launch**
+
+Before: root model загружает все records, чтобы показать счетчики, badges и recent items.
+
+After: shell получает lightweight snapshot, critical screen lazily fetches visible data, badges update after first render.
+
+Validation:
+- launch trace shows no large main-thread fetch;
+- old device with large dataset reaches first usable screen within target;
+- after-update migration path remains crash-safe;
+- UI distinguishes cached snapshot and refreshing state.
+
+**Пример 3: deep link arrives before auth restoration**
+
+Before: app parses Universal Link during launch, cannot route because session unknown, silently drops link.
+
+After: app persists `LaunchRouteIntent`, restores session, then reconciles route or shows auth gate with pending destination.
+
+Validation:
+- link survives cold launch;
+- link survives auth refresh;
+- invalid/unauthorized link produces safe user-facing message;
+- no duplicate navigation occurs after scene recreation.
+
+**Пример 4: permission prompt на cold launch**
+
+Before: app сразу показывает location или notification permission prompt, потому что первый экран “когда-нибудь использует” эту capability.
+
+Проблема: пользователь ещё не видит value, prompt выглядит случайным, denial становится вероятнее, а launch path получает privacy/review risk.
+
+After: первый экран объясняет product value, permission запрашивается в момент user intent, denied/restricted state имеет полноценный UI, а cold launch остаётся без prompt side effects.
+
+Validation:
+- fresh install launch не показывает permission prompt без действия пользователя;
+- denied/restricted state не ломает первый экран;
+- analytics не логирует sensitive prompt context;
+- App Review rationale совпадает с реальным UX.
+
+#### Testing strategy
+Launch testing should cover correctness and performance.
+
+Minimum matrix:
+- fresh install logged-out;
+- logged-in with cached data;
+- logged-in with large local data;
+- after app update with migration;
+- offline launch;
+- push/deep link launch;
+- lowest supported iOS/device class;
+- app killed during previous sync or mutation;
+- denied/revoked permission affecting initial screen.
+
+Automated tests can validate state machines, routing intent preservation, migration idempotency and startup policy decisions. Real-device profiling is needed for credible performance claims. Manual QA remains necessary for first-frame perception, auth gates, permission prompts, deep link flows and old-device responsiveness.
+
 #### Interview/incident-review Q&A с ответами
+1. **Почему холодный запуск нельзя оптимизировать только переносом работы в `Task {}`?**
+   **Ответ:** `Task` не гарантирует, что work не повлияет на launch. Она может стартовать сразу, вернуться на main actor, удержать locks, вызвать memory peak или broad invalidation. Нужно понимать priority, cancellation, actor hops, resource usage and UI timing.
+
+2. **Какая работа действительно должна выполняться до first usable screen?**
+   **Ответ:** только работа, без которой нельзя безопасно показать корректный shell: минимальная configuration, crash-safe session/security state, локальный durable snapshot where needed, routing intent capture и essential dependency setup. Remote refresh, prefetch, analytics upload, indexing и noncritical SDK setup обычно должны быть deferred.
+
+3. **Почему first frame не равен successful launch?**
+   **Ответ:** первый frame может быть пустым shell или spinner, пока main actor заблокирован. Success означает first usable screen и interaction readiness: пользователь видит meaningful state и primary interaction не зависает.
+
+4. **Как расследовать launch regression после release?**
+   **Ответ:** сегментировать metrics by app version, OS, device, data size, entry point and install/update state; сравнить p50/p95; проверить crash/hang reports, MetricKit, Organizer metrics, startup signposts and recent changes in dependencies, migrations, SDK initialization and root view rendering.
+
+5. **Когда launch slowdown допустим?**
+   **Ответ:** только если slowdown bounded, one-time или product-critical, имеет user-visible rationale/progress, rollback/recovery path и измеренный impact. Например, обязательная migration может быть допустима, если она crash-safe, idempotent and communicated через release readiness.
+
+6. **Что должно быть в post-incident action после плохого cold launch release?**
+   **Ответ:** identify root startup path, add regression metric/signpost, remove or defer noncritical work, add QA scenario for affected state, document owner, add release gate and verify on representative device/OS/data matrix.
+
+#### Чеклист production-readiness для cold launch
+Cold launch не готов к production, пока:
+- first usable screen определён product/engineering совместно;
+- startup tasks имеют owners and justification;
+- unnecessary network/database/media work removed before first usable screen;
+- session restoration and deep link intent preservation covered;
+- migrations are idempotent, crash-safe and measured;
+- root SwiftUI view does not perform heavy sorting/filtering/decoding/fetching;
+- feature flags have безопасные значения по умолчанию and do not block UI;
+- privacy prompts are not shown before user context;
+- launch metrics/signposts exist for primary milestones;
+- release checks include old device / lowest supported OS / large data case;
+- failures degrade to safe UI state instead of blank launch blocker;
+- post-launch отложенная работа is bounded, cancellable and observable.
+
+
 ### 2.2. Тёплый запуск
 #### Performance budget и measurement target
 #### Instrumentation setup и trace interpretation
