@@ -2846,11 +2846,271 @@ Warm launch не готов к production, пока:
 
 
 ### 2.3. Активация foreground
+#### Назначение раздела
+Foreground activation — это переход app/scene в состояние, где пользователь снова может видеть и взаимодействовать с UI. В отличие от `2.2`, где фокус был на пользовательском warm return path, этот раздел описывает **формальную lifecycle-семантику**: какие callbacks/signals приходят, как различаются application и scene lifecycle, почему `.active` не означает “можно запустить всё”, как проектировать idempotent activation handlers и как не смешивать lifecycle events с feature business logic.
+
+Senior-level цель — правильно реагировать на activation без дублирования работы, UI races и stale assumptions. Staff-level цель — создать platform convention: где живут app-level observers, где scene-level ownership, какие actions разрешены на activation, какие запрещены, как это тестируется и как команды не превращают `scenePhase` в глобальную кнопку “reload everything”.
+
 #### Scope и prerequisites
+Этот раздел предполагает, что читатель уже понимает:
+- cold launch как startup path (`2.1`);
+- warm launch как user-perceived return path (`2.2`);
+- базовую разницу между process, app, scene, task и data lifecycle (`1.1`).
+
+Здесь рассматриваются:
+- UIKit application lifecycle callbacks;
+- `UIScene` / `UIWindowScene` lifecycle;
+- SwiftUI `scenePhase`;
+- foreground inactive vs foreground active;
+- ordering and duplication risks;
+- multi-scene implications;
+- ownership rules for activation reactions;
+- testing and incident review for activation bugs.
+
+Здесь не раскрываются глубоко background execution, scene restoration, push routing, widgets/extensions или product-level warm-return reconciliation. Deep links, permission revalidation, pending mutations и duplicate refresh упоминаются только как примеры того, почему lifecycle signal должен иметь owner и boundary; подробный warm-return reconciliation остаётся в `2.2`.
+
 #### Core theory и mental model
+Foreground activation — это **signal**, а не business event. Он сообщает, что application или scene изменили lifecycle state. Он не говорит, что нужно перезагрузить все данные, показать alert, обновить все tokens, сбросить navigation или запустить sync без ограничений.
+
+Ключевые различия:
+
+| Концепция | Что означает | Что не гарантирует |
+| --- | --- | --- |
+| Process alive | app process существует в памяти | UI видим, scene active, state fresh |
+| App active | приложение foreground and receiving events | каждая scene готова к feature routing |
+| Scene foreground active | конкретная scene видима и интерактивна | другие scenes имеют тот же navigation/state |
+| Scene foreground inactive | scene видима, но временно не принимает normal events | можно запускать heavy work |
+| SwiftUI `scenePhase` | environment signal для scene/app lifecycle | точный global process lifecycle или single delivery |
+| `onAppear` / `.task` | view lifecycle/rendering signal | app foreground activation semantics |
+
+Senior mental model: **activation handler должен быть idempotent, дешёвым по ресурсам, scene-aware and intent-preserving**. Он может инициировать reconciliation, но не должен сам становиться местом feature orchestration без ownership.
+
 #### Подкапотные детали
+В UIKit era приложение часто имело один window и application-level callbacks казались достаточными. С `UIScene` app может иметь несколько scenes, каждая со своим lifecycle. На iPadOS несколько windows одного приложения могут быть active, inactive, backgrounded или discarded независимо. SwiftUI скрывает часть этой сложности, но не отменяет её.
+
+Критичное правило для современных iOS apps: при scene-based lifecycle UI foreground/background semantics принадлежат `UISceneDelegate`, `UIWindowScene` и SwiftUI scene lifecycle. `UIApplicationDelegate` остаётся process/configuration entry point для launch configuration, push registration, background events, app-wide services and handoff points, но не должен быть единственным owner scene-specific foreground activation, navigation или visible UI refresh.
+
+Важные lifecycle signals:
+- `application(_:didFinishLaunchingWithOptions:)` — process/app launch setup, не foreground activation для каждой scene.
+- `applicationDidBecomeActive(_:)` — app-level active signal; может быть слишком широким для scene-specific work.
+- `applicationWillResignActive(_:)` — temporary interruption или переход из active.
+- `applicationDidEnterBackground(_:)` — app moved to background; не guaranteed final cleanup point.
+- `scene(_:willConnectTo:options:)` — scene created/connected; место для scene setup and connection options.
+- `sceneWillEnterForeground(_:)` — scene moving from background to foreground.
+- `sceneDidBecomeActive(_:)` — конкретная scene стала active.
+- `sceneWillResignActive(_:)` — interruption или потеря active state.
+- `sceneDidEnterBackground(_:)` — scene moved to background.
+- SwiftUI `@Environment(\.scenePhase)` — high-level signal, удобный для UI reactions, но требует осторожности в multi-scene apps.
+
+SwiftUI `scenePhase` — это удобная абстракция, а не замена `UISceneSession`, connection options, push/deep-link delivery, restoration activity или explicit routing store. Для routing и ownership она должна быть input signal, а не единственный source of truth.
+
+SwiftUI `scenePhase` delivery не является ordering boundary относительно UIKit/UIScene callbacks. Если correctness зависит от порядка, введи явную state machine и traceable events, а не полагайся на порядок доставки environment update.
+
+Ordering can vary by entry path. Cold launch with scene connection, warm return, push tap, Universal Link, handoff, system UI return and multi-window creation могут давать разные combinations of app and scene callbacks. Production code должен опираться на documented lifecycle meaning и собственную state machine, а не на наблюдённый порядок одного simulator run.
+
+Примеры типовых последовательностей, которые нужно воспринимать как conceptual model, а не как exhaustive contract:
+
+| Сценарий | Типовая последовательность signals | Design implication |
+| --- | --- | --- |
+| Cold launch with scene connection | app launch/configuration → scene connection → scene foreground → scene active | scene setup and route options должны жить на scene boundary |
+| Warm return from background | scene will enter foreground → scene did become active → SwiftUI `scenePhase` becomes `.active` | refresh должен быть idempotent and deduplicated |
+| Temporary interruption | active → inactive → active without background | не завершай session и не очищай state как при background/termination |
+| Multi-scene activation | one scene active/inactive while another remains active or backgrounded | navigation/selection are scene-scoped; domain/session state shared carefully |
+
+One-shot vs repeating semantics: activation signals repeat many times. Handlers must be repeat-safe. Route intent consumption, analytics session start, irreversible mutations and migration steps require separate once-policy keyed by intent/session/version, not by lifecycle callback delivery.
+
+#### Foreground inactive vs active
+`inactive` не является “почти active, можно запускать всё”. Это transitional state: system alert, Control Center, multitasking transition, incoming call, permission prompt, app switcher, scene transition. UI может быть visible, но normal event delivery ограничена.
+
+Правила:
+- Не стартуй expensive refresh только потому, что scene стала inactive.
+- Не считай inactive user abandonment.
+- Не очищай sensitive state on every inactive без product/security policy: можно получить flicker around permission prompt или system UI.
+- Не отправляй analytics “session ended” на каждый short inactive transition.
+- Используй active для interaction-ready work, но всё равно deduplicate and bound.
+
+Для privacy-sensitive apps может быть policy: redact UI при `willResignActive` или entering app switcher. Это отдельное product/security requirement, а не generic rule для всех приложений.
+
+Additional inactive rule: `inactive` может возникать без перехода в background и может повторяться кратко. Cleanup, persistence, logout, analytics session end и destructive security decisions нельзя строить только на `inactive`; нужна отдельная policy based on background transition, elapsed time, device lock, app lock, account risk или explicit user action.
+
+#### Ownership и boundaries
+Главная архитектурная ошибка — позволить каждому screen самостоятельно подписаться на foreground activation и запускать refresh. Это создаёт N независимых lifecycle interpretations.
+
+Recommended ownership:
+
+| Boundary | Ответственность | Примеры allowed work |
+| --- | --- | --- |
+| App-level lifecycle owner | process/app-wide events, metrics, global security policy | app lock, analytics session boundary, global capability refresh |
+| Scene-level owner | scene connection, active/inactive/background, scene-specific route intents | scene route reconciliation, visible scene refresh signal |
+| Session owner | auth/session/lock state | token validity check, lock gate state, credential revocation handling |
+| Permission owner | permission re-read and state publication | location/photos/camera/notification state changes |
+| Sync owner | deduplicated refresh/sync coordination | pending mutation sync, foreground refresh with conflict policy |
+| Feature owner | visible feature data update | refresh currently visible domain slice only |
+
+Rule: lifecycle layer emits **semantic signals**; feature layer decides whether work is relevant. Example: `foregroundBecameActive(sceneID:)` is acceptable. `reloadHomeFeedAndProfileAndNotifications()` inside app delegate is not.
+
+Минимальное multi-scene rule: process-level domain/session state can be shared, but scene-level navigation, selection, presentation state and route intent handling must be isolated or explicitly targeted. If code cannot name the target `UISceneSession`/scene identity, it should not mutate scene navigation.
+
 #### Production-правила и ловушки
-#### Примеры, упражнения и Q&A с ответами для добавления
+Production rules:
+- Activation handlers must be idempotent; repeated `.active` should not duplicate irreversible work.
+- Activation handlers must be cheap on main actor: heavy work moves off-main and returns with narrow UI updates.
+- Scene-specific work must know scene identity; app-level work must not mutate every scene’s navigation blindly.
+- Permission/session state must be revalidated where product behavior depends on it.
+- Pending deep links/notifications must survive auth/session transitions and be consumed/rejected once.
+- Foreground refresh must not overwrite pending local mutations without merge/conflict policy.
+- Analytics must distinguish user-visible foreground session from transient lifecycle noise.
+- Lifecycle callbacks are not durable persistence guarantees; checkpoint user-critical state earlier.
+
+Ловушки:
+- **Reload storm:** every screen observes `.active` and calls reload.
+- **Scene confusion:** one global navigation path used by multiple scenes.
+- **Inactive overreaction:** app treats every interruption as logout/session end.
+- **Permission stale state:** user changed Settings while app inactive, UI still assumes grant.
+- **Routing race:** push/deep link route fires before session/domain ready.
+- **Main actor jam:** activation handler performs DB fetch, sorting, image decode or JSON parsing.
+- **Analytics inflation:** “app opened” event emitted for system prompt return, not real user session.
+
+#### SwiftUI-specific guidance
+SwiftUI makes lifecycle observation easy, which increases risk of overuse.
+
+Acceptable uses of `scenePhase` in a view:
+- notify a feature model that visible scene became active;
+- pause/resume lightweight visible work;
+- trigger a narrowly scoped refresh with deduplication;
+- update privacy redaction state for a visible scene.
+
+Suspicious uses:
+- root view calls multiple repositories on every `.active`;
+- child rows observe `scenePhase` independently;
+- `.task` and `.onChange(scenePhase)` both start the same work;
+- scenePhase handler mutates global navigation directly;
+- handler starts unbounded detached tasks.
+
+Safer pattern:
+
+```swift
+struct ArticleListScreen: View {
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var model: ArticleListModel
+
+    var body: some View {
+        ArticleListContent(state: model.state) {
+            model.refreshRequestedByUser()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            model.sceneBecameActive()
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class ArticleListModel {
+    private let refreshCoordinator: RefreshCoordinator
+    private var visibleRefreshTask: Task<Void, Never>?
+
+    func sceneBecameActive() {
+        visibleRefreshTask?.cancel()
+        visibleRefreshTask = Task { [refreshCoordinator] in
+            await refreshCoordinator.refreshVisibleArticlesIfNeeded(reason: .foregroundActivation)
+        }
+    }
+
+    func refreshRequestedByUser() {
+        visibleRefreshTask?.cancel()
+        visibleRefreshTask = Task { [refreshCoordinator] in
+            await refreshCoordinator.refreshVisibleArticles(reason: .explicitUserIntent)
+        }
+    }
+}
+```
+
+Важный нюанс: this is a pattern, not a mandate. If activation work is app-wide, keep it out of a feature view. If work is scene-specific, do not put it in process-level singleton without scene identity.
+
+#### Debug workflow для activation incidents
+Минимальный workflow расследования:
+1. Собрать sequence app/scene/SwiftUI lifecycle events with timestamps.
+2. Добавить scene identity / `UISceneSession` / route intent ID where applicable.
+3. Определить, какой owner запустил work: app-level, scene-level, session, permission, sync или feature.
+4. Проверить repeat-safety: был ли signal delivered more than once и есть ли deduplication/once-policy.
+5. Проверить cancellation: что произошло, если app ушла inactive/background during work.
+6. Снять main actor trace, если user-visible freeze связан с activation.
+7. Проверить data policy: pending mutations, conflict handling, permission/session state and route consumption.
+
+#### Примеры, упражнения и Q&A с ответами
+**Пример 1: app-level callback мутирует scene navigation**
+
+Проблема: `applicationDidBecomeActive` checks pending deep link and directly updates global SwiftUI navigation path. On iPadOS two scenes exist; wrong scene receives route or both scenes mutate.
+
+Correct target state: route intent is stored with target policy. Scene-level coordinator reconciles intent when the correct scene becomes active. If target scene is unknown, app creates/selects scene or asks user, depending on product policy.
+
+Validation:
+- two scenes open different documents;
+- Universal Link targets a document already open in one scene;
+- wrong scene is not mutated;
+- intent consumed exactly once.
+
+**Пример 2: foreground refresh перетирает local edit**
+
+Проблема: user edited item offline, backgrounds app, returns. Foreground refresh fetches server state and replaces local model, losing edit.
+
+Correct target state: pending mutation is source of local user intent. Refresh merges by version/conflict policy, preserves local edit, shows sync/conflict state if needed and never silently discards local work.
+
+Validation:
+- offline edit survives foreground refresh;
+- duplicate refresh does not duplicate mutation;
+- conflict produces explicit UI state;
+- logs do not include raw sensitive payload.
+
+**Пример 3: inactive transition causes unnecessary logout**
+
+Проблема: app logs out user on every `willResignActive`, including Control Center, incoming call or permission prompt. User returns and loses context.
+
+Correct target state: security policy distinguishes temporary inactive from background timeout, device lock, account risk or explicit logout. Sensitive UI may be redacted, but session is not destroyed without policy reason.
+
+Validation:
+- open Control Center and return;
+- show permission prompt and return;
+- lock device beyond configured timeout;
+- verify redaction/session behavior matches product/security policy.
+
+#### Review Q&A с ответами
+1. **Почему foreground activation нельзя считать product event “пользователь открыл приложение”?**
+   **Ответ:** activation может быть вызвана system UI return, scene transition, permission prompt, multitasking or short interruption. Product analytics should distinguish true user-visible session start from lifecycle noise.
+
+2. **Чем app-level active отличается от scene-level active?**
+   **Ответ:** app-level active describes application foreground event, while scene-level active describes a specific scene becoming interactive. In multi-scene apps, scene-specific navigation/refresh must not be driven blindly by app-level callbacks.
+
+3. **Почему `scenePhase == .active` не должен автоматически запускать full reload?**
+   **Ответ:** `.active` may happen repeatedly and for different scenes. Full reload creates network bursts, DB contention, UI invalidation and data races with local pending mutations.
+
+4. **Как правильно обрабатывать permission changes при activation?**
+   **Ответ:** affected permission owners re-read system state, publish semantic domain state, and UI maps denied/restricted/limited/unavailable into explicit user-facing states. Do not assume previous grant is permanent.
+
+5. **Когда нужно redacted UI при foreground/inactive transitions?**
+   **Ответ:** when product/security policy says content is sensitive: banking, health, private documents, enterprise data. Redaction should protect content without destroying session or navigation unless policy requires lock/logout.
+
+6. **Что должно быть в incident review, если activation вызывает зависание?**
+   **Ответ:** collect app/scene lifecycle sequence, activation reason, main actor trace, duplicate refresh evidence, session/permission checks, route intent handling, pending mutation state, device/OS/data size and recent changes in lifecycle handlers.
+
+#### Чеклист production-readiness для foreground activation
+Foreground activation handling не готово к production, пока:
+- app-level and scene-level responsibilities separated;
+- activation handlers are idempotent and cheap;
+- `.inactive` and `.active` have distinct policies;
+- multi-scene routing/state ownership defined where relevant;
+- session/security policy handles lock/redaction/logout separately;
+- permissions can be revalidated after Settings/system UI changes;
+- deep links/notifications are preserved through activation and consumed/rejected once;
+- foreground refresh is deduplicated and conflict-safe;
+- lifecycle events are observed with privacy-safe metrics;
+- feature views do not each implement independent global lifecycle policy;
+- tests cover rapid active/inactive transitions and system UI returns;
+- incident playbook includes lifecycle sequence reconstruction.
+
+
 ### 2.4. Переход в background
 #### Scope и prerequisites
 #### Core theory и mental model
