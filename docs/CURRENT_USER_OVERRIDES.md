@@ -84,6 +84,58 @@ Purpose: the user may forget exact rule/command names. When the user asks for "�
 - **Action:** return the saved command registry with each command name, aliases, purpose, action, restrictions and verification/reporting expectations.
 - **No file changes:** this is read-only unless the user explicitly asks to update the registry.
 
+
+#### Command: `запусти поверхностную проверку`
+- **Aliases:** `поверхностная проверка`, `быстрая проверка`, `легкая проверка`, `минимальная проверка`.
+- **Action:** run the cheapest non-simulator verification appropriate for the current diff.
+- **Default scope:** `git diff --check` plus relevant static/read-only checks. For MVVMExample this usually maps to `./scripts/verify.sh static` when source/docs scope makes it useful.
+- **Does not run by default:** Xcode build, tests, Simulator UI, Instruments, manual flows.
+- **Report:** commands run, pass/fail, skipped checks with reasons, remaining risks.
+
+#### Command: `запусти неполную проверку`
+- **Aliases:** `не полную проверку`, `частичную проверку`, `targeted проверку`, `среднюю проверку`.
+- **Action:** run targeted verification for the changed scope without the full matrix.
+- **Default scope:** `git diff --check`, relevant static checks, and one focused build or targeted unit lane only if the change requires it and current task approval allows it.
+- **Does not include by default:** UI tests, full test matrix, manual simulator, Instruments.
+- **Report:** why the selected subset is sufficient, what remains unverified.
+
+#### Command: `запусти полную проверку`
+- **Aliases:** `полная проверка`, `full verification`, `полный прогон`, `запусти все проверки`.
+- **Action:** run the approved full non-UI verification lane for the current project.
+- **MVVMExample mapping:** `./scripts/verify.sh all`, which runs static, list, build, and unit tests. UI tests remain explicit and are not included unless the user says `с UI`, `UI smoke`, or `test-ui`.
+- **Artifacts:** all build/test outputs must remain under `/Users/Artem/.zenflow`.
+- **Aftercare:** apply `очисти DerivedData` when DerivedData is no longer needed.
+
+#### Command: `запусти UI smoke`
+- **Aliases:** `test-ui`, `UI проверка`, `UI smoke проверка`, `запусти UI тесты`.
+- **Action:** run the explicit UI accessibility smoke lane only when the user asks for it.
+- **MVVMExample mapping:** `./scripts/verify.sh test-ui`.
+- **Notes:** requires Simulator execution; may be slower/flakier than unit lane; report simulator/device/runtime used.
+
+#### Command: `запусти билд`
+- **Aliases:** `build`, `собери проект`, `проверь сборку`.
+- **Action:** run the project-approved sandboxed build command.
+- **MVVMExample mapping:** `./scripts/verify.sh build` unless a task-specific build command is required.
+- **Artifacts:** DerivedData/logs/results must remain under `/Users/Artem/.zenflow`.
+
+#### Command: `запусти unit tests`
+- **Aliases:** `unit тесты`, `test-unit`, `запусти юнит тесты`.
+- **Action:** run deterministic unit test lane when tests are approved/needed.
+- **MVVMExample mapping:** `./scripts/verify.sh test-unit`.
+- **Does not include:** UI tests unless explicitly requested.
+
+#### Command: `покажи доступные проверки`
+- **Aliases:** `список проверок`, `verify list`, `что можно запустить`, `какие проверки есть`.
+- **Action:** show project-supported verification commands without running build/tests.
+- **MVVMExample mapping:** `./scripts/verify.sh list`.
+
+#### Command: `ревью`
+- **Aliases:** `review`, `code review`, `аудит`, `проверь качество`, `проверь production-ready`.
+- **Action:** run the production review trigger rule: apply production review completeness gates and relevant iOS standards before saying something is clean/ready.
+- **Default output:** prioritized findings: `must do now`, `should do next`, `later / only if needed`, `do not do / overengineering for this scope`.
+- **No silent narrowing:** do not limit review to the latest visible bug unless the user explicitly narrows scope.
+- **No code changes by default:** review is read-only unless the user asks to fix findings.
+
 #### Rule: `учебник на паузе`
 - **Status:** the senior iOS handbook filling task is paused and not active by default.
 - **Action:** do not continue filling handbook sections unless the user explicitly resumes it.
