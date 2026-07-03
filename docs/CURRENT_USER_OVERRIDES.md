@@ -136,6 +136,16 @@ Purpose: the user may forget exact rule/command names. When the user asks for "�
 - **No silent narrowing:** do not limit review to the latest visible bug unless the user explicitly narrows scope.
 - **No code changes by default:** review is read-only unless the user asks to fix findings.
 
+#### Rule: `review gate`
+- **Aliases:** `ревью-гейт`, `проверка перед коммитом`, `review перед коммитом`, `оценка риска перед коммитом`.
+- **Purpose:** avoid wasting tokens on mandatory full review for every commit while still forcing review on risk-significant changes.
+- **Action:** before committing or reporting completion, classify the change risk and decide the review level.
+- **Low-risk:** use self-review plus `git diff --check`; full review is not required by default. Examples: typo/docs-only changes, formatting, mechanical rename, small localized UI text changes, command registry edits.
+- **Medium-risk:** run targeted review for the affected scope. Examples: localized feature logic, focused ViewModel behavior, small networking/UI state changes, project configuration with limited blast radius.
+- **High-risk:** run full production review before commit/report. Triggers: architecture/state ownership/navigation, persistence/migration/data loss, concurrency/lifecycle/background, security/privacy/PII/tokens/logging, networking/sync/auth/retry/idempotency, performance-sensitive UI/render/cache/media, release/build/project configuration, large cross-cutting refactors.
+- **Required report:** risk class, review level used, why full review was or was not run, commands/checks executed, and remaining risks.
+- **Restriction:** do not call a change clean/production-ready if relevant high-risk gates were not checked or explicitly reported as remaining risk.
+
 #### Rule: `учебник на паузе`
 - **Status:** the senior iOS handbook filling task is paused and not active by default.
 - **Action:** do not continue filling handbook sections unless the user explicitly resumes it.
