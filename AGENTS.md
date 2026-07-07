@@ -23,7 +23,10 @@ Before code, docs, git, or project changes, read:
 7. `./docs/WORK_CONTINUITY.md`
 8. `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
 9. `./docs/MODEL_ROUTING_RULE.md`
-10. current Zenflow task plan if present
+10. central shared documentation guide: `/Users/Artem/.zenflow/worktrees/documentation-vault/DOCUMENT_LIBRARY_GUIDE.md`
+11. central shared documentation inventory: `/Users/Artem/.zenflow/worktrees/documentation-vault/ALL_DOCUMENTS_INVENTORY.md`
+12. current Zenflow task plan/handoff if present
+13. task-relevant package/prompt/skill docs selected from the central library.
 
 ## Filesystem Sandbox
 - Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow`.
@@ -43,7 +46,8 @@ Before code, docs, git, or project changes, read:
 - The app may use DummyJSON/test API and demo credentials only under explicit debug/demo policy.
 - Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
 - This worktree intentionally uses app-local infrastructure under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/`; do not reintroduce `./Packages/AppInfrastructure` unless the user explicitly approves package-mode adoption again.
-- Reusable/cross-app source context belongs in `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault`, separated into `reusable/` and `apps/<AppName>/`.
+- Reusable/cross-app source context belongs in `/Users/Artem/.zenflow/worktrees/documentation-vault`, separated into `reusable/` and `apps/<AppName>/`.
+- Do not copy the full shared documentation library into this worktree; keep only local task/project state here.
 
 
 ## Product-Staff Quality Bar Rule

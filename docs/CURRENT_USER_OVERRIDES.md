@@ -162,7 +162,7 @@ If this file conflicts with a newer explicit user instruction in chat, the newer
 
 
 ### Documentation Vault Ownership
-- Durable reusable docs/rules/prompts/skills/templates/scripts must be synchronized with `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/reusable/`.
-- MVVMExample-specific docs must be synchronized with `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/apps/MVVMExample/`.
+- Durable reusable docs/rules/prompts/skills/templates/scripts live in `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/` as the central canonical library; do not copy the full library into this worktree.
+- MVVMExample-specific durable snapshots belong in `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/`; local MVVMExample docs should stay minimal and operational.
 - Do not change TchopApp-specific docs from MVVMExample tasks unless explicitly requested.
 - Do not commit or push without explicit user approval.
