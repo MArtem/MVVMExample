@@ -78,3 +78,6 @@ Before code, docs, git, or project changes, read:
 
 ## Plan Rule
 If new user-approved work benefits from a breakdown, update the local task plan with checkbox steps and mark completed steps before reporting completion.
+
+## Cross-Project Live User Protocol
+The newest explicit user instruction takes precedence over older local model, build, and documentation defaults. Apply the canonical `MODEL_ROUTING_RULE.md`: proceed when the current route is adequate; otherwise stop before task actions and require the documented switch with quality, cost, trade-off, and alternative analysis. Do not use older GPT-5.4/5.5 routing text. For this user's active work, use a code-first cadence: one bounded patch, one relevant static check, then stop for user-run runtime/UI QA. Before using a subagent, browsing, extended research, broad rereads, runtime verification, or a scope sweep, state the need, expected token cost, benefits, trade-offs, and smaller alternative, then wait for approval. Read mandatory routes once and use targeted reads thereafter. Do not run builds, tests, Simulator UI, screenshots, Instruments, archive, or signing while the user owns verification. Seek approval before work expected to touch more than three source files or consume roughly more than 2–3% of the weekly budget.

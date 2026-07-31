@@ -160,6 +160,13 @@ Purpose: the user may forget exact rule/command names. When the user asks for "�
 ## Notes
 If this file conflicts with a newer explicit user instruction in chat, the newer instruction wins.
 
+### Cross-Project Live User Protocol
+- The newest explicit user instruction supersedes the older model and verification defaults in this file. Apply the canonical `MODEL_ROUTING_RULE.md`: proceed on an adequate current route; otherwise stop before task actions and require the documented switch. Do not use older GPT-5.4/5.5 routing text.
+- Work code-first in self-contained iterations: targeted inspection → one patch → one relevant static check → stop for the user's build/UI QA.
+- Before any optional or expansive action — subagent, model/reasoning switch, browsing, extended research, broad documentation reread, runtime verification, or scope sweep — explain need, expected token cost, benefits, trade-offs, and the smaller alternative; wait for approval.
+- Read mandatory documentation once per selected route and use targeted reads thereafter. Do not run builds, tests, Simulator UI, screenshots, Instruments, archive, or signing while the user owns runtime verification.
+- Require a checkpoint before work expected to touch more than three source files or consume roughly more than 2–3% of the weekly budget.
+
 
 ### Documentation Vault Ownership
 - Durable reusable docs/rules/prompts/skills/templates/scripts live in `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/` as the central canonical library; do not copy the full library into this worktree.
