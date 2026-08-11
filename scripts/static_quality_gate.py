@@ -114,9 +114,26 @@ def index_text_at(path: Path) -> str | None:
 
 
 def index_texts(paths: list[Path]) -> list[tuple[Path, str]]:
+    specifications = b"".join(f":{path.as_posix()}\n".encode("utf-8") for path in paths)
+    sizes = subprocess.run(
+        ["git", "-C", str(ROOT), "cat-file", "--batch-check=%(objecttype) %(objectsize)"],
+        input=specifications,
+        capture_output=True,
+        check=False,
+    )
+    if sizes.returncode != 0:
+        raise RuntimeError("git cat-file failed while checking staged blob sizes")
+    headers = sizes.stdout.splitlines()
+    if len(headers) != len(paths):
+        raise RuntimeError("git cat-file returned an incomplete staged blob size batch")
+    small_paths: list[Path] = []
+    for path, header in zip(paths, headers):
+        fields = header.split()
+        if len(fields) == 2 and fields[0] == b"blob" and int(fields[1]) <= MAX_TEXT_SCAN_BYTES:
+            small_paths.append(path)
     result = subprocess.run(
         ["git", "-C", str(ROOT), "cat-file", "--batch"],
-        input=b"".join(f":{path.as_posix()}\n".encode("utf-8") for path in paths),
+        input=b"".join(f":{path.as_posix()}\n".encode("utf-8") for path in small_paths),
         capture_output=True,
         check=False,
     )
@@ -125,7 +142,7 @@ def index_texts(paths: list[Path]) -> list[tuple[Path, str]]:
     output = result.stdout
     offset = 0
     texts: list[tuple[Path, str]] = []
-    for path in paths:
+    for path in small_paths:
         newline = output.find(b"\n", offset)
         if newline < 0:
             raise RuntimeError("git cat-file returned a truncated batch header")
@@ -170,6 +187,10 @@ def swift_method_body(source: str, method: str) -> str | None:
 
 def generic_send_positions(source: str) -> list[int]:
     return [match.start() for match in re.finditer(r"\bfunc\s+send\s*\(", source)]
+
+
+def action_enum_positions(source: str) -> list[int]:
+    return [match.start() for match in re.finditer(r"\benum\s+\w*Action\b", source)]
 
 
 def contains_pbx_object(project_text: str, isa: str) -> bool:
@@ -409,7 +430,7 @@ def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_cha
     return findings
 
 
-def check_project_contract(files: list[Path], cached: list[Path], worktree_changed: list[Path], project_override: str | None = None) -> list[Finding]:
+def check_project_contract(files: list[Path], cached: list[Path], worktree_changed: list[Path], project_override: str | None = None, scheme_override: str | None = None) -> list[Finding]:
     findings: list[Finding] = []
     tracked = set(cached)
     required = {PROJECT, SCHEME, *TEST_PLANS}
@@ -487,9 +508,19 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
     if resources is None or reference_paths is None:
         findings.append(Finding("FAIL", "QC.XCODE.RESOURCES_PHASE", PROJECT.as_posix(), "could not parse the app target Resources build phase"))
     else:
-        for path in reference_paths.values():
-            if path.is_relative_to(Path("MVVMExample")) and path.suffix in {".xcstrings", ".xcassets"} and path not in resources:
-                findings.append(Finding("FAIL", "QC.XCODE.RESOURCE_MEMBERSHIP", path.as_posix(), "app localization and asset catalogs must be in the Resources build phase"))
+        expected_resources: set[Path] = set()
+        for path in files:
+            if path.is_relative_to(Path("MVVMExample")) and path.suffix == ".xcstrings":
+                expected_resources.add(path)
+            elif path.is_relative_to(Path("MVVMExample")):
+                index = next((index for index, component in enumerate(path.parts) if component.endswith(".xcassets")), None)
+                if index is not None:
+                    expected_resources.add(Path(*path.parts[:index + 1]))
+        for path in expected_resources - resources:
+            findings.append(Finding("FAIL", "QC.XCODE.RESOURCE_MEMBERSHIP", path.as_posix(), "tracked app catalog is not in the Resources build phase"))
+        for path in resources - expected_resources:
+            if path.suffix in {".xcstrings", ".xcassets"}:
+                findings.append(Finding("FAIL", "QC.XCODE.RESOURCE_MEMBERSHIP", path.as_posix(), "Resources build phase contains an unexpected or stale catalog"))
 
     app_target = native_target(project_text, "MVVMExample")
     app_identifier = app_target[0] if app_target else None
@@ -517,7 +548,10 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
             findings.append(Finding("FAIL", "QC.XCODE.TEST_TARGET_DEPENDENCY", PROJECT.as_posix(), f"{target_name} must depend on the current MVVMExample target through its proxy"))
 
     try:
-        scheme_root = element_tree.parse(ROOT / SCHEME).getroot()
+        scheme_text = scheme_override if scheme_override is not None else index_text_at(SCHEME)
+        if scheme_text is None:
+            raise ValueError("staged shared scheme cannot be read")
+        scheme_root = element_tree.fromstring(scheme_text)
         references = {node.attrib.get("reference") for node in scheme_root.findall(".//TestPlanReference")}
         expected = {f"container:{path.name}" for path in TEST_PLANS}
         if not expected.issubset(references):
@@ -569,10 +603,12 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
                 raise ValueError("target contract mismatch")
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"must be a version-1 plan for {target_name}"))
-    if project_override is None and PROJECT in worktree_changed:
-        worktree_project = text_at(PROJECT)
-        if worktree_project is not None and worktree_project != project_text:
-            findings += check_project_contract(files, cached, [], worktree_project)
+    if project_override is None and scheme_override is None:
+        worktree_project = text_at(PROJECT) if PROJECT in worktree_changed else project_text
+        staged_scheme = index_text_at(SCHEME)
+        worktree_scheme = text_at(SCHEME) if SCHEME in worktree_changed else staged_scheme
+        if worktree_project is not None and worktree_scheme is not None and (worktree_project != project_text or worktree_scheme != staged_scheme):
+            findings += check_project_contract(files, cached, [], worktree_project, worktree_scheme)
     return findings
 
 
@@ -612,8 +648,8 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
         if "/Presentation/" in path_string or path.name.endswith("ViewModel.swift"):
             for position in generic_send_positions(source):
                 findings.append(Finding("FAIL", "QC.MVVM.GENERIC_ACTION_DISPATCH", path_string, "ViewModels must expose explicit intent methods", line_number(text, position)))
-            for match in re.finditer(r"\benum\s+\w+Action\b", source):
-                findings.append(Finding("FAIL", "QC.MVVM.ACTION_ENUM", path_string, "action enums require an approved reducer architecture", line_number(text, match.start())))
+            for position in action_enum_positions(source):
+                findings.append(Finding("FAIL", "QC.MVVM.ACTION_ENUM", path_string, "action enums require an approved reducer architecture", line_number(text, position)))
         if "/Domain/" in path_string and re.search(r"\bimport\s+SwiftUI\b|\bURLSession\b|\b(?:\w+DTO)\b", source):
             findings.append(Finding("FAIL", "QC.MVVM.DOMAIN_BOUNDARY", path_string, "Domain must not depend on SwiftUI, URLSession, or DTO types"))
         if "/Presentation/" in path_string and re.search(r"\bURLSession\b|\bURLRequest\b|\bURLSessionAPIClient\b|\bURLSessionNetworkClient\b", source):

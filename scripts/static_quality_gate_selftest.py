@@ -11,6 +11,7 @@ import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
 from static_quality_gate import (
+    action_enum_positions,
     contains_pbx_object,
     executable_text,
     generic_send_positions,
@@ -108,6 +109,10 @@ class StaticQualityGateSelfTests(unittest.TestCase):
     def test_generic_send_detection_does_not_depend_on_parameter_spelling(self) -> None:
         source = "func send(action: LoginIntent) {}\nfunc send(_ intent: LoginIntent) {}\nfunc sendAnalytics() {}"
         self.assertEqual(len(generic_send_positions(source)), 2)
+
+    def test_action_enum_detection_includes_the_bare_action_name(self) -> None:
+        source = "enum Action {}\nenum LoginAction {}\nenum Actionable {}"
+        self.assertEqual(len(action_enum_positions(source)), 2)
 
     def test_scheme_reference_requires_current_target_identity(self) -> None:
         targets = {"A1": "MVVMExample"}
