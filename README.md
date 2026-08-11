@@ -28,9 +28,16 @@
 ## Verification
 
 ```zsh
-git diff --check
-xcodebuild -list -project MVVMExample.xcodeproj
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+./scripts/verify.sh static
 ```
 
-Tests are not written or modified unless explicitly requested.
+`static` is the canonical deterministic repository check. It validates tracked-file hygiene,
+secrets, Xcode project/scheme/test-plan contracts, resources, and MVVM boundaries without a build,
+Simulator, signing, package download, or generated artifacts.
+
+GitHub exposes the same command as the manual **Static quality** workflow. It uses a standard
+macOS runner with read-only repository permissions; it does not build or test the app. Run it from
+the Actions tab for the branch whose current commit you want to inspect.
+
+Build and test commands remain explicit user-owned verification; tests are not written or modified
+unless explicitly requested.
