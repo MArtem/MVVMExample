@@ -14,6 +14,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_ROOT = Path("MVVMExample/MVVMExampleDemo")
+TEST_ROOTS = {
+    "MVVMExampleTests": Path("MVVMExampleTests"),
+    "MVVMExampleUITests": Path("MVVMExampleUITests"),
+}
 PROJECT = Path("MVVMExample.xcodeproj/project.pbxproj")
 SCHEME = Path("MVVMExample.xcodeproj/xcshareddata/xcschemes/MVVMExample.xcscheme")
 TEST_PLANS = {
@@ -65,6 +69,18 @@ def scanned_files() -> list[Path]:
     return git_files("--cached", "--others", "--exclude-standard")
 
 
+def worktree_changed_files() -> list[Path]:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "diff", "--name-only", "-z"],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("git diff failed; the static gate requires a Git worktree")
+    changed = [Path(item.decode("utf-8")) for item in result.stdout.split(b"\0") if item]
+    return list(set(changed) | set(git_files("--others", "--exclude-standard")))
+
+
 def line_number(text: str, position: int) -> int:
     return text.count("\n", 0, position) + 1
 
@@ -76,9 +92,20 @@ def text_at(path: Path) -> str | None:
     try:
         if absolute.stat().st_size > MAX_TEXT_SCAN_BYTES:
             return None
-        return absolute.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        return absolute.read_bytes().decode("utf-8", errors="replace")
+    except OSError:
         return None
+
+
+def index_text_at(path: Path) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "show", f":{path.as_posix()}"],
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0 or len(result.stdout) > MAX_TEXT_SCAN_BYTES:
+        return None
+    return result.stdout.decode("utf-8", errors="replace")
 
 
 def executable_text(text: str) -> str:
@@ -165,9 +192,21 @@ def scheme_reference_matches_target(reference: element_tree.Element, targets: di
     )
 
 
+def scheme_action_has_target(scheme_root: element_tree.Element, path: str, target_identifier: str, targets: dict[str, str]) -> bool:
+    return any(
+        reference.attrib.get("BlueprintIdentifier") == target_identifier
+        and scheme_reference_matches_target(reference, targets)
+        for reference in scheme_root.findall(path)
+    )
+
+
 def pbx_value(body: str, key: str) -> str | None:
     match = re.search(rf"\b{re.escape(key)} = (.*?);", body, re.DOTALL)
     return match.group(1).strip().strip('"') if match else None
+
+
+def pbx_identifier(value: str | None) -> str | None:
+    return value.split(" ", 1)[0] if value else None
 
 
 def file_reference_paths(project_text: str) -> dict[str, Path] | None:
@@ -210,22 +249,22 @@ def file_reference_paths(project_text: str) -> dict[str, Path] | None:
     return result if visit(main_group, Path()) else None
 
 
-def source_member_paths(project_text: str, target_name: str) -> set[Path] | None:
+def target_phase_paths(project_text: str, target_name: str, phase_name: str, phase_type: str) -> set[Path] | None:
     target = native_target(project_text, target_name)
     if target is None:
         return None
     _, target_body = target
-    phase_ids = re.findall(rf"({PBX_IDENTIFIER}) /\* Sources \*/", target_body)
+    phase_ids = re.findall(rf"({PBX_IDENTIFIER}) /\* {re.escape(phase_name)} \*/", target_body)
     if len(phase_ids) != 1:
         return None
     phase_body = pbx_object_body(project_text, phase_ids[0])
-    if phase_body is None or "isa = PBXSourcesBuildPhase;" not in phase_body:
+    if phase_body is None or f"isa = {phase_type};" not in phase_body:
         return None
     references = file_reference_paths(project_text)
     if references is None:
         return None
     paths: set[Path] = set()
-    for build_identifier in re.findall(rf"({PBX_IDENTIFIER}) /\* [^*]+\.swift in Sources \*/", phase_body):
+    for build_identifier in re.findall(rf"({PBX_IDENTIFIER}) /\* [^*]+ in {re.escape(phase_name)} \*/", phase_body):
         build_body = pbx_object_body(project_text, build_identifier)
         file_reference = pbx_value(build_body, "fileRef") if build_body else None
         if file_reference is None:
@@ -236,6 +275,14 @@ def source_member_paths(project_text: str, target_name: str) -> set[Path] | None
             return None
         paths.add(path)
     return paths
+
+
+def source_member_paths(project_text: str, target_name: str) -> set[Path] | None:
+    return target_phase_paths(project_text, target_name, "Sources", "PBXSourcesBuildPhase")
+
+
+def resource_member_paths(project_text: str, target_name: str) -> set[Path] | None:
+    return target_phase_paths(project_text, target_name, "Resources", "PBXResourcesBuildPhase")
 
 
 def build_settings_for_target(project_text: str, target_name: str) -> dict[str, dict[str, str]] | None:
@@ -275,7 +322,7 @@ def is_allowlisted_demo_credential(value: str) -> bool:
     )
 
 
-def check_repository_hygiene(files: list[Path]) -> list[Finding]:
+def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_changed: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     lowercase_paths: dict[str, Path] = {}
     secret_patterns = (
@@ -308,16 +355,27 @@ def check_repository_hygiene(files: list[Path]) -> list[Finding]:
         if any(component.endswith(FORBIDDEN_COMPONENT_SUFFIXES) for component in components):
             findings.append(Finding("FAIL", "QC.REPOSITORY.GENERATED_ARTIFACT", path_string, "generated build or release artifact is tracked"))
 
+    text_inputs: list[tuple[Path, str]] = []
+    for path in cached:
+        text = index_text_at(path)
+        if text is not None:
+            text_inputs.append((path, text))
+    for path in worktree_changed:
         text = text_at(path)
-        if text is None:
-            continue
+        if text is not None:
+            text_inputs.append((path, text))
+    seen_secret_findings: set[tuple[str, str, int]] = set()
+    for path, text in text_inputs:
         for rule, pattern in secret_patterns:
             for match in pattern.finditer(text):
                 literal = match.group(0)
                 quoted_value = re.search(r"[\"']([^\"']+)[\"']\s*$", literal)
                 if rule == "QC.SECRET.HARDCODED_CREDENTIAL" and quoted_value and is_allowlisted_demo_credential(quoted_value.group(1)):
                     continue
-                findings.append(Finding("FAIL", rule, path_string, "possible credential in tracked source", line_number(text, match.start())))
+                key = (rule, path.as_posix(), line_number(text, match.start()))
+                if key not in seen_secret_findings:
+                    seen_secret_findings.add(key)
+                    findings.append(Finding("FAIL", rule, path.as_posix(), "possible credential in staged or worktree source", key[2]))
     return findings
 
 
@@ -366,6 +424,48 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
     for path in files:
         if path.suffix == ".swift" and path.is_relative_to(APP_ROOT) and path not in source_members:
             findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), "application Swift file is not in the app target Sources build phase"))
+    for target_name, root in TEST_ROOTS.items():
+        source_members = source_member_paths(project_text, target_name)
+        if source_members is None:
+            findings.append(Finding("FAIL", "QC.XCODE.SOURCES_PHASE", PROJECT.as_posix(), f"could not parse the {target_name} Sources build phase"))
+            source_members = set()
+        for path in files:
+            if path.suffix == ".swift" and path.is_relative_to(root) and path not in source_members:
+                findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), f"test source is not in the {target_name} Sources build phase"))
+
+    resources = resource_member_paths(project_text, "MVVMExample")
+    reference_paths = file_reference_paths(project_text)
+    if resources is None or reference_paths is None:
+        findings.append(Finding("FAIL", "QC.XCODE.RESOURCES_PHASE", PROJECT.as_posix(), "could not parse the app target Resources build phase"))
+    else:
+        for path in reference_paths.values():
+            if path.is_relative_to(Path("MVVMExample")) and path.suffix in {".xcstrings", ".xcassets"} and path not in resources:
+                findings.append(Finding("FAIL", "QC.XCODE.RESOURCE_MEMBERSHIP", path.as_posix(), "app localization and asset catalogs must be in the Resources build phase"))
+
+    app_target = native_target(project_text, "MVVMExample")
+    app_identifier = app_target[0] if app_target else None
+    project_identifier_match = re.search(rf"(?m)^\t\t({PBX_IDENTIFIER}) /\* Project object \*/ = \{{", project_text)
+    project_identifier = project_identifier_match.group(1) if project_identifier_match else None
+    for target_name in TEST_ROOTS:
+        target = native_target(project_text, target_name)
+        target_body = target[1] if target else ""
+        dependency_ids = re.findall(rf"({PBX_IDENTIFIER}) /\* PBXTargetDependency \*/", target_body)
+        valid = len(dependency_ids) == 1 and app_identifier is not None
+        dependency_body = pbx_object_body(project_text, dependency_ids[0]) if valid else None
+        proxy_body = pbx_object_body(project_text, pbx_identifier(pbx_value(dependency_body, "targetProxy")) or "") if dependency_body else None
+        if (
+            not valid
+            or dependency_body is None
+            or pbx_value(dependency_body, "name") != "MVVMExample"
+            or pbx_identifier(pbx_value(dependency_body, "target")) != app_identifier
+            or proxy_body is None
+            or "isa = PBXContainerItemProxy;" not in proxy_body
+            or pbx_identifier(pbx_value(proxy_body, "containerPortal")) != project_identifier
+            or pbx_value(proxy_body, "proxyType") != "1"
+            or pbx_identifier(pbx_value(proxy_body, "remoteGlobalIDString")) != app_identifier
+            or pbx_value(proxy_body, "remoteInfo") != "MVVMExample"
+        ):
+            findings.append(Finding("FAIL", "QC.XCODE.TEST_TARGET_DEPENDENCY", PROJECT.as_posix(), f"{target_name} must depend on the current MVVMExample target through its proxy"))
 
     try:
         scheme_root = element_tree.parse(ROOT / SCHEME).getroot()
@@ -380,6 +480,16 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
             if not scheme_reference_matches_target(reference, targets):
                 findings.append(Finding("FAIL", "QC.XCODE.SCHEME_TARGET_CONTRACT", SCHEME.as_posix(), "BuildableReference must identify a current native target in this project"))
                 break
+        required_scheme_references = (
+            (".//BuildAction/BuildActionEntries/BuildActionEntry/BuildableReference", "MVVMExample"),
+            (".//TestAction/Testables/TestableReference/BuildableReference", "MVVMExampleTests"),
+            (".//LaunchAction/BuildableProductRunnable/BuildableReference", "MVVMExample"),
+            (".//ProfileAction/BuildableProductRunnable/BuildableReference", "MVVMExample"),
+        )
+        for action_path, target_name in required_scheme_references:
+            target = native_target(project_text, target_name)
+            if target is None or not scheme_action_has_target(scheme_root, action_path, target[0], targets):
+                findings.append(Finding("FAIL", "QC.XCODE.SCHEME_ACTION_CONTRACT", SCHEME.as_posix(), f"required {target_name} reference is missing from its scheme action"))
     except (OSError, ValueError, element_tree.ParseError):
         findings.append(Finding("FAIL", "QC.XCODE.SCHEME_SYNTAX", SCHEME.as_posix(), "shared scheme is not valid XML"))
 
@@ -488,8 +598,9 @@ def main() -> int:
     try:
         files = scanned_files()
         cached = cached_files()
+        worktree_changed = worktree_changed_files()
         findings = (
-            check_repository_hygiene(files)
+            check_repository_hygiene(files, cached, worktree_changed)
             + check_project_contract(files, cached)
             + check_resources(files)
             + check_app_architecture(files)

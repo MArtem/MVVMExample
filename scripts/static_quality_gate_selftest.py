@@ -15,6 +15,7 @@ from static_quality_gate import (
     executable_text,
     generic_send_positions,
     is_allowlisted_demo_credential,
+    scheme_action_has_target,
     scheme_reference_matches_target,
     source_member_paths,
     swift_method_body,
@@ -114,6 +115,16 @@ class StaticQualityGateSelfTests(unittest.TestCase):
         stale = element_tree.fromstring('<BuildableReference BlueprintIdentifier="A0" BlueprintName="MVVMExample" ReferencedContainer="container:MVVMExample.xcodeproj" />')
         self.assertTrue(scheme_reference_matches_target(valid, targets))
         self.assertFalse(scheme_reference_matches_target(stale, targets))
+
+    def test_scheme_action_requires_its_own_target_reference(self) -> None:
+        scheme = element_tree.fromstring('''
+            <Scheme><BuildAction><BuildActionEntries><BuildActionEntry>
+            <BuildableReference BlueprintIdentifier="A1" BlueprintName="MVVMExample" ReferencedContainer="container:MVVMExample.xcodeproj" />
+            </BuildActionEntry></BuildActionEntries></BuildAction></Scheme>
+        ''')
+        targets = {"A1": "MVVMExample"}
+        self.assertTrue(scheme_action_has_target(scheme, ".//BuildAction/BuildActionEntries/BuildActionEntry/BuildableReference", "A1", targets))
+        self.assertFalse(scheme_action_has_target(scheme, ".//LaunchAction/BuildableProductRunnable/BuildableReference", "A1", targets))
 
 
 if __name__ == "__main__":
