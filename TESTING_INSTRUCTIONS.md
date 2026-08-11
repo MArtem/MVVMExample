@@ -13,6 +13,10 @@ Active verification policy for `MVVMExample`.
 - `./MVVMExampleUI.xctestplan` is the explicit UI accessibility smoke lane and contains `MVVMExampleUITests` only.
 - UI tests are intentionally separate from the default unit lane because they require simulator execution and are slower/flakier than deterministic unit tests.
 
+## Approved Simulator Runtime
+- The current approved destination is `iPhone 17 Pro` on iOS `26.5`.
+- Do not download, install, replace, or delete any Simulator runtime without the user's explicit approval. If this destination is unavailable, report it instead of selecting or downloading another runtime.
+
 ## Verification Levels
 ### Absent
 - no build

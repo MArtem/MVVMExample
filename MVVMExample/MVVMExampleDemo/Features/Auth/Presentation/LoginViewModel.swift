@@ -68,13 +68,14 @@ final class LoginViewModel {
         let username = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let password = password
 
-        loginTask = Task { [repository, onLoginSuccess] in
+        loginTask = Task { [weak self, repository, onLoginSuccess] in
             do {
                 let session = try await repository.login(
                     username: username,
                     password: password
                 )
                 try Task.checkCancellation()
+                guard let self else { return }
                 state.isLoading = false
                 onLoginSuccess(session)
             } catch is CancellationError {
@@ -82,6 +83,7 @@ final class LoginViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 state.isLoading = false
                 state.errorMessage = AppErrorMapper.userMessage(for: error)
             }

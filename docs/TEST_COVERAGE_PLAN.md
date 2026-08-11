@@ -145,7 +145,7 @@ done
 - app unit tests run through the Xcode scheme/test plan:
 
 ```zsh
-xcodebuild test -project MVVMExample.xcodeproj -scheme MVVMExample -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' CODE_SIGNING_ALLOWED=NO
+xcodebuild test -project MVVMExample.xcodeproj -scheme MVVMExample -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5' CODE_SIGNING_ALLOWED=NO
 ```
 
 - UI tests are a separate configuration/lane after `MVVMExampleUITests` exists;
@@ -513,7 +513,7 @@ Recommended order once tests exist:
 xcodebuild test \
   -project MVVMExample.xcodeproj \
   -scheme MVVMExample \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0'
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5'
 ```
 
 UI tests should be separate from unit tests and may run in a slower CI lane.

@@ -73,10 +73,11 @@ final class ProfileViewModel {
         let generation = loadGeneration
         state = .loading
 
-        loadTask = Task { [repository, session, viewStateBuilder] in
+        loadTask = Task { [weak self, repository, session, viewStateBuilder] in
             do {
                 let profile = try await repository.loadCurrentProfile(session: session)
                 try Task.checkCancellation()
+                guard let self else { return }
                 guard generation == loadGeneration else { return }
                 state = .content(viewStateBuilder.makeContent(from: profile))
             } catch is CancellationError {
@@ -84,6 +85,7 @@ final class ProfileViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 guard generation == loadGeneration else { return }
                 state = .error(viewStateBuilder.makeError(from: error))
             }

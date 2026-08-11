@@ -68,10 +68,11 @@ final class ProfileEditViewModel {
             email: email.trimmingCharacters(in: .whitespacesAndNewlines)
         )
 
-        saveTask = Task { [repository, payload] in
+        saveTask = Task { [weak self, repository, payload] in
             do {
                 let updatedProfile = try await repository.updateProfile(id: payload.id, request: request)
                 try Task.checkCancellation()
+                guard let self else { return }
                 state.isSaving = false
                 onSaveSuccess(updatedProfile)
                 router?.pop()
@@ -80,6 +81,7 @@ final class ProfileEditViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 state.isSaving = false
                 state.errorMessage = AppErrorMapper.userMessage(for: error)
             }

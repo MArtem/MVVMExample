@@ -113,12 +113,13 @@ final class NewsListViewModel {
         let generation = loadGeneration
         state = .loading
 
-        loadTask = Task { [repository, interactionStore, viewStateBuilder, pageSize] in
+        loadTask = Task { [weak self, repository, interactionStore, viewStateBuilder, pageSize] in
             do {
                 let loadedArticles = try await repository.loadNews(
                     page: NewsPageRequest(limit: pageSize, skip: 0)
                 )
                 try Task.checkCancellation()
+                guard let self else { return }
                 guard generation == loadGeneration else { return }
                 articles = interactionStore.merge(loadedArticles)
                 nextSkip = articles.count
@@ -129,6 +130,7 @@ final class NewsListViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 guard generation == loadGeneration else { return }
                 state = .error(viewStateBuilder.makeError(from: error))
             }
@@ -181,11 +183,12 @@ final class NewsListViewModel {
         loadingContent.banner = nil
         state = .content(loadingContent)
 
-        loadNextPageTask = Task { [repository, interactionStore, viewStateBuilder] in
-            defer { loadNextPageTask = nil }
+        loadNextPageTask = Task { [weak self, repository, interactionStore, viewStateBuilder] in
+            defer { self?.loadNextPageTask = nil }
             do {
                 let nextPageArticles = try await repository.loadNews(page: request)
                 try Task.checkCancellation()
+                guard let self else { return }
                 guard generation == paginationGeneration else { return }
 
                 let mergedPage = interactionStore.merge(nextPageArticles)
@@ -198,6 +201,7 @@ final class NewsListViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 guard generation == paginationGeneration else { return }
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
@@ -305,19 +309,23 @@ final class NewsListViewModel {
             return viewStateBuilder.makeCard(from: optimisticArticle)
         }
         state = .content(optimisticContent)
+        let pendingReceipt = interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
 
-        likeTasks[articleID] = Task { [repository, interactionStore, viewStateBuilder] in
-            defer { likeTasks[articleID] = nil }
+        likeTasks[articleID] = Task { [weak self, repository, interactionStore, viewStateBuilder] in
+            defer { self?.likeTasks[articleID] = nil }
             do {
                 _ = try await repository.toggleLike(
                     articleID: articleID,
                     isLiked: targetIsLiked
                 )
                 try Task.checkCancellation()
-                interactionStore.update(with: optimisticArticle)
-                interactionStore.clearPendingLike(articleID: articleID)
-                articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
-                let updatedCard = viewStateBuilder.makeCard(from: optimisticArticle)
+                guard let self else { return }
+                if let pendingReceipt {
+                    interactionStore.clearPendingLike(pendingReceipt)
+                }
+                let currentArticle = interactionStore.merge(optimisticArticle)
+                articles = articles.map { $0.id == articleID ? currentArticle : $0 }
+                let updatedCard = viewStateBuilder.makeCard(from: currentArticle)
 
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
@@ -328,10 +336,11 @@ final class NewsListViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
-                interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
-                let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
+                let currentArticle = interactionStore.merge(optimisticArticle)
+                let localCard = viewStateBuilder.makeCard(from: currentArticle)
                 content.cards = latestContent.cards.map { item in
                     item.id == articleID ? localCard : item
                 }

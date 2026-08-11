@@ -5,7 +5,7 @@ readonly PROJECT="MVVMExample.xcodeproj"
 readonly SCHEME="MVVMExample"
 readonly UNIT_TEST_PLAN="MVVMExample"
 readonly UI_TEST_PLAN="MVVMExampleUI"
-readonly DESTINATION_IOS_26="platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0"
+readonly DESTINATION_IOS_26_5="platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5"
 readonly WORKTREES_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 readonly DERIVED_DATA_PATH="${MVVMEXAMPLE_DERIVED_DATA_PATH:-${WORKTREES_ROOT}/.xcode-derived-data/MVVMExample}"
 readonly CLONED_PACKAGES_PATH="${MVVMEXAMPLE_XCODE_PACKAGE_CACHE:-${WORKTREES_ROOT}/.xcode-package-cache/MVVMExample}"
@@ -19,7 +19,7 @@ Usage:
 Levels:
   static     Run static quality gates that do not require simulator execution
   list       Verify Xcode project structure
-  build      Build MVVMExample on iPhone 17 Pro (iOS 26.0)
+  build      Build MVVMExample on iPhone 17 Pro (iOS 26.5)
   test-unit  Run the unit-test xctestplan only
   test-ui    Run the UI accessibility smoke xctestplan only
   all        Run static, list, build, and unit tests; UI tests remain explicit via test-ui
@@ -50,7 +50,7 @@ run_build() {
     -project "${PROJECT}" \
     -scheme "${SCHEME}" \
     -configuration Debug \
-    -destination "${DESTINATION_IOS_26}" \
+    -destination "${DESTINATION_IOS_26_5}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     CODE_SIGNING_ALLOWED=NO \
@@ -66,7 +66,7 @@ run_unit_tests() {
     -scheme "${SCHEME}" \
     -testPlan "${UNIT_TEST_PLAN}" \
     -configuration Debug \
-    -destination "${DESTINATION_IOS_26}" \
+    -destination "${DESTINATION_IOS_26_5}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     -resultBundlePath "${result_bundle_path}" \
@@ -83,7 +83,7 @@ run_ui_tests() {
     -scheme "${SCHEME}" \
     -testPlan "${UI_TEST_PLAN}" \
     -configuration Debug \
-    -destination "${DESTINATION_IOS_26}" \
+    -destination "${DESTINATION_IOS_26_5}" \
     -derivedDataPath "${DERIVED_DATA_PATH}" \
     -clonedSourcePackagesDirPath "${CLONED_PACKAGES_PATH}" \
     -resultBundlePath "${result_bundle_path}" \

@@ -11,14 +11,17 @@ struct PendingMutationStoreTests {
         let context = try makeInMemoryModelContext()
         let store = PendingMutationStore(modelContext: context)
 
-        store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true)
-        store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: false)
+        _ = store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true)
+        _ = store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: false)
 
         let mutations = fetchPendingMutations(in: context)
         let mutation = try #require(mutations.first)
         #expect(mutations.count == 1)
         #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 7))
-        #expect(store.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 7, isLiked: false))
+        let payload = try #require(store.decodeArticleLike(mutation))
+        #expect(payload.articleID == 7)
+        #expect(payload.isLiked == false)
+        #expect(payload.operationID != nil)
         #expect(mutation.retryCount == 0)
         #expect(mutation.lastAttemptAt == nil)
         #expect(mutation.lastErrorDescription == nil)
@@ -54,7 +57,7 @@ struct PendingMutationStoreTests {
             newsRepository: newsRepository,
             profileRepository: profileRepository
         )
-        store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true)
+        _ = store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true)
 
         syncService.syncPendingMutations(for: 42)
         _ = await newsRepository.waitForToggleCall(at: 0)
@@ -68,8 +71,9 @@ struct PendingMutationStoreTests {
         #expect(failedMutation.lastErrorDescription?.isEmpty == false)
 
         let now = Date(timeIntervalSince1970: 2_000)
-        store.markAttempt(failedMutation, at: now)
-        store.markFailure(failedMutation, error: AppAPIError.offline, at: now)
+        let failedReceipt = store.receipt(for: failedMutation)
+        store.markAttempt(failedReceipt, at: now)
+        store.markFailure(failedReceipt, error: AppAPIError.offline, at: now)
         #expect(store.dueMutations(for: 42, now: now.addingTimeInterval(1)).isEmpty)
         #expect(store.dueMutations(for: 42, now: now.addingTimeInterval(20)).map(\.key) == [failedMutation.key])
 
@@ -88,6 +92,51 @@ struct PendingMutationStoreTests {
         let invalidPayloadMutation = try #require(fetchPendingMutations(in: context).first)
         #expect(invalidPayloadMutation.retryCount == 1)
         #expect(invalidPayloadMutation.lastErrorDescription?.isEmpty == false)
+    }
+
+    @Test("Older acknowledgement and failure cannot affect a newer like mutation")
+    func olderLikeAttemptCannotChangeNewerMutation() throws {
+        let context = try makeInMemoryModelContext()
+        let store = PendingMutationStore(modelContext: context)
+        let first = try #require(store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true))
+        let second = try #require(store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: false))
+
+        store.clear(first)
+        store.markFailure(first, error: AppAPIError.offline)
+
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        let payload = try #require(store.decodeArticleLike(mutation))
+        #expect(payload.isLiked == false)
+        #expect(payload.operationID != nil)
+        #expect(mutation.retryCount == 0)
+
+        store.clear(second)
+        #expect(fetchPendingMutations(in: context).isEmpty)
+    }
+
+    @Test("Pending sync cannot acknowledge a like superseded while its request is in flight")
+    func pendingSyncCannotAcknowledgeSupersededLike() async throws {
+        let context = try makeInMemoryModelContext()
+        let store = PendingMutationStore(modelContext: context)
+        let newsRepository = ControllablePendingNewsRepository()
+        let profileRepository = ControllablePendingProfileRepository()
+        let syncService = PendingMutationSyncService(
+            pendingStore: store,
+            newsRepository: newsRepository,
+            profileRepository: profileRepository
+        )
+        _ = store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: true)
+
+        syncService.syncPendingMutations(for: 42)
+        _ = await newsRepository.waitForToggleCall(at: 0)
+        _ = store.enqueueArticleLike(userID: 42, articleID: 7, isLiked: false)
+        await newsRepository.completeToggle(at: 0, with: .success(makePendingArticle(id: 7, isLiked: true, likesCount: 11)))
+        await drainPendingMainActorTasks()
+
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        let payload = try #require(store.decodeArticleLike(mutation))
+        #expect(payload.isLiked == false)
+        #expect(mutation.retryCount == 0)
     }
 
     @Test("Pending sync clears successful article and profile mutations")

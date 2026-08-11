@@ -7,6 +7,25 @@ import SwiftData
 struct PendingArticleLikeMutation: Codable, Equatable, Sendable {
     let articleID: Int
     let isLiked: Bool
+    /// Identifies one concrete optimistic action. Existing persisted payloads predate this field
+    /// and decode with `nil`; every newly enqueued action receives a fresh value.
+    let operationID: UUID?
+
+    init(articleID: Int, isLiked: Bool, operationID: UUID? = UUID()) {
+        self.articleID = articleID
+        self.isLiked = isLiked
+        self.operationID = operationID
+    }
+}
+
+/// Immutable identity of the exact durable mutation payload a caller is acknowledging.
+///
+/// The deterministic queue key intentionally coalesces repeated user actions. The payload bytes
+/// add the missing version boundary, so an older request cannot clear or back off a newer action
+/// that reused the same key.
+struct PendingMutationReceipt: Sendable, Equatable {
+    let key: String
+    let payloadData: Data
 }
 
 /// Persistence boundary for durable app-local state.
@@ -41,9 +60,10 @@ final class PendingMutationStore {
         self.modelContext = modelContext
     }
 
-    func enqueueArticleLike(userID: Int, articleID: Int, isLiked: Bool) {
+    @discardableResult
+    func enqueueArticleLike(userID: Int, articleID: Int, isLiked: Bool) -> PendingMutationReceipt? {
         let payload = PendingArticleLikeMutation(articleID: articleID, isLiked: isLiked)
-        upsert(
+        return upsert(
             key: PersistedPendingMutation.articleLikeKey(userID: userID, articleID: articleID),
             userID: userID,
             kind: PendingMutationKind.articleLike,
@@ -55,9 +75,14 @@ final class PendingMutationStore {
         delete(key: PersistedPendingMutation.articleLikeKey(userID: userID, articleID: articleID))
     }
 
+    func clear(_ receipt: PendingMutationReceipt) {
+        guard pendingMutation(key: receipt.key)?.payloadData == receipt.payloadData else { return }
+        delete(key: receipt.key)
+    }
+
     func enqueueProfileUpdate(userID: Int, profileID: Int, request: UpdateProfileRequest) {
         let payload = PendingProfileUpdateMutation(profileID: profileID, request: request)
-        upsert(
+        _ = upsert(
             key: PersistedPendingMutation.profileUpdateKey(userID: userID, profileID: profileID),
             userID: userID,
             kind: PendingMutationKind.profileUpdate,
@@ -78,13 +103,19 @@ final class PendingMutationStore {
         return records.filter { $0.isDue(now: now) }
     }
 
-    func markAttempt(_ mutation: PersistedPendingMutation, at date: Date = Date()) {
+    func receipt(for mutation: PersistedPendingMutation) -> PendingMutationReceipt {
+        PendingMutationReceipt(key: mutation.key, payloadData: mutation.payloadData)
+    }
+
+    func markAttempt(_ receipt: PendingMutationReceipt, at date: Date = Date()) {
+        guard let mutation = pendingMutation(key: receipt.key), mutation.payloadData == receipt.payloadData else { return }
         mutation.lastAttemptAt = date
         mutation.updatedAt = date
         try? modelContext.save()
     }
 
-    func markFailure(_ mutation: PersistedPendingMutation, error: Error, at date: Date = Date()) {
+    func markFailure(_ receipt: PendingMutationReceipt, error: Error, at date: Date = Date()) {
+        guard let mutation = pendingMutation(key: receipt.key), mutation.payloadData == receipt.payloadData else { return }
         mutation.retryCount += 1
         mutation.lastErrorDescription = String(describing: error)
         mutation.updatedAt = date
@@ -101,8 +132,8 @@ final class PendingMutationStore {
         return try? decoder.decode(PendingProfileUpdateMutation.self, from: mutation.payloadData)
     }
 
-    private func upsert<Payload: Encodable>(key: String, userID: Int, kind: String, payload: Payload) {
-        guard let payloadData = try? encoder.encode(payload) else { return }
+    private func upsert<Payload: Encodable>(key: String, userID: Int, kind: String, payload: Payload) -> PendingMutationReceipt? {
+        guard let payloadData = try? encoder.encode(payload) else { return nil }
         if let existing = pendingMutation(key: key) {
             existing.payloadData = payloadData
             existing.retryCount = 0
@@ -120,6 +151,7 @@ final class PendingMutationStore {
             )
         }
         try? modelContext.save()
+        return PendingMutationReceipt(key: key, payloadData: payloadData)
     }
 
     private func delete(key: String) {
@@ -162,39 +194,40 @@ final class PendingMutationSyncService {
         syncTask?.cancel()
         syncTask = Task { [pendingStore, newsRepository, profileRepository] in
             for mutation in pendingStore.dueMutations(for: userID) {
+                let receipt = pendingStore.receipt(for: mutation)
                 do {
                     try Task.checkCancellation()
-                    pendingStore.markAttempt(mutation)
+                    pendingStore.markAttempt(receipt)
                     switch mutation.kind {
                     case PendingMutationKind.articleLike:
                         guard let payload = pendingStore.decodeArticleLike(mutation) else {
-                            pendingStore.markFailure(mutation, error: PendingMutationSyncError.invalidPayload)
+                            pendingStore.markFailure(receipt, error: PendingMutationSyncError.invalidPayload)
                             continue
                         }
                         _ = try await newsRepository.toggleLike(
                             articleID: payload.articleID,
                             isLiked: payload.isLiked
                         )
-                        pendingStore.clearArticleLike(userID: userID, articleID: payload.articleID)
+                        pendingStore.clear(receipt)
 
                     case PendingMutationKind.profileUpdate:
                         guard let payload = pendingStore.decodeProfileUpdate(mutation) else {
-                            pendingStore.markFailure(mutation, error: PendingMutationSyncError.invalidPayload)
+                            pendingStore.markFailure(receipt, error: PendingMutationSyncError.invalidPayload)
                             continue
                         }
                         _ = try await profileRepository.updateProfile(
                             id: payload.profileID,
                             request: payload.request
                         )
-                        pendingStore.clearProfileUpdate(userID: userID, profileID: payload.profileID)
+                        pendingStore.clear(receipt)
 
                     default:
-                        pendingStore.markFailure(mutation, error: PendingMutationSyncError.unsupportedKind(mutation.kind))
+                        pendingStore.markFailure(receipt, error: PendingMutationSyncError.unsupportedKind(mutation.kind))
                     }
                 } catch is CancellationError {
                     return
                 } catch {
-                    pendingStore.markFailure(mutation, error: error)
+                    pendingStore.markFailure(receipt, error: error)
                 }
             }
         }
