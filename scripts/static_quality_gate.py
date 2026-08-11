@@ -46,15 +46,23 @@ class Finding:
         return f"{self.severity} {self.rule} {location} — {self.message}"
 
 
-def scanned_files() -> list[Path]:
+def git_files(*arguments: str) -> list[Path]:
     result = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        ["git", "-C", str(ROOT), "ls-files", "-z", *arguments],
         capture_output=True,
         check=False,
     )
     if result.returncode != 0:
         raise RuntimeError("git ls-files failed; the static gate requires a Git worktree")
     return [Path(item.decode("utf-8")) for item in result.stdout.split(b"\0") if item]
+
+
+def cached_files() -> list[Path]:
+    return git_files("--cached")
+
+
+def scanned_files() -> list[Path]:
+    return git_files("--cached", "--others", "--exclude-standard")
 
 
 def line_number(text: str, position: int) -> int:
@@ -80,6 +88,28 @@ def executable_text(text: str) -> str:
 
     without_blocks = re.sub(r"/\*.*?\*/", blank, text, flags=re.DOTALL)
     return re.sub(r"//[^\n]*", blank, without_blocks)
+
+
+def swift_method_body(source: str, method: str) -> str | None:
+    match = re.search(rf"\bfunc\s+{re.escape(method)}\s*\(", source)
+    if match is None:
+        return None
+    opening = source.find("{", match.end())
+    if opening < 0:
+        return None
+    depth = 1
+    for position, character in enumerate(source[opening + 1:], start=opening + 1):
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return source[opening + 1:position]
+    return None
+
+
+def generic_send_positions(source: str) -> list[int]:
+    return [match.start() for match in re.finditer(r"\bfunc\s+send\s*\(", source)]
 
 
 def contains_pbx_object(project_text: str, isa: str) -> bool:
@@ -111,6 +141,28 @@ def native_target(project_text: str, target_name: str) -> tuple[str, str] | None
         project_text,
     )
     return (match.group(1), match.group("body")) if match else None
+
+
+def native_targets(project_text: str) -> dict[str, str] | None:
+    targets: dict[str, str] = {}
+    for match in re.finditer(
+        rf"(?ms)^\t\t({PBX_IDENTIFIER}) /\* [^\n]*? \*/ = \{{\n\t\t\tisa = PBXNativeTarget;(?P<body>.*?)^\t\t\}};",
+        project_text,
+    ):
+        name = pbx_value(match.group("body"), "name")
+        if name is None or match.group(1) in targets:
+            return None
+        targets[match.group(1)] = name
+    return targets or None
+
+
+def scheme_reference_matches_target(reference: element_tree.Element, targets: dict[str, str]) -> bool:
+    identifier = reference.attrib.get("BlueprintIdentifier")
+    return (
+        identifier is not None
+        and targets.get(identifier) == reference.attrib.get("BlueprintName")
+        and reference.attrib.get("ReferencedContainer") == "container:MVVMExample.xcodeproj"
+    )
 
 
 def pbx_value(body: str, key: str) -> str | None:
@@ -269,12 +321,13 @@ def check_repository_hygiene(files: list[Path]) -> list[Finding]:
     return findings
 
 
-def check_project_contract(files: list[Path]) -> list[Finding]:
+def check_project_contract(files: list[Path], cached: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
-    tracked = set(files)
+    tracked = set(cached)
     required = {PROJECT, SCHEME, *TEST_PLANS}
+    missing_required = required - tracked
     for path in sorted(required):
-        if path not in tracked:
+        if path in missing_required:
             findings.append(Finding("FAIL", "QC.XCODE.REQUIRED_FILE", path.as_posix(), "required Xcode contract file is not tracked"))
             continue
         if (ROOT / path).is_symlink():
@@ -320,7 +373,14 @@ def check_project_contract(files: list[Path]) -> list[Finding]:
         expected = {f"container:{path.name}" for path in TEST_PLANS}
         if not expected.issubset(references):
             findings.append(Finding("FAIL", "QC.XCODE.SCHEME_TEST_PLANS", SCHEME.as_posix(), "shared scheme does not reference both required test plans"))
-    except (OSError, element_tree.ParseError):
+        targets = native_targets(project_text)
+        if targets is None:
+            raise ValueError("could not parse native targets")
+        for reference in scheme_root.findall(".//BuildableReference"):
+            if not scheme_reference_matches_target(reference, targets):
+                findings.append(Finding("FAIL", "QC.XCODE.SCHEME_TARGET_CONTRACT", SCHEME.as_posix(), "BuildableReference must identify a current native target in this project"))
+                break
+    except (OSError, ValueError, element_tree.ParseError):
         findings.append(Finding("FAIL", "QC.XCODE.SCHEME_SYNTAX", SCHEME.as_posix(), "shared scheme is not valid XML"))
 
     for path, target_name in TEST_PLANS.items():
@@ -362,7 +422,6 @@ def check_resources(files: list[Path]) -> list[Finding]:
 def check_app_architecture(files: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     forbidden_patterns = (
-        ("QC.MVVM.GENERIC_ACTION_DISPATCH", re.compile(r"func\s+send\s*\(\s*_\s+action\s*:"), "ViewModels must expose explicit intent methods"),
         ("QC.PERFORMANCE.SYNC_FILE_LOAD", re.compile(r"Data\s*\(\s*contentsOf\s*:"), "synchronous file load is forbidden in app source"),
         ("QC.PERFORMANCE.TYPE_ERASURE", re.compile(r"\bAnyView\s*\("), "unnecessary SwiftUI type erasure is forbidden"),
     )
@@ -378,6 +437,8 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
                 findings.append(Finding("FAIL", rule, path.as_posix(), message, line_number(text, match.start())))
         path_string = path.as_posix()
         if "/Presentation/" in path_string or path.name.endswith("ViewModel.swift"):
+            for position in generic_send_positions(source):
+                findings.append(Finding("FAIL", "QC.MVVM.GENERIC_ACTION_DISPATCH", path_string, "ViewModels must expose explicit intent methods", line_number(text, position)))
             for match in re.finditer(r"\benum\s+\w+Action\b", source):
                 findings.append(Finding("FAIL", "QC.MVVM.ACTION_ENUM", path_string, "action enums require an approved reducer architecture", line_number(text, match.start())))
         if "/Domain/" in path_string and re.search(r"\bimport\s+SwiftUI\b|\bURLSession\b|\b(?:\w+DTO)\b", source):
@@ -391,15 +452,18 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
     interaction_contract = ROOT / APP_ROOT / "Features/News/Domain/ArticleInteractionStore.swift"
     receipt_text = executable_text(receipt_contract.read_text(encoding="utf-8")) if receipt_contract.exists() else ""
     interaction_text = executable_text(interaction_contract.read_text(encoding="utf-8")) if interaction_contract.exists() else ""
-    required_receipt_fragments = (
-        "func clear(_ receipt: PendingMutationReceipt)",
-        "payloadData == receipt.payloadData",
-        "func markFailure(_ receipt: PendingMutationReceipt",
-        "func clearPendingLike(_ receipt: PendingMutationReceipt)",
+    receipt_method_contracts = (
+        ("clear", r"pendingMutation\s*\(\s*key:\s*receipt\.key\s*\)\?\.payloadData\s*==\s*receipt\.payloadData"),
+        ("markAttempt", r"pendingMutation\s*\(\s*key:\s*receipt\.key\s*\).*mutation\.payloadData\s*==\s*receipt\.payloadData"),
+        ("markFailure", r"pendingMutation\s*\(\s*key:\s*receipt\.key\s*\).*mutation\.payloadData\s*==\s*receipt\.payloadData"),
     )
-    for fragment in required_receipt_fragments:
-        if fragment not in receipt_text + interaction_text:
-            findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", "MVVMExample/MVVMExampleDemo", f"missing versioned mutation acknowledgement contract: {fragment}"))
+    for method, guard in receipt_method_contracts:
+        body = swift_method_body(receipt_text, method)
+        if body is None or re.search(guard, body, re.DOTALL) is None:
+            findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", receipt_contract.relative_to(ROOT).as_posix(), f"{method} must retain its receipt payload guard"))
+    clear_pending_like = swift_method_body(interaction_text, "clearPendingLike")
+    if clear_pending_like is None or re.search(r"pendingMutationStore\?\.clear\s*\(\s*receipt\s*\)", clear_pending_like) is None:
+        findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", interaction_contract.relative_to(ROOT).as_posix(), "clearPendingLike must clear through its receipt"))
     if re.search(r"clearPendingLike\s*\(\s*(?:articleID|id)\s*:", interaction_text):
         findings.append(Finding("FAIL", "QC.MUTATION.UNCONDITIONAL_CLEAR", interaction_contract.relative_to(ROOT).as_posix(), "pending mutations must be cleared by receipt, not logical ID"))
     return findings
@@ -423,9 +487,10 @@ def advisory_findings(files: list[Path]) -> list[Finding]:
 def main() -> int:
     try:
         files = scanned_files()
+        cached = cached_files()
         findings = (
             check_repository_hygiene(files)
-            + check_project_contract(files)
+            + check_project_contract(files, cached)
             + check_resources(files)
             + check_app_architecture(files)
             + advisory_findings(files)

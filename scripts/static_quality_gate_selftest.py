@@ -7,13 +7,17 @@ sys.dont_write_bytecode = True
 
 import re
 import unittest
+import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
 from static_quality_gate import (
     contains_pbx_object,
     executable_text,
+    generic_send_positions,
     is_allowlisted_demo_credential,
+    scheme_reference_matches_target,
     source_member_paths,
+    swift_method_body,
 )
 
 
@@ -89,6 +93,27 @@ class StaticQualityGateSelfTests(unittest.TestCase):
 \t\tC3 /* Duplicate.swift in Sources */ = {isa = PBXBuildFile; fileRef = PF0001 /* Duplicate.swift */; };
 """
         self.assertEqual(source_member_paths(project, "MVVMExample"), {Path("MVVMExample/First/Duplicate.swift")})
+
+    def test_receipt_guard_is_read_from_the_mutating_method(self) -> None:
+        source = """
+        func clear(_ receipt: Receipt) { delete(key: receipt.key) }
+        func markFailure(_ receipt: Receipt) {
+            guard mutation.payloadData == receipt.payloadData else { return }
+        }
+        """
+        self.assertNotIn("payloadData == receipt.payloadData", swift_method_body(source, "clear") or "")
+        self.assertIn("payloadData == receipt.payloadData", swift_method_body(source, "markFailure") or "")
+
+    def test_generic_send_detection_does_not_depend_on_parameter_spelling(self) -> None:
+        source = "func send(action: LoginIntent) {}\nfunc send(_ intent: LoginIntent) {}\nfunc sendAnalytics() {}"
+        self.assertEqual(len(generic_send_positions(source)), 2)
+
+    def test_scheme_reference_requires_current_target_identity(self) -> None:
+        targets = {"A1": "MVVMExample"}
+        valid = element_tree.fromstring('<BuildableReference BlueprintIdentifier="A1" BlueprintName="MVVMExample" ReferencedContainer="container:MVVMExample.xcodeproj" />')
+        stale = element_tree.fromstring('<BuildableReference BlueprintIdentifier="A0" BlueprintName="MVVMExample" ReferencedContainer="container:MVVMExample.xcodeproj" />')
+        self.assertTrue(scheme_reference_matches_target(valid, targets))
+        self.assertFalse(scheme_reference_matches_target(stale, targets))
 
 
 if __name__ == "__main__":
