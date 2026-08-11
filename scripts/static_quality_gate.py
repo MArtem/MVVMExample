@@ -221,7 +221,7 @@ def native_target(project_text: str, target_name: str) -> tuple[str, str] | None
         rf"(?ms)^\t\t({PBX_IDENTIFIER}) /\* {re.escape(target_name)} \*/ = \{{\n\t\t\tisa = PBXNativeTarget;(?P<body>.*?)^\t\t\}};",
         project_text,
     )
-    return (match.group(1), match.group("body")) if match else None
+    return (match.group(1), match.group("body")) if match and match.group(1) in project_target_identifiers(project_text) else None
 
 
 def native_targets(project_text: str) -> dict[str, str] | None:
@@ -231,7 +231,7 @@ def native_targets(project_text: str) -> dict[str, str] | None:
         project_text,
     ):
         name = pbx_value(match.group("body"), "name")
-        if name is None or match.group(1) in targets:
+        if name is None or match.group(1) in targets or match.group(1) not in project_target_identifiers(project_text):
             return None
         targets[match.group(1)] = name
     return targets or None
@@ -259,8 +259,30 @@ def pbx_value(body: str, key: str) -> str | None:
     return match.group(1).strip().strip('"') if match else None
 
 
+def project_target_identifiers(project_text: str) -> set[str]:
+    project = re.search(rf"(?ms)^\t\t{PBX_IDENTIFIER} /\* Project object \*/ = \{{(?P<body>.*?)^\t\t\}};", project_text)
+    targets = re.search(r"targets = \((?P<targets>.*?)\);", project.group("body"), re.DOTALL) if project else None
+    return set(re.findall(rf"({PBX_IDENTIFIER}) /\*", targets.group("targets"))) if targets else set()
+
+
 def pbx_identifier(value: str | None) -> str | None:
     return value.split(" ", 1)[0] if value else None
+
+
+def test_plan_matches_target(text: str, target_name: str, target_identifier: str) -> bool:
+    payload = json.loads(text)
+    targets = payload["testTargets"]
+    if not isinstance(targets, list) or any(not isinstance(item.get("enabled"), bool) for item in targets if isinstance(item, dict)):
+        return False
+    if any(not isinstance(item, dict) for item in targets):
+        return False
+    enabled_targets = [item["target"] for item in targets if item["enabled"]]
+    expected_target = {
+        "containerPath": "container:MVVMExample.xcodeproj",
+        "identifier": target_identifier,
+        "name": target_name,
+    }
+    return enabled_targets == [expected_target] and payload.get("version") == 1
 
 
 def file_reference_paths(project_text: str) -> dict[str, Path] | None:
@@ -588,18 +610,12 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
 
     for path, target_name in TEST_PLANS.items():
         try:
-            payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
             target = native_target(project_text, target_name)
             if target is None:
                 raise ValueError("target not found")
             target_identifier, _ = target
-            enabled_targets = [item["target"] for item in payload["testTargets"] if item.get("enabled")]
-            expected_target = {
-                "containerPath": "container:MVVMExample.xcodeproj",
-                "identifier": target_identifier,
-                "name": target_name,
-            }
-            if enabled_targets != [expected_target] or payload.get("version") != 1:
+            staged_plan = index_text_at(path)
+            if staged_plan is None or not test_plan_matches_target(staged_plan, target_name, target_identifier):
                 raise ValueError("target contract mismatch")
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"must be a version-1 plan for {target_name}"))
@@ -609,6 +625,12 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
         worktree_scheme = text_at(SCHEME) if SCHEME in worktree_changed else staged_scheme
         if worktree_project is not None and worktree_scheme is not None and (worktree_project != project_text or worktree_scheme != staged_scheme):
             findings += check_project_contract(files, cached, [], worktree_project, worktree_scheme)
+        for path, target_name in TEST_PLANS.items():
+            if path in worktree_changed:
+                worktree_plan = text_at(path)
+                target = native_target(worktree_project or project_text, target_name)
+                if worktree_plan is None or target is None or not test_plan_matches_target(worktree_plan, target_name, target[0]):
+                    findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"worktree plan must be a version-1 plan for {target_name}"))
     return findings
 
 
@@ -623,23 +645,32 @@ def check_resources(files: list[Path]) -> list[Finding]:
             payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
             if path.suffix == ".xcstrings" and (payload.get("sourceLanguage") != "en" or not isinstance(payload.get("strings"), dict)):
                 raise ValueError("catalog shape")
+            if any(component.endswith(".xcassets") for component in path.parts) and (
+                not isinstance(payload, dict)
+                or not isinstance(payload.get("info"), dict)
+                or not isinstance(payload["info"].get("author"), str)
+                or not isinstance(payload["info"].get("version"), int)
+            ):
+                raise ValueError("asset catalog shape")
         except (OSError, ValueError, json.JSONDecodeError):
             findings.append(Finding("FAIL", "QC.RESOURCE.JSON_CONTRACT", path.as_posix(), "resource JSON is malformed or has an invalid catalog shape"))
     return findings
 
 
-def check_app_architecture(files: list[Path]) -> list[Finding]:
+def check_app_architecture(files: list[Path], cached: list[Path], worktree_changed: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     forbidden_patterns = (
         ("QC.PERFORMANCE.SYNC_FILE_LOAD", re.compile(r"Data\s*\(\s*contentsOf\s*:"), "synchronous file load is forbidden in app source"),
         ("QC.PERFORMANCE.TYPE_ERASURE", re.compile(r"\bAnyView\s*\("), "unnecessary SwiftUI type erasure is forbidden"),
     )
-    app_files = [path for path in files if path.suffix == ".swift" and path.is_relative_to(APP_ROOT)]
-    for path in app_files:
-        text = text_at(path)
-        if text is None:
-            findings.append(Finding("FAIL", "QC.SOURCE.UNREADABLE", path.as_posix(), "application source must be UTF-8 and below the static scan limit"))
-            continue
+    app_files = [path for path in cached if path.suffix == ".swift" and path.is_relative_to(APP_ROOT)]
+    source_inputs = index_texts(app_files)
+    for path in worktree_changed:
+        if path.suffix == ".swift" and path.is_relative_to(APP_ROOT):
+            text = text_at(path)
+            if text is not None:
+                source_inputs.append((path, text))
+    for path, text in source_inputs:
         source = executable_text(text)
         for rule, pattern, message in forbidden_patterns:
             for match in pattern.finditer(source):
@@ -652,7 +683,7 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
                 findings.append(Finding("FAIL", "QC.MVVM.ACTION_ENUM", path_string, "action enums require an approved reducer architecture", line_number(text, position)))
         if "/Domain/" in path_string and re.search(r"\bimport\s+SwiftUI\b|\bURLSession\b|\b(?:\w+DTO)\b", source):
             findings.append(Finding("FAIL", "QC.MVVM.DOMAIN_BOUNDARY", path_string, "Domain must not depend on SwiftUI, URLSession, or DTO types"))
-        if "/Presentation/" in path_string and re.search(r"\bURLSession\b|\bURLRequest\b|\bURLSessionAPIClient\b|\bURLSessionNetworkClient\b", source):
+        if "/Presentation/" in path_string and re.search(r"\bURLSession\b|\bURLRequest\b|\b(?:URLSession)?APIClient\b|\b(?:URLSession)?NetworkClient\b", source):
             findings.append(Finding("FAIL", "QC.MVVM.PRESENTATION_NETWORKING", path_string, "Presentation must depend on repositories, not transport clients"))
         if any(component in path_string for component in ("/Data/API/", "/Infrastructure/Networking/", "/Infrastructure/LocalSupport/AppNetworking/")) and "try?" in source:
             findings.append(Finding("FAIL", "QC.NETWORK.SILENCED_FAILURE", path_string, "API boundary must not silence errors with try?"))
@@ -702,7 +733,7 @@ def main() -> int:
             check_repository_hygiene(files, cached, worktree_changed)
             + check_project_contract(files, cached, worktree_changed)
             + check_resources(files)
-            + check_app_architecture(files)
+            + check_app_architecture(files, cached, worktree_changed)
             + advisory_findings(files)
         )
     except Exception as error:  # Gate failures must never masquerade as PASS.

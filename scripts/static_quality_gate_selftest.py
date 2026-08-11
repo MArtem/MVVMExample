@@ -20,6 +20,7 @@ from static_quality_gate import (
     scheme_reference_matches_target,
     source_member_paths,
     swift_method_body,
+    test_plan_matches_target,
 )
 
 
@@ -44,6 +45,7 @@ class StaticQualityGateSelfTests(unittest.TestCase):
 \t\tA0 /* Project object */ = {
 \t\t\tisa = PBXProject;
 \t\t\tmainGroup = A1 /* Root */;
+\t\t\ttargets = ( B0 /* MVVMExample */, );
 \t\t};
 \t\tA1 /* Root */ = {
 \t\t\tisa = PBXGroup;
@@ -130,6 +132,12 @@ class StaticQualityGateSelfTests(unittest.TestCase):
         targets = {"A1": "MVVMExample"}
         self.assertTrue(scheme_action_has_target(scheme, ".//BuildAction/BuildActionEntries/BuildActionEntry/BuildableReference", "A1", targets))
         self.assertFalse(scheme_action_has_target(scheme, ".//LaunchAction/BuildableProductRunnable/BuildableReference", "A1", targets))
+
+    def test_test_plan_requires_boolean_enabled_flags(self) -> None:
+        valid = '{"version": 1, "testTargets": [{"enabled": true, "target": {"containerPath": "container:MVVMExample.xcodeproj", "identifier": "A1", "name": "MVVMExampleTests"}}]}'
+        invalid = valid.replace('"enabled": true', '"enabled": "true"')
+        self.assertTrue(test_plan_matches_target(valid, "MVVMExampleTests", "A1"))
+        self.assertFalse(test_plan_matches_target(invalid, "MVVMExampleTests", "A1"))
 
 
 if __name__ == "__main__":
