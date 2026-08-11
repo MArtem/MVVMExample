@@ -59,10 +59,11 @@ final class NewsDetailViewModel {
         let generation = loadGeneration
         state = .loading(viewStateBuilder.makePlaceholder(from: payload))
 
-        loadTask = Task { [repository, interactionStore, viewStateBuilder, payload] in
+        loadTask = Task { [weak self, repository, interactionStore, viewStateBuilder, payload] in
             do {
                 let loadedArticle = try await repository.loadArticleDetail(id: payload.id)
                 try Task.checkCancellation()
+                guard let self else { return }
                 guard generation == loadGeneration else { return }
                 let mergedArticle = interactionStore.merge(loadedArticle)
                 article = mergedArticle
@@ -72,6 +73,7 @@ final class NewsDetailViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
+                guard let self else { return }
                 guard generation == loadGeneration else { return }
                 state = .error(viewStateBuilder.makeError(from: error))
             }
@@ -87,12 +89,14 @@ final class NewsDetailViewModel {
         self.article = optimisticArticle
         interactionStore.update(with: optimisticArticle)
         state = .content(viewStateBuilder.makeContent(from: optimisticArticle))
+        interactionStore.enqueuePendingLike(articleID: article.id, isLiked: target)
 
-        favoriteTask = Task { [repository, interactionStore, viewStateBuilder] in
-            defer { favoriteTask = nil }
+        favoriteTask = Task { [weak self, repository, interactionStore, viewStateBuilder] in
+            defer { self?.favoriteTask = nil }
             do {
                 _ = try await repository.toggleLike(articleID: article.id, isLiked: target)
                 try Task.checkCancellation()
+                guard let self else { return }
                 interactionStore.update(with: optimisticArticle)
                 interactionStore.clearPendingLike(articleID: article.id)
                 let merged = interactionStore.merge(optimisticArticle)
@@ -103,7 +107,7 @@ final class NewsDetailViewModel {
             } catch AppAPIError.cancelled {
                 return
             } catch {
-                interactionStore.enqueuePendingLike(articleID: article.id, isLiked: target)
+                guard let self else { return }
                 self.article = optimisticArticle
                 state = .content(viewStateBuilder.makeContent(from: optimisticArticle))
             }

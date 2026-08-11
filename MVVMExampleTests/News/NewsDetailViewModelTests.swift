@@ -145,6 +145,43 @@ struct NewsDetailViewModelTests {
         #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 7, isLiked: true))
     }
 
+    @Test("Cancelled favorite keeps its pending mutation after the detail ViewModel is released")
+    func cancelledFavoriteKeepsPendingMutationAfterViewModelRelease() async throws {
+        let context = try makeInMemoryModelContext()
+        let pendingMutationStore = PendingMutationStore(modelContext: context)
+        let interactionStore = ArticleInteractionStore(modelContext: context, pendingMutationStore: pendingMutationStore)
+        interactionStore.activateUser(id: 42)
+        let repository = ControllableNewsDetailRepository()
+        var viewModel: NewsDetailViewModel? = makeDetailViewModel(repository: repository, interactionStore: interactionStore)
+        weak var releasedViewModel: NewsDetailViewModel?
+
+        do {
+            guard let activeViewModel = viewModel else {
+                Issue.record("Expected detail ViewModel")
+                return
+            }
+            await loadDetailContent(
+                viewModel: activeViewModel,
+                repository: repository,
+                article: makeDetailArticle(isLiked: false, likesCount: 10)
+            )
+            activeViewModel.favoriteTapped()
+            _ = await repository.waitForToggleRequest(at: 0)
+            releasedViewModel = activeViewModel
+        }
+
+        viewModel = nil
+        await drainDetailMainActorTasks()
+        #expect(releasedViewModel == nil)
+
+        await repository.completeToggle(at: 0, with: .success(makeDetailArticle(isLiked: false, likesCount: 10)))
+        await drainDetailMainActorTasks()
+
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 7))
+        #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 7, isLiked: true))
+    }
+
     @Test("Duplicate favorite tap while request is in flight is ignored")
     func duplicateFavoriteTapWhileRequestIsInFlightIsIgnored() async {
         let repository = ControllableNewsDetailRepository()

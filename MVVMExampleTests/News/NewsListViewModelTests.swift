@@ -139,6 +139,39 @@ struct NewsListViewModelTests {
         #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 1, isLiked: true))
     }
 
+    @Test("Cancelled like keeps its pending mutation after the list ViewModel is released")
+    func cancelledLikeKeepsPendingMutationAfterViewModelRelease() async throws {
+        let context = try makeInMemoryModelContext()
+        let pendingMutationStore = PendingMutationStore(modelContext: context)
+        let interactionStore = ArticleInteractionStore(modelContext: context, pendingMutationStore: pendingMutationStore)
+        interactionStore.activateUser(id: 42)
+        let repository = ControllableNewsRepository()
+        var viewModel: NewsListViewModel? = makeViewModel(repository: repository, interactionStore: interactionStore)
+        weak var releasedViewModel: NewsListViewModel?
+
+        do {
+            guard let activeViewModel = viewModel else {
+                Issue.record("Expected list ViewModel")
+                return
+            }
+            await loadInitialContent(viewModel: activeViewModel, repository: repository, articles: makeArticles(count: 2))
+            activeViewModel.likeTapped(id: 1)
+            _ = await repository.waitForToggleRequest(at: 0)
+            releasedViewModel = activeViewModel
+        }
+
+        viewModel = nil
+        await drainMainActorTasks()
+        #expect(releasedViewModel == nil)
+
+        await repository.completeToggle(at: 0, with: .success(makeArticle(id: 1, isLiked: false, likesCount: 1)))
+        await drainMainActorTasks()
+
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 1))
+        #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 1, isLiked: true))
+    }
+
     @Test("Duplicate like tap while request is in flight is ignored")
     func duplicateLikeTapWhileRequestIsInFlightIsIgnored() async {
         let repository = ControllableNewsRepository()
