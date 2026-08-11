@@ -36,7 +36,11 @@ TARGET_PRODUCT_CONTRACTS = {
 }
 MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024
 MAX_TEXT_SCAN_BYTES = 2 * 1024 * 1024
-FORBIDDEN_COMPONENT_SUFFIXES = (".xcarchive", ".xcresult", ".ipa", ".dSYM", ".app")
+FORBIDDEN_COMPONENT_NAMES = frozenset({
+    ".build", ".cache", ".swiftpm", "build", "coverage", "deriveddata", "dist",
+    "node_modules", "temp", "tmp", "xcuserdata",
+})
+FORBIDDEN_COMPONENT_SUFFIXES = (".app", ".dsym", ".dsym.zip", ".ipa", ".result", ".xcarchive", ".xcresult")
 PBX_IDENTIFIER = r"[A-Za-z0-9]+"
 
 
@@ -259,6 +263,19 @@ def scheme_action_has_target(scheme_root: element_tree.Element, path: str, targe
     )
 
 
+def app_build_action_has_required_flags(scheme_root: element_tree.Element, app_target_identifier: str, targets: dict[str, str]) -> bool:
+    required_flags = ("buildForTesting", "buildForRunning", "buildForProfiling", "buildForArchiving", "buildForAnalyzing")
+    for entry in scheme_root.findall(".//BuildAction/BuildActionEntries/BuildActionEntry"):
+        reference = entry.find("./BuildableReference")
+        if (
+            reference is not None
+            and reference.attrib.get("BlueprintIdentifier") == app_target_identifier
+            and scheme_reference_matches_target(reference, targets)
+        ):
+            return all(entry.attrib.get(flag) == "YES" for flag in required_flags)
+    return False
+
+
 def pbx_value(body: str, key: str) -> str | None:
     match = re.search(rf"\b{re.escape(key)} = (.*?);", body, re.DOTALL)
     return match.group(1).strip().strip('"') if match else None
@@ -280,7 +297,7 @@ def pbx_identifier(value: str | None) -> str | None:
     return value.split(" ", 1)[0] if value else None
 
 
-def test_plan_matches_target(text: str, target_name: str, target_identifier: str) -> bool:
+def test_plan_matches_target(text: str, target_name: str, target_identifier: str, app_target_identifier: str) -> bool:
     payload = json.loads(text)
     targets = payload["testTargets"]
     if not isinstance(targets, list) or any(not isinstance(item.get("enabled"), bool) for item in targets if isinstance(item, dict)):
@@ -293,7 +310,16 @@ def test_plan_matches_target(text: str, target_name: str, target_identifier: str
         "identifier": target_identifier,
         "name": target_name,
     }
-    return enabled_targets == [expected_target] and payload.get("version") == 1
+    expected_expansion_target = {
+        "containerPath": "container:MVVMExample.xcodeproj",
+        "identifier": app_target_identifier,
+        "name": "MVVMExample",
+    }
+    return (
+        enabled_targets == [expected_target]
+        and payload.get("defaultOptions", {}).get("targetForVariableExpansion") == expected_expansion_target
+        and payload.get("version") == 1
+    )
 
 
 def file_reference_paths(project_text: str) -> dict[str, Path] | None:
@@ -446,8 +472,8 @@ def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_cha
         if size > MAX_TRACKED_FILE_BYTES:
             findings.append(Finding("FAIL", "QC.REPOSITORY.LARGE_FILE", path_string, f"staged or untracked file exceeds {MAX_TRACKED_FILE_BYTES // (1024 * 1024)} MiB"))
 
-        components = path.parts
-        if any(component.endswith(FORBIDDEN_COMPONENT_SUFFIXES) for component in components):
+        components = tuple(component.casefold() for component in path.parts)
+        if any(component in FORBIDDEN_COMPONENT_NAMES or component.endswith(FORBIDDEN_COMPONENT_SUFFIXES) for component in components):
             findings.append(Finding("FAIL", "QC.REPOSITORY.GENERATED_ARTIFACT", path_string, "generated build or release artifact is tracked"))
 
     for path in worktree_changed:
@@ -622,6 +648,8 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
             target = native_target(project_text, target_name)
             if target is None or not scheme_action_has_target(scheme_root, action_path, target[0], targets):
                 findings.append(Finding("FAIL", "QC.XCODE.SCHEME_ACTION_CONTRACT", SCHEME.as_posix(), f"required {target_name} reference is missing from its scheme action"))
+        if app_target is None or not app_build_action_has_required_flags(scheme_root, app_target[0], targets):
+            findings.append(Finding("FAIL", "QC.XCODE.SCHEME_BUILD_ACTION", SCHEME.as_posix(), "the app BuildActionEntry must enable all required build actions"))
         required_action_configurations = {
             "TestAction": "Debug",
             "LaunchAction": "Debug",
@@ -642,7 +670,7 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
                 raise ValueError("target not found")
             target_identifier, _ = target
             staged_plan = index_text_at(path)
-            if staged_plan is None or not test_plan_matches_target(staged_plan, target_name, target_identifier):
+            if staged_plan is None or app_identifier is None or not test_plan_matches_target(staged_plan, target_name, target_identifier, app_identifier):
                 raise ValueError("target contract mismatch")
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"must be a version-1 plan for {target_name}"))
@@ -656,7 +684,8 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
             if path in worktree_changed:
                 worktree_plan = text_at(path)
                 target = native_target(worktree_project or project_text, target_name)
-                if worktree_plan is None or target is None or not test_plan_matches_target(worktree_plan, target_name, target[0]):
+                worktree_app_target = native_target(worktree_project or project_text, "MVVMExample")
+                if worktree_plan is None or target is None or worktree_app_target is None or not test_plan_matches_target(worktree_plan, target_name, target[0], worktree_app_target[0]):
                     findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"worktree plan must be a version-1 plan for {target_name}"))
     return findings
 

@@ -11,6 +11,7 @@ import xml.etree.ElementTree as element_tree
 from pathlib import Path
 
 from static_quality_gate import (
+    app_build_action_has_required_flags,
     action_enum_positions,
     contains_pbx_object,
     executable_text,
@@ -134,11 +135,26 @@ class StaticQualityGateSelfTests(unittest.TestCase):
         self.assertTrue(scheme_action_has_target(scheme, ".//BuildAction/BuildActionEntries/BuildActionEntry/BuildableReference", "A1", targets))
         self.assertFalse(scheme_action_has_target(scheme, ".//LaunchAction/BuildableProductRunnable/BuildableReference", "A1", targets))
 
+    def test_app_build_action_requires_every_build_flag(self) -> None:
+        valid = element_tree.fromstring('''
+            <Scheme><BuildAction><BuildActionEntries><BuildActionEntry
+            buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES"
+            buildForArchiving="YES" buildForAnalyzing="YES"><BuildableReference
+            BlueprintIdentifier="A1" BlueprintName="MVVMExample" ReferencedContainer="container:MVVMExample.xcodeproj" />
+            </BuildActionEntry></BuildActionEntries></BuildAction></Scheme>
+        ''')
+        invalid = element_tree.fromstring(element_tree.tostring(valid, encoding="unicode").replace('buildForRunning="YES"', 'buildForRunning="NO"'))
+        targets = {"A1": "MVVMExample"}
+        self.assertTrue(app_build_action_has_required_flags(valid, "A1", targets))
+        self.assertFalse(app_build_action_has_required_flags(invalid, "A1", targets))
+
     def test_test_plan_requires_boolean_enabled_flags(self) -> None:
-        valid = '{"version": 1, "testTargets": [{"enabled": true, "target": {"containerPath": "container:MVVMExample.xcodeproj", "identifier": "A1", "name": "MVVMExampleTests"}}]}'
+        valid = '{"version": 1, "defaultOptions": {"targetForVariableExpansion": {"containerPath": "container:MVVMExample.xcodeproj", "identifier": "APP", "name": "MVVMExample"}}, "testTargets": [{"enabled": true, "target": {"containerPath": "container:MVVMExample.xcodeproj", "identifier": "A1", "name": "MVVMExampleTests"}}]}'
         invalid = valid.replace('"enabled": true', '"enabled": "true"')
-        self.assertTrue(test_plan_matches_target(valid, "MVVMExampleTests", "A1"))
-        self.assertFalse(test_plan_matches_target(invalid, "MVVMExampleTests", "A1"))
+        stale_expansion_target = valid.replace('"identifier": "APP"', '"identifier": "STALE"')
+        self.assertTrue(test_plan_matches_target(valid, "MVVMExampleTests", "A1", "APP"))
+        self.assertFalse(test_plan_matches_target(invalid, "MVVMExampleTests", "A1", "APP"))
+        self.assertFalse(test_plan_matches_target(stale_expansion_target, "MVVMExampleTests", "A1", "APP"))
 
 
 if __name__ == "__main__":

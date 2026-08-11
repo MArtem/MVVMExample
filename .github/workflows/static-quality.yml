@@ -22,16 +22,21 @@ jobs:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - name: Run the same local static gate
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
             git fetch --no-tags origin "${BASE_SHA}:refs/remotes/origin/pr-base"
             MVVMEXAMPLE_STATIC_DIFF_RANGE="origin/pr-base...${HEAD_SHA}" ./scripts/verify.sh static
+            git diff --name-only "origin/pr-base...${HEAD_SHA}" \
+              | awk -F/ '/^AllArchitectureCases\/[^/]+\// { print $1 "/" $2 }' \
+              | sort -u \
+              | while IFS= read -r architecture_case; do
+                  (cd "${architecture_case}" && ./scripts/verify.sh static)
+                done
           else
             ./scripts/verify.sh static
           fi
