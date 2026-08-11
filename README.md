@@ -35,9 +35,10 @@
 secrets, Xcode project/scheme/test-plan contracts, resources, and MVVM boundaries without a build,
 Simulator, signing, package download, or generated artifacts.
 
-GitHub exposes the same command as the manual **Static quality** workflow. It uses a standard
-macOS runner with read-only repository permissions; it does not build or test the app. Run it from
-the Actions tab for the branch whose current commit you want to inspect.
+GitHub runs the same command automatically when a pull request is opened, reopened, or updated.
+After the workflow reaches `Development`, it can also be started manually from the Actions tab.
+It uses a standard macOS runner with read-only repository permissions; it does not build or test
+the app.
 
 Build and test commands remain explicit user-owned verification; tests are not written or modified
 unless explicitly requested.
