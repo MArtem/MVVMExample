@@ -17,8 +17,8 @@ APP_ROOT = Path("MVVMExample/MVVMExampleDemo")
 PROJECT = Path("MVVMExample.xcodeproj/project.pbxproj")
 SCHEME = Path("MVVMExample.xcodeproj/xcshareddata/xcschemes/MVVMExample.xcscheme")
 TEST_PLANS = {
-    Path("MVVMExample.xctestplan"): ("MVVMExampleTests", "177120BDB76CBC9039B9FB95"),
-    Path("MVVMExampleUI.xctestplan"): ("MVVMExampleUITests", "7C17E40D544DCA5DEFEA3454"),
+    Path("MVVMExample.xctestplan"): "MVVMExampleTests",
+    Path("MVVMExampleUI.xctestplan"): "MVVMExampleUITests",
 }
 TARGET_BUNDLE_IDENTIFIERS = {
     "MVVMExample": "com.example.MVVMExample",
@@ -28,6 +28,7 @@ TARGET_BUNDLE_IDENTIFIERS = {
 MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024
 MAX_TEXT_SCAN_BYTES = 2 * 1024 * 1024
 FORBIDDEN_COMPONENT_SUFFIXES = (".xcarchive", ".xcresult", ".ipa", ".dSYM", ".app")
+PBX_IDENTIFIER = r"[A-Za-z0-9]+"
 
 
 @dataclass(frozen=True)
@@ -45,9 +46,9 @@ class Finding:
         return f"{self.severity} {self.rule} {location} — {self.message}"
 
 
-def tracked_files() -> list[Path]:
+def scanned_files() -> list[Path]:
     result = subprocess.run(
-        ["git", "-C", str(ROOT), "ls-files", "-z"],
+        ["git", "-C", str(ROOT), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         capture_output=True,
         check=False,
     )
@@ -87,32 +88,102 @@ def contains_pbx_object(project_text: str, isa: str) -> bool:
 
 def pbx_object_body(project_text: str, identifier: str) -> str | None:
     match = re.search(
-        rf"(?ms)^\t\t{re.escape(identifier)} /\* .*? \*/ = \{{(?P<body>.*?)^\t\t\}};",
+        rf"(?m)^\t\t{re.escape(identifier)}(?: /\* .*? \*/)? = \{{",
         project_text,
     )
-    return match.group("body") if match else None
+    if match is None:
+        return None
+
+    depth = 1
+    for position, character in enumerate(project_text[match.end():], start=match.end()):
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return project_text[match.end():position]
+    return None
 
 
 def native_target(project_text: str, target_name: str) -> tuple[str, str] | None:
     match = re.search(
-        rf"(?ms)^\t\t([A-F0-9]+) /\* {re.escape(target_name)} \*/ = \{{\n\t\t\tisa = PBXNativeTarget;(?P<body>.*?)^\t\t\}};",
+        rf"(?ms)^\t\t({PBX_IDENTIFIER}) /\* {re.escape(target_name)} \*/ = \{{\n\t\t\tisa = PBXNativeTarget;(?P<body>.*?)^\t\t\}};",
         project_text,
     )
     return (match.group(1), match.group("body")) if match else None
 
 
-def source_member_names(project_text: str, target_name: str) -> set[str] | None:
+def pbx_value(body: str, key: str) -> str | None:
+    match = re.search(rf"\b{re.escape(key)} = (.*?);", body, re.DOTALL)
+    return match.group(1).strip().strip('"') if match else None
+
+
+def file_reference_paths(project_text: str) -> dict[str, Path] | None:
+    project = re.search(rf"(?m)^\t\t{PBX_IDENTIFIER} /\* Project object \*/ = \{{(?P<body>.*?)^\t\t\}};", project_text, re.DOTALL)
+    if project is None:
+        return None
+    main_group = pbx_value(project.group("body"), "mainGroup")
+    if main_group is None:
+        return None
+    main_group = main_group.split(" ", 1)[0]
+    result: dict[str, Path] = {}
+    visited: set[str] = set()
+
+    def visit(group_identifier: str, parent_path: Path) -> bool:
+        if group_identifier in visited:
+            return False
+        visited.add(group_identifier)
+        group_body = pbx_object_body(project_text, group_identifier)
+        if group_body is None or "isa = PBXGroup;" not in group_body:
+            return False
+        group_path = pbx_value(group_body, "path")
+        current_path = parent_path / group_path if group_path else parent_path
+        children = re.search(r"children = \((?P<children>.*?)\);", group_body, re.DOTALL)
+        if children is None:
+            return False
+        for child_identifier in re.findall(rf"({PBX_IDENTIFIER}) /\*", children.group("children")):
+            child_body = pbx_object_body(project_text, child_identifier)
+            if child_body is None:
+                return False
+            if "isa = PBXGroup;" in child_body:
+                if not visit(child_identifier, current_path):
+                    return False
+            elif "isa = PBXFileReference;" in child_body:
+                path = pbx_value(child_body, "path")
+                source_tree = pbx_value(child_body, "sourceTree")
+                if path and source_tree == "<group>":
+                    result[child_identifier] = current_path / path
+        return True
+
+    return result if visit(main_group, Path()) else None
+
+
+def source_member_paths(project_text: str, target_name: str) -> set[Path] | None:
     target = native_target(project_text, target_name)
     if target is None:
         return None
     _, target_body = target
-    phase_ids = re.findall(r"([A-F0-9]+) /\* Sources \*/", target_body)
+    phase_ids = re.findall(rf"({PBX_IDENTIFIER}) /\* Sources \*/", target_body)
     if len(phase_ids) != 1:
         return None
     phase_body = pbx_object_body(project_text, phase_ids[0])
     if phase_body is None or "isa = PBXSourcesBuildPhase;" not in phase_body:
         return None
-    return set(re.findall(r"/\* ([^*]+\.swift) in Sources \*/", phase_body))
+    references = file_reference_paths(project_text)
+    if references is None:
+        return None
+    paths: set[Path] = set()
+    for build_identifier in re.findall(rf"({PBX_IDENTIFIER}) /\* [^*]+\.swift in Sources \*/", phase_body):
+        build_body = pbx_object_body(project_text, build_identifier)
+        file_reference = pbx_value(build_body, "fileRef") if build_body else None
+        if file_reference is None:
+            return None
+        file_reference = file_reference.split(" ", 1)[0]
+        path = references.get(file_reference)
+        if path is None:
+            return None
+        paths.add(path)
+    return paths
 
 
 def build_settings_for_target(project_text: str, target_name: str) -> dict[str, dict[str, str]] | None:
@@ -120,13 +191,13 @@ def build_settings_for_target(project_text: str, target_name: str) -> dict[str, 
     if target is None:
         return None
     _, target_body = target
-    configuration_list = re.search(r"buildConfigurationList = ([A-F0-9]+)", target_body)
+    configuration_list = re.search(rf"buildConfigurationList = ({PBX_IDENTIFIER})", target_body)
     if configuration_list is None:
         return None
     list_body = pbx_object_body(project_text, configuration_list.group(1))
     if list_body is None or "isa = XCConfigurationList;" not in list_body:
         return None
-    configurations = re.findall(r"([A-F0-9]+) /\* (Debug|Release) \*/", list_body)
+    configurations = re.findall(rf"({PBX_IDENTIFIER}) /\* (Debug|Release) \*/", list_body)
     if {name for _, name in configurations} != {"Debug", "Release"}:
         return None
 
@@ -235,12 +306,12 @@ def check_project_contract(files: list[Path]) -> list[Finding]:
         if contains_pbx_object(project_text, forbidden):
             findings.append(Finding("FAIL", "QC.XCODE.UNAPPROVED_BUILD_EDGE", PROJECT.as_posix(), f"unexpected build-graph edge: {forbidden}"))
 
-    source_members = source_member_names(project_text, "MVVMExample")
+    source_members = source_member_paths(project_text, "MVVMExample")
     if source_members is None:
         findings.append(Finding("FAIL", "QC.XCODE.SOURCES_PHASE", PROJECT.as_posix(), "could not parse the app target Sources build phase"))
         source_members = set()
     for path in files:
-        if path.suffix == ".swift" and path.is_relative_to(APP_ROOT) and path.name not in source_members:
+        if path.suffix == ".swift" and path.is_relative_to(APP_ROOT) and path not in source_members:
             findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), "application Swift file is not in the app target Sources build phase"))
 
     try:
@@ -252,9 +323,13 @@ def check_project_contract(files: list[Path]) -> list[Finding]:
     except (OSError, element_tree.ParseError):
         findings.append(Finding("FAIL", "QC.XCODE.SCHEME_SYNTAX", SCHEME.as_posix(), "shared scheme is not valid XML"))
 
-    for path, (target_name, target_identifier) in TEST_PLANS.items():
+    for path, target_name in TEST_PLANS.items():
         try:
             payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
+            target = native_target(project_text, target_name)
+            if target is None:
+                raise ValueError("target not found")
+            target_identifier, _ = target
             enabled_targets = [item["target"] for item in payload["testTargets"] if item.get("enabled")]
             expected_target = {
                 "containerPath": "container:MVVMExample.xcodeproj",
@@ -288,7 +363,6 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     forbidden_patterns = (
         ("QC.MVVM.GENERIC_ACTION_DISPATCH", re.compile(r"func\s+send\s*\(\s*_\s+action\s*:"), "ViewModels must expose explicit intent methods"),
-        ("QC.MVVM.ACTION_ENUM", re.compile(r"enum\s+\w+Action\s*:\s*Equatable"), "action enums require an approved reducer architecture"),
         ("QC.PERFORMANCE.SYNC_FILE_LOAD", re.compile(r"Data\s*\(\s*contentsOf\s*:"), "synchronous file load is forbidden in app source"),
         ("QC.PERFORMANCE.TYPE_ERASURE", re.compile(r"\bAnyView\s*\("), "unnecessary SwiftUI type erasure is forbidden"),
     )
@@ -303,6 +377,9 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
             for match in pattern.finditer(source):
                 findings.append(Finding("FAIL", rule, path.as_posix(), message, line_number(text, match.start())))
         path_string = path.as_posix()
+        if "/Presentation/" in path_string or path.name.endswith("ViewModel.swift"):
+            for match in re.finditer(r"\benum\s+\w+Action\b", source):
+                findings.append(Finding("FAIL", "QC.MVVM.ACTION_ENUM", path_string, "action enums require an approved reducer architecture", line_number(text, match.start())))
         if "/Domain/" in path_string and re.search(r"\bimport\s+SwiftUI\b|\bURLSession\b|\b(?:\w+DTO)\b", source):
             findings.append(Finding("FAIL", "QC.MVVM.DOMAIN_BOUNDARY", path_string, "Domain must not depend on SwiftUI, URLSession, or DTO types"))
         if "/Presentation/" in path_string and re.search(r"\bURLSession\b|\bURLRequest\b|\bURLSessionAPIClient\b|\bURLSessionNetworkClient\b", source):
@@ -345,7 +422,7 @@ def advisory_findings(files: list[Path]) -> list[Finding]:
 
 def main() -> int:
     try:
-        files = tracked_files()
+        files = scanned_files()
         findings = (
             check_repository_hygiene(files)
             + check_project_contract(files)
@@ -361,7 +438,7 @@ def main() -> int:
     advisory = [finding for finding in findings if finding.severity == "ADVISORY"]
     for finding in findings:
         print(finding.render())
-    print(f"Static quality gate: {len(files)} tracked files, {len(blocking)} blocking findings, {len(advisory)} advisory findings")
+    print(f"Static quality gate: {len(files)} tracked/nonignored files, {len(blocking)} blocking findings, {len(advisory)} advisory findings")
     return 1 if blocking else 0
 
 

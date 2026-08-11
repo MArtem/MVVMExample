@@ -27,7 +27,12 @@ USAGE
 }
 
 run_static() {
-  git diff --check
+  if [[ -n "${MVVMEXAMPLE_STATIC_DIFF_RANGE:-}" ]]; then
+    git diff --check "${MVVMEXAMPLE_STATIC_DIFF_RANGE}"
+  else
+    git diff --check
+    git diff --cached --check
+  fi
   ./scripts/static_quality_gate_selftest.py
   ./scripts/static_quality_gate.py
   ./scripts/check_forbidden_patterns.py
