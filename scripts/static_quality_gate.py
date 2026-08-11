@@ -29,6 +29,11 @@ TARGET_BUNDLE_IDENTIFIERS = {
     "MVVMExampleTests": "com.example.MVVMExampleTests",
     "MVVMExampleUITests": "com.example.MVVMExampleUITests",
 }
+TARGET_PRODUCT_CONTRACTS = {
+    "MVVMExample": ("com.apple.product-type.application", "MVVMExample.app", "wrapper.application"),
+    "MVVMExampleTests": ("com.apple.product-type.bundle.unit-test", "MVVMExampleTests.xctest", "wrapper.cfbundle"),
+    "MVVMExampleUITests": ("com.apple.product-type.bundle.ui-testing", "MVVMExampleUITests.xctest", "wrapper.cfbundle"),
+}
 MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024
 MAX_TEXT_SCAN_BYTES = 2 * 1024 * 1024
 FORBIDDEN_COMPONENT_SUFFIXES = (".xcarchive", ".xcresult", ".ipa", ".dSYM", ".app")
@@ -106,6 +111,34 @@ def index_text_at(path: Path) -> str | None:
     if result.returncode != 0 or len(result.stdout) > MAX_TEXT_SCAN_BYTES:
         return None
     return result.stdout.decode("utf-8", errors="replace")
+
+
+def index_texts(paths: list[Path]) -> list[tuple[Path, str]]:
+    result = subprocess.run(
+        ["git", "-C", str(ROOT), "cat-file", "--batch"],
+        input=b"".join(f":{path.as_posix()}\n".encode("utf-8") for path in paths),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError("git cat-file failed while reading staged blobs")
+    output = result.stdout
+    offset = 0
+    texts: list[tuple[Path, str]] = []
+    for path in paths:
+        newline = output.find(b"\n", offset)
+        if newline < 0:
+            raise RuntimeError("git cat-file returned a truncated batch header")
+        header = output[offset:newline].split()
+        offset = newline + 1
+        if len(header) != 3:
+            continue
+        size = int(header[2])
+        blob = output[offset:offset + size]
+        offset += size + 1
+        if header[1] == b"blob" and len(blob) <= MAX_TEXT_SCAN_BYTES:
+            texts.append((path, blob.decode("utf-8", errors="replace")))
+    return texts
 
 
 def executable_text(text: str) -> str:
@@ -356,10 +389,7 @@ def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_cha
             findings.append(Finding("FAIL", "QC.REPOSITORY.GENERATED_ARTIFACT", path_string, "generated build or release artifact is tracked"))
 
     text_inputs: list[tuple[Path, str]] = []
-    for path in cached:
-        text = index_text_at(path)
-        if text is not None:
-            text_inputs.append((path, text))
+    text_inputs.extend(index_texts(cached))
     for path in worktree_changed:
         text = text_at(path)
         if text is not None:
@@ -379,7 +409,7 @@ def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_cha
     return findings
 
 
-def check_project_contract(files: list[Path], cached: list[Path]) -> list[Finding]:
+def check_project_contract(files: list[Path], cached: list[Path], worktree_changed: list[Path], project_override: str | None = None) -> list[Finding]:
     findings: list[Finding] = []
     tracked = set(cached)
     required = {PROJECT, SCHEME, *TEST_PLANS}
@@ -391,15 +421,15 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
         if (ROOT / path).is_symlink():
             findings.append(Finding("FAIL", "QC.XCODE.SYMLINK", path.as_posix(), "Xcode contract files must not be symlinks"))
 
-    project_path = ROOT / PROJECT
-    if not project_path.exists():
+    project_text = project_override if project_override is not None else index_text_at(PROJECT)
+    if project_text is None:
+        findings.append(Finding("FAIL", "QC.XCODE.PROJECT_UNREADABLE", PROJECT.as_posix(), "staged Xcode project cannot be read"))
         return findings
-    lint = subprocess.run(["plutil", "-lint", str(project_path)], capture_output=True, text=True, check=False)
+    lint = subprocess.run(["plutil", "-lint", "-"], input=project_text, capture_output=True, text=True, check=False)
     if lint.returncode != 0:
         findings.append(Finding("FAIL", "QC.XCODE.PROJECT_SYNTAX", PROJECT.as_posix(), lint.stderr.strip() or lint.stdout.strip() or "plutil rejected project.pbxproj"))
         return findings
 
-    project_text = project_path.read_text(encoding="utf-8")
     for target_name, expected_bundle_identifier in TARGET_BUNDLE_IDENTIFIERS.items():
         configurations = build_settings_for_target(project_text, target_name)
         if configurations is None:
@@ -413,6 +443,19 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
             ):
                 if settings.get(key) != expected_value:
                     findings.append(Finding("FAIL", "QC.XCODE.BUILD_CONTRACT", PROJECT.as_posix(), f"{target_name} {configuration_name} must set {key} = {expected_value}"))
+        target = native_target(project_text, target_name)
+        contract = TARGET_PRODUCT_CONTRACTS[target_name]
+        product_reference = pbx_object_body(project_text, pbx_identifier(pbx_value(target[1], "productReference")) or "") if target else None
+        if (
+            target is None
+            or pbx_value(target[1], "productType") != contract[0]
+            or product_reference is None
+            or "isa = PBXFileReference;" not in product_reference
+            or pbx_value(product_reference, "path") != contract[1]
+            or pbx_value(product_reference, "explicitFileType") != contract[2]
+            or pbx_value(product_reference, "sourceTree") != "BUILT_PRODUCTS_DIR"
+        ):
+            findings.append(Finding("FAIL", "QC.XCODE.TARGET_PRODUCT_CONTRACT", PROJECT.as_posix(), f"{target_name} must retain its native product type and product reference"))
     for forbidden in ("PBXShellScriptBuildPhase", "XCRemoteSwiftPackageReference", "XCLocalSwiftPackageReference"):
         if contains_pbx_object(project_text, forbidden):
             findings.append(Finding("FAIL", "QC.XCODE.UNAPPROVED_BUILD_EDGE", PROJECT.as_posix(), f"unexpected build-graph edge: {forbidden}"))
@@ -424,6 +467,9 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
     for path in files:
         if path.suffix == ".swift" and path.is_relative_to(APP_ROOT) and path not in source_members:
             findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), "application Swift file is not in the app target Sources build phase"))
+    expected_app_sources = {path for path in files if path.suffix == ".swift" and path.is_relative_to(APP_ROOT)}
+    for path in source_members - expected_app_sources:
+        findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), "app Sources build phase contains an unexpected or stale source"))
     for target_name, root in TEST_ROOTS.items():
         source_members = source_member_paths(project_text, target_name)
         if source_members is None:
@@ -432,6 +478,9 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
         for path in files:
             if path.suffix == ".swift" and path.is_relative_to(root) and path not in source_members:
                 findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), f"test source is not in the {target_name} Sources build phase"))
+        expected_test_sources = {path for path in files if path.suffix == ".swift" and path.is_relative_to(root)}
+        for path in source_members - expected_test_sources:
+            findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), f"{target_name} Sources build phase contains an unexpected or stale source"))
 
     resources = resource_member_paths(project_text, "MVVMExample")
     reference_paths = file_reference_paths(project_text)
@@ -490,6 +539,16 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
             target = native_target(project_text, target_name)
             if target is None or not scheme_action_has_target(scheme_root, action_path, target[0], targets):
                 findings.append(Finding("FAIL", "QC.XCODE.SCHEME_ACTION_CONTRACT", SCHEME.as_posix(), f"required {target_name} reference is missing from its scheme action"))
+        required_action_configurations = {
+            "TestAction": "Debug",
+            "LaunchAction": "Debug",
+            "ProfileAction": "Release",
+            "AnalyzeAction": "Debug",
+            "ArchiveAction": "Release",
+        }
+        for action, configuration in required_action_configurations.items():
+            if scheme_root.find(f".//{action}") is None or scheme_root.find(f".//{action}").attrib.get("buildConfiguration") != configuration:
+                findings.append(Finding("FAIL", "QC.XCODE.SCHEME_CONFIGURATION", SCHEME.as_posix(), f"{action} must use {configuration} configuration"))
     except (OSError, ValueError, element_tree.ParseError):
         findings.append(Finding("FAIL", "QC.XCODE.SCHEME_SYNTAX", SCHEME.as_posix(), "shared scheme is not valid XML"))
 
@@ -510,6 +569,10 @@ def check_project_contract(files: list[Path], cached: list[Path]) -> list[Findin
                 raise ValueError("target contract mismatch")
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"must be a version-1 plan for {target_name}"))
+    if project_override is None and PROJECT in worktree_changed:
+        worktree_project = text_at(PROJECT)
+        if worktree_project is not None and worktree_project != project_text:
+            findings += check_project_contract(files, cached, [], worktree_project)
     return findings
 
 
@@ -601,7 +664,7 @@ def main() -> int:
         worktree_changed = worktree_changed_files()
         findings = (
             check_repository_hygiene(files, cached, worktree_changed)
-            + check_project_contract(files, cached)
+            + check_project_contract(files, cached, worktree_changed)
             + check_resources(files)
             + check_app_architecture(files)
             + advisory_findings(files)
