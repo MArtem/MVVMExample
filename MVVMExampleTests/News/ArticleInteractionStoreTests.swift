@@ -49,8 +49,8 @@ struct ArticleInteractionStoreTests {
         #expect(store.merge(remoteArticle).likesCount == 2)
 
         store.setLikeState(articleID: 7, isLiked: true, likesCount: 11)
-        store.enqueuePendingLike(articleID: 7, isLiked: true)
-        store.clearPendingLike(articleID: 7)
+        let receipt = try #require(store.enqueuePendingLike(articleID: 7, isLiked: true))
+        store.clearPendingLike(receipt)
         let mergedAcknowledgement = store.merge(makeStoredArticle(id: 7, isLiked: false, likesCount: 10))
         #expect(fetchPendingMutations(in: context).isEmpty)
         #expect(mergedAcknowledgement.isLiked == true)

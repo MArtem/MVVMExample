@@ -89,7 +89,7 @@ final class NewsDetailViewModel {
         self.article = optimisticArticle
         interactionStore.update(with: optimisticArticle)
         state = .content(viewStateBuilder.makeContent(from: optimisticArticle))
-        interactionStore.enqueuePendingLike(articleID: article.id, isLiked: target)
+        let pendingReceipt = interactionStore.enqueuePendingLike(articleID: article.id, isLiked: target)
 
         favoriteTask = Task { [weak self, repository, interactionStore, viewStateBuilder] in
             defer { self?.favoriteTask = nil }
@@ -97,8 +97,9 @@ final class NewsDetailViewModel {
                 _ = try await repository.toggleLike(articleID: article.id, isLiked: target)
                 try Task.checkCancellation()
                 guard let self else { return }
-                interactionStore.update(with: optimisticArticle)
-                interactionStore.clearPendingLike(articleID: article.id)
+                if let pendingReceipt {
+                    interactionStore.clearPendingLike(pendingReceipt)
+                }
                 let merged = interactionStore.merge(optimisticArticle)
                 self.article = merged
                 state = .content(viewStateBuilder.makeContent(from: merged))
@@ -108,8 +109,9 @@ final class NewsDetailViewModel {
                 return
             } catch {
                 guard let self else { return }
-                self.article = optimisticArticle
-                state = .content(viewStateBuilder.makeContent(from: optimisticArticle))
+                let merged = interactionStore.merge(optimisticArticle)
+                self.article = merged
+                state = .content(viewStateBuilder.makeContent(from: merged))
             }
         }
     }

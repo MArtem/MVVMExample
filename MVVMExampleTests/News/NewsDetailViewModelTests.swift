@@ -121,6 +121,32 @@ struct NewsDetailViewModelTests {
         #expect(fetchPendingMutations(in: context).isEmpty)
     }
 
+    @Test("Late detail acknowledgement preserves a newer shared like action")
+    func lateDetailAcknowledgementPreservesNewerSharedLikeAction() async throws {
+        let context = try makeInMemoryModelContext()
+        let pendingMutationStore = PendingMutationStore(modelContext: context)
+        let interactionStore = ArticleInteractionStore(modelContext: context, pendingMutationStore: pendingMutationStore)
+        interactionStore.activateUser(id: 42)
+        let repository = ControllableNewsDetailRepository()
+        let viewModel = makeDetailViewModel(repository: repository, interactionStore: interactionStore)
+        await loadDetailContent(viewModel: viewModel, repository: repository, article: makeDetailArticle(isLiked: false, likesCount: 10))
+
+        viewModel.favoriteTapped()
+        _ = await repository.waitForToggleRequest(at: 0)
+        let newerArticle = makeDetailArticle(isLiked: false, likesCount: 10)
+        interactionStore.update(with: newerArticle)
+        _ = interactionStore.enqueuePendingLike(articleID: 7, isLiked: false)
+
+        await repository.waitForToggleContinuation(at: 0)
+        await repository.completeToggle(at: 0, with: .success(makeDetailArticle(isLiked: true, likesCount: 11)))
+        await drainDetailMainActorTasks()
+
+        assertDetailContent(viewModel.state, isFavorite: false, likesText: "Likes 10")
+        let mutation = try #require(fetchPendingMutations(in: context).first)
+        let payload = try #require(pendingMutationStore.decodeArticleLike(mutation))
+        #expect(payload.isLiked == false)
+    }
+
     @Test("Favorite failure keeps optimistic local state and enqueues pending mutation")
     func favoriteFailureKeepsOptimisticLocalStateAndEnqueuesPendingMutation() async throws {
         let context = try makeInMemoryModelContext()
@@ -142,7 +168,9 @@ struct NewsDetailViewModelTests {
         assertDetailContent(viewModel.state, isFavorite: true, likesText: "Likes 11")
         let mutation = try #require(fetchPendingMutations(in: context).first)
         #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 7))
-        #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 7, isLiked: true))
+        let payload = try #require(pendingMutationStore.decodeArticleLike(mutation))
+        #expect(payload.articleID == 7)
+        #expect(payload.isLiked == true)
     }
 
     @Test("Cancelled favorite keeps its pending mutation after the detail ViewModel is released")
@@ -179,7 +207,9 @@ struct NewsDetailViewModelTests {
 
         let mutation = try #require(fetchPendingMutations(in: context).first)
         #expect(mutation.key == PersistedPendingMutation.articleLikeKey(userID: 42, articleID: 7))
-        #expect(pendingMutationStore.decodeArticleLike(mutation) == PendingArticleLikeMutation(articleID: 7, isLiked: true))
+        let payload = try #require(pendingMutationStore.decodeArticleLike(mutation))
+        #expect(payload.articleID == 7)
+        #expect(payload.isLiked == true)
     }
 
     @Test("Duplicate favorite tap while request is in flight is ignored")

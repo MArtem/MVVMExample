@@ -309,7 +309,7 @@ final class NewsListViewModel {
             return viewStateBuilder.makeCard(from: optimisticArticle)
         }
         state = .content(optimisticContent)
-        interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
+        let pendingReceipt = interactionStore.enqueuePendingLike(articleID: articleID, isLiked: targetIsLiked)
 
         likeTasks[articleID] = Task { [weak self, repository, interactionStore, viewStateBuilder] in
             defer { self?.likeTasks[articleID] = nil }
@@ -320,10 +320,12 @@ final class NewsListViewModel {
                 )
                 try Task.checkCancellation()
                 guard let self else { return }
-                interactionStore.update(with: optimisticArticle)
-                interactionStore.clearPendingLike(articleID: articleID)
-                articles = articles.map { $0.id == articleID ? optimisticArticle : $0 }
-                let updatedCard = viewStateBuilder.makeCard(from: optimisticArticle)
+                if let pendingReceipt {
+                    interactionStore.clearPendingLike(pendingReceipt)
+                }
+                let currentArticle = interactionStore.merge(optimisticArticle)
+                articles = articles.map { $0.id == articleID ? currentArticle : $0 }
+                let updatedCard = viewStateBuilder.makeCard(from: currentArticle)
 
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
@@ -337,7 +339,8 @@ final class NewsListViewModel {
                 guard let self else { return }
                 guard case .content(let latestContent) = state else { return }
                 var content = latestContent
-                let localCard = viewStateBuilder.makeCard(from: optimisticArticle)
+                let currentArticle = interactionStore.merge(optimisticArticle)
+                let localCard = viewStateBuilder.makeCard(from: currentArticle)
                 content.cards = latestContent.cards.map { item in
                     item.id == articleID ? localCard : item
                 }

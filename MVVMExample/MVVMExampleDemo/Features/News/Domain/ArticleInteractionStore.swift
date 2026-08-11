@@ -56,18 +56,18 @@ final class ArticleInteractionStore {
         )
     }
 
-    func enqueuePendingLike(articleID: NewsArticle.ID, isLiked: Bool) {
-        guard let currentUserID else { return }
-        pendingMutationStore?.enqueueArticleLike(
+    @discardableResult
+    func enqueuePendingLike(articleID: NewsArticle.ID, isLiked: Bool) -> PendingMutationReceipt? {
+        guard let currentUserID else { return nil }
+        return pendingMutationStore?.enqueueArticleLike(
             userID: currentUserID,
             articleID: articleID,
             isLiked: isLiked
         )
     }
 
-    func clearPendingLike(articleID: NewsArticle.ID) {
-        guard let currentUserID else { return }
-        pendingMutationStore?.clearArticleLike(userID: currentUserID, articleID: articleID)
+    func clearPendingLike(_ receipt: PendingMutationReceipt) {
+        pendingMutationStore?.clear(receipt)
     }
 
     private func loadPersistedStates(for userID: Int) -> [NewsArticle.ID: ArticleInteractionState] {
