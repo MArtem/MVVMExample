@@ -17,8 +17,13 @@ APP_ROOT = Path("MVVMExample/MVVMExampleDemo")
 PROJECT = Path("MVVMExample.xcodeproj/project.pbxproj")
 SCHEME = Path("MVVMExample.xcodeproj/xcshareddata/xcschemes/MVVMExample.xcscheme")
 TEST_PLANS = {
-    Path("MVVMExample.xctestplan"): "MVVMExampleTests",
-    Path("MVVMExampleUI.xctestplan"): "MVVMExampleUITests",
+    Path("MVVMExample.xctestplan"): ("MVVMExampleTests", "177120BDB76CBC9039B9FB95"),
+    Path("MVVMExampleUI.xctestplan"): ("MVVMExampleUITests", "7C17E40D544DCA5DEFEA3454"),
+}
+TARGET_BUNDLE_IDENTIFIERS = {
+    "MVVMExample": "com.example.MVVMExample",
+    "MVVMExampleTests": "com.example.MVVMExampleTests",
+    "MVVMExampleUITests": "com.example.MVVMExampleUITests",
 }
 MAX_TRACKED_FILE_BYTES = 5 * 1024 * 1024
 MAX_TEXT_SCAN_BYTES = 2 * 1024 * 1024
@@ -80,6 +85,73 @@ def contains_pbx_object(project_text: str, isa: str) -> bool:
     return f"isa = {isa};" in project_text
 
 
+def pbx_object_body(project_text: str, identifier: str) -> str | None:
+    match = re.search(
+        rf"(?ms)^\t\t{re.escape(identifier)} /\* .*? \*/ = \{{(?P<body>.*?)^\t\t\}};",
+        project_text,
+    )
+    return match.group("body") if match else None
+
+
+def native_target(project_text: str, target_name: str) -> tuple[str, str] | None:
+    match = re.search(
+        rf"(?ms)^\t\t([A-F0-9]+) /\* {re.escape(target_name)} \*/ = \{{\n\t\t\tisa = PBXNativeTarget;(?P<body>.*?)^\t\t\}};",
+        project_text,
+    )
+    return (match.group(1), match.group("body")) if match else None
+
+
+def source_member_names(project_text: str, target_name: str) -> set[str] | None:
+    target = native_target(project_text, target_name)
+    if target is None:
+        return None
+    _, target_body = target
+    phase_ids = re.findall(r"([A-F0-9]+) /\* Sources \*/", target_body)
+    if len(phase_ids) != 1:
+        return None
+    phase_body = pbx_object_body(project_text, phase_ids[0])
+    if phase_body is None or "isa = PBXSourcesBuildPhase;" not in phase_body:
+        return None
+    return set(re.findall(r"/\* ([^*]+\.swift) in Sources \*/", phase_body))
+
+
+def build_settings_for_target(project_text: str, target_name: str) -> dict[str, dict[str, str]] | None:
+    target = native_target(project_text, target_name)
+    if target is None:
+        return None
+    _, target_body = target
+    configuration_list = re.search(r"buildConfigurationList = ([A-F0-9]+)", target_body)
+    if configuration_list is None:
+        return None
+    list_body = pbx_object_body(project_text, configuration_list.group(1))
+    if list_body is None or "isa = XCConfigurationList;" not in list_body:
+        return None
+    configurations = re.findall(r"([A-F0-9]+) /\* (Debug|Release) \*/", list_body)
+    if {name for _, name in configurations} != {"Debug", "Release"}:
+        return None
+
+    result: dict[str, dict[str, str]] = {}
+    for identifier, name in configurations:
+        configuration_body = pbx_object_body(project_text, identifier)
+        if configuration_body is None:
+            return None
+        settings_match = re.search(r"(?ms)^\t\t\tbuildSettings = \{(?P<settings>.*?)^\t\t\t\};", configuration_body)
+        if settings_match is None:
+            return None
+        result[name] = {
+            key: value.strip().strip('"')
+            for key, value in re.findall(r"(?m)^\t\t\t\t([A-Z0-9_]+) = (.*?);$", settings_match.group("settings"))
+        }
+    return result
+
+
+def is_allowlisted_demo_credential(value: str) -> bool:
+    return (
+        value.startswith(("dev-access-", "dev-refresh-", "reqres-demo-refresh-", "${"))
+        or value.endswith("-not-a-secret")
+    )
+
+
 def check_repository_hygiene(files: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
     lowercase_paths: dict[str, Path] = {}
@@ -88,7 +160,6 @@ def check_repository_hygiene(files: list[Path]) -> list[Finding]:
         ("QC.SECRET.AWS_ACCESS_KEY", re.compile(r"AKIA[0-9A-Z]{16}")),
         ("QC.SECRET.HARDCODED_CREDENTIAL", re.compile(r"(?i)(?:api[_-]?key|secret|token|password)\s*[:=]\s*[\"'][^\"']{16,}[\"']")),
     )
-    allowed_demo_prefixes = ("dev-access-", "dev-refresh-", "reqres-demo-refresh-", "${")
 
     for path in files:
         absolute = ROOT / path
@@ -120,10 +191,8 @@ def check_repository_hygiene(files: list[Path]) -> list[Finding]:
         for rule, pattern in secret_patterns:
             for match in pattern.finditer(text):
                 literal = match.group(0)
-                if rule == "QC.SECRET.HARDCODED_CREDENTIAL" and (
-                    any(prefix in literal for prefix in allowed_demo_prefixes)
-                    or "-not-a-secret" in literal
-                ):
+                quoted_value = re.search(r"[\"']([^\"']+)[\"']\s*$", literal)
+                if rule == "QC.SECRET.HARDCODED_CREDENTIAL" and quoted_value and is_allowlisted_demo_credential(quoted_value.group(1)):
                     continue
                 findings.append(Finding("FAIL", rule, path_string, "possible credential in tracked source", line_number(text, match.start())))
     return findings
@@ -149,23 +218,30 @@ def check_project_contract(files: list[Path]) -> list[Finding]:
         return findings
 
     project_text = project_path.read_text(encoding="utf-8")
-    for contract in (
-        "IPHONEOS_DEPLOYMENT_TARGET = 17.0;",
-        "SWIFT_VERSION = 5.0;",
-        "PRODUCT_BUNDLE_IDENTIFIER = com.example.MVVMExample;",
-        "PRODUCT_BUNDLE_IDENTIFIER = com.example.MVVMExampleTests;",
-        "PRODUCT_BUNDLE_IDENTIFIER = com.example.MVVMExampleUITests;",
-    ):
-        if contract not in project_text:
-            findings.append(Finding("FAIL", "QC.XCODE.BUILD_CONTRACT", PROJECT.as_posix(), f"missing required setting: {contract}"))
+    for target_name, expected_bundle_identifier in TARGET_BUNDLE_IDENTIFIERS.items():
+        configurations = build_settings_for_target(project_text, target_name)
+        if configurations is None:
+            findings.append(Finding("FAIL", "QC.XCODE.BUILD_CONTRACT", PROJECT.as_posix(), f"could not parse Debug and Release settings for {target_name}"))
+            continue
+        for configuration_name, settings in configurations.items():
+            for key, expected_value in (
+                ("IPHONEOS_DEPLOYMENT_TARGET", "17.0"),
+                ("SWIFT_VERSION", "5.0"),
+                ("PRODUCT_BUNDLE_IDENTIFIER", expected_bundle_identifier),
+            ):
+                if settings.get(key) != expected_value:
+                    findings.append(Finding("FAIL", "QC.XCODE.BUILD_CONTRACT", PROJECT.as_posix(), f"{target_name} {configuration_name} must set {key} = {expected_value}"))
     for forbidden in ("PBXShellScriptBuildPhase", "XCRemoteSwiftPackageReference", "XCLocalSwiftPackageReference"):
         if contains_pbx_object(project_text, forbidden):
             findings.append(Finding("FAIL", "QC.XCODE.UNAPPROVED_BUILD_EDGE", PROJECT.as_posix(), f"unexpected build-graph edge: {forbidden}"))
 
-    project_references = set(re.findall(r"/\* ([^*]+\.swift) \*/", project_text))
+    source_members = source_member_names(project_text, "MVVMExample")
+    if source_members is None:
+        findings.append(Finding("FAIL", "QC.XCODE.SOURCES_PHASE", PROJECT.as_posix(), "could not parse the app target Sources build phase"))
+        source_members = set()
     for path in files:
-        if path.suffix == ".swift" and path.is_relative_to(APP_ROOT) and path.name not in project_references:
-            findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), "application Swift file has no Xcode project reference"))
+        if path.suffix == ".swift" and path.is_relative_to(APP_ROOT) and path.name not in source_members:
+            findings.append(Finding("FAIL", "QC.XCODE.SOURCE_MEMBERSHIP", path.as_posix(), "application Swift file is not in the app target Sources build phase"))
 
     try:
         scheme_root = element_tree.parse(ROOT / SCHEME).getroot()
@@ -176,11 +252,16 @@ def check_project_contract(files: list[Path]) -> list[Finding]:
     except (OSError, element_tree.ParseError):
         findings.append(Finding("FAIL", "QC.XCODE.SCHEME_SYNTAX", SCHEME.as_posix(), "shared scheme is not valid XML"))
 
-    for path, target_name in TEST_PLANS.items():
+    for path, (target_name, target_identifier) in TEST_PLANS.items():
         try:
             payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
-            target_names = {item["target"]["name"] for item in payload["testTargets"] if item.get("enabled")}
-            if target_names != {target_name} or payload.get("version") != 1:
+            enabled_targets = [item["target"] for item in payload["testTargets"] if item.get("enabled")]
+            expected_target = {
+                "containerPath": "container:MVVMExample.xcodeproj",
+                "identifier": target_identifier,
+                "name": target_name,
+            }
+            if enabled_targets != [expected_target] or payload.get("version") != 1:
                 raise ValueError("target contract mismatch")
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             findings.append(Finding("FAIL", "QC.XCODE.TEST_PLAN_CONTRACT", path.as_posix(), f"must be a version-1 plan for {target_name}"))
@@ -226,13 +307,13 @@ def check_app_architecture(files: list[Path]) -> list[Finding]:
             findings.append(Finding("FAIL", "QC.MVVM.DOMAIN_BOUNDARY", path_string, "Domain must not depend on SwiftUI, URLSession, or DTO types"))
         if "/Presentation/" in path_string and re.search(r"\bURLSession\b|\bURLRequest\b|\bURLSessionAPIClient\b|\bURLSessionNetworkClient\b", source):
             findings.append(Finding("FAIL", "QC.MVVM.PRESENTATION_NETWORKING", path_string, "Presentation must depend on repositories, not transport clients"))
-        if "/Data/API/" in path_string and "try?" in source:
+        if any(component in path_string for component in ("/Data/API/", "/Infrastructure/Networking/", "/Infrastructure/LocalSupport/AppNetworking/")) and "try?" in source:
             findings.append(Finding("FAIL", "QC.NETWORK.SILENCED_FAILURE", path_string, "API boundary must not silence errors with try?"))
 
     receipt_contract = ROOT / APP_ROOT / "Infrastructure/Persistence/PendingMutationStore.swift"
     interaction_contract = ROOT / APP_ROOT / "Features/News/Domain/ArticleInteractionStore.swift"
-    receipt_text = receipt_contract.read_text(encoding="utf-8") if receipt_contract.exists() else ""
-    interaction_text = interaction_contract.read_text(encoding="utf-8") if interaction_contract.exists() else ""
+    receipt_text = executable_text(receipt_contract.read_text(encoding="utf-8")) if receipt_contract.exists() else ""
+    interaction_text = executable_text(interaction_contract.read_text(encoding="utf-8")) if interaction_contract.exists() else ""
     required_receipt_fragments = (
         "func clear(_ receipt: PendingMutationReceipt)",
         "payloadData == receipt.payloadData",
