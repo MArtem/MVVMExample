@@ -113,7 +113,7 @@ def index_text_at(path: Path) -> str | None:
     return result.stdout.decode("utf-8", errors="replace")
 
 
-def index_texts(paths: list[Path]) -> list[tuple[Path, str]]:
+def index_blob_sizes(paths: list[Path]) -> dict[Path, int]:
     specifications = b"".join(f":{path.as_posix()}\n".encode("utf-8") for path in paths)
     sizes = subprocess.run(
         ["git", "-C", str(ROOT), "cat-file", "--batch-check=%(objecttype) %(objectsize)"],
@@ -126,11 +126,16 @@ def index_texts(paths: list[Path]) -> list[tuple[Path, str]]:
     headers = sizes.stdout.splitlines()
     if len(headers) != len(paths):
         raise RuntimeError("git cat-file returned an incomplete staged blob size batch")
-    small_paths: list[Path] = []
+    sizes_by_path: dict[Path, int] = {}
     for path, header in zip(paths, headers):
         fields = header.split()
-        if len(fields) == 2 and fields[0] == b"blob" and int(fields[1]) <= MAX_TEXT_SCAN_BYTES:
-            small_paths.append(path)
+        if len(fields) == 2 and fields[0] == b"blob":
+            sizes_by_path[path] = int(fields[1])
+    return sizes_by_path
+
+
+def index_texts(paths: list[Path]) -> list[tuple[Path, str]]:
+    small_paths = [path for path, size in index_blob_sizes(paths).items() if size <= MAX_TEXT_SCAN_BYTES]
     result = subprocess.run(
         ["git", "-C", str(ROOT), "cat-file", "--batch"],
         input=b"".join(f":{path.as_posix()}\n".encode("utf-8") for path in small_paths),
@@ -185,8 +190,8 @@ def swift_method_body(source: str, method: str) -> str | None:
     return None
 
 
-def generic_send_positions(source: str) -> list[int]:
-    return [match.start() for match in re.finditer(r"\bfunc\s+send\s*\(", source)]
+def generic_dispatch_positions(source: str) -> list[int]:
+    return [match.start() for match in re.finditer(r"\bfunc\s+(?:send|dispatch)\s*\(", source)]
 
 
 def action_enum_positions(source: str) -> list[int]:
@@ -259,9 +264,15 @@ def pbx_value(body: str, key: str) -> str | None:
     return match.group(1).strip().strip('"') if match else None
 
 
+def project_object(project_text: str) -> tuple[str, str] | None:
+    root = re.search(rf"(?m)^\trootObject = ({PBX_IDENTIFIER}) /\* Project object \*/;", project_text)
+    body = pbx_object_body(project_text, root.group(1)) if root else None
+    return (root.group(1), body) if body is not None and "isa = PBXProject;" in body else None
+
+
 def project_target_identifiers(project_text: str) -> set[str]:
-    project = re.search(rf"(?ms)^\t\t{PBX_IDENTIFIER} /\* Project object \*/ = \{{(?P<body>.*?)^\t\t\}};", project_text)
-    targets = re.search(r"targets = \((?P<targets>.*?)\);", project.group("body"), re.DOTALL) if project else None
+    project = project_object(project_text)
+    targets = re.search(r"targets = \((?P<targets>.*?)\);", project[1], re.DOTALL) if project else None
     return set(re.findall(rf"({PBX_IDENTIFIER}) /\*", targets.group("targets"))) if targets else set()
 
 
@@ -286,10 +297,10 @@ def test_plan_matches_target(text: str, target_name: str, target_identifier: str
 
 
 def file_reference_paths(project_text: str) -> dict[str, Path] | None:
-    project = re.search(rf"(?m)^\t\t{PBX_IDENTIFIER} /\* Project object \*/ = \{{(?P<body>.*?)^\t\t\}};", project_text, re.DOTALL)
+    project = project_object(project_text)
     if project is None:
         return None
-    main_group = pbx_value(project.group("body"), "mainGroup")
+    main_group = pbx_value(project[1], "mainGroup")
     if main_group is None:
         return None
     main_group = main_group.split(" ", 1)[0]
@@ -373,7 +384,7 @@ def build_settings_for_target(project_text: str, target_name: str) -> dict[str, 
     if list_body is None or "isa = XCConfigurationList;" not in list_body:
         return None
     configurations = re.findall(rf"({PBX_IDENTIFIER}) /\* (Debug|Release) \*/", list_body)
-    if {name for _, name in configurations} != {"Debug", "Release"}:
+    if len(configurations) != 2 or len({identifier for identifier, _ in configurations}) != 2 or {name for _, name in configurations} != {"Debug", "Release"}:
         return None
 
     result: dict[str, dict[str, str]] = {}
@@ -400,6 +411,8 @@ def is_allowlisted_demo_credential(value: str) -> bool:
 
 def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_changed: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
+    cached_sizes = index_blob_sizes(cached)
+    cached_paths = set(cached)
     lowercase_paths: dict[str, Path] = {}
     secret_patterns = (
         ("QC.SECRET.PRIVATE_KEY", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |)?PRIVATE KEY-----")),
@@ -419,17 +432,31 @@ def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_cha
         if absolute.is_symlink():
             findings.append(Finding("FAIL", "QC.REPOSITORY.SYMLINK", path_string, "tracked symlinks are not accepted by this deterministic source gate"))
             continue
-        try:
-            size = absolute.stat().st_size
-        except OSError:
-            findings.append(Finding("FAIL", "QC.REPOSITORY.MISSING_TRACKED_FILE", path_string, "tracked path cannot be read"))
-            continue
+        if path in cached_paths:
+            size = cached_sizes.get(path)
+            if size is None:
+                findings.append(Finding("FAIL", "QC.REPOSITORY.UNREADABLE_STAGED_FILE", path_string, "staged path cannot be read as a regular blob"))
+                continue
+        else:
+            try:
+                size = absolute.stat().st_size
+            except OSError:
+                findings.append(Finding("FAIL", "QC.REPOSITORY.MISSING_WORKTREE_FILE", path_string, "untracked path cannot be read"))
+                continue
         if size > MAX_TRACKED_FILE_BYTES:
-            findings.append(Finding("FAIL", "QC.REPOSITORY.LARGE_FILE", path_string, f"tracked file exceeds {MAX_TRACKED_FILE_BYTES // (1024 * 1024)} MiB"))
+            findings.append(Finding("FAIL", "QC.REPOSITORY.LARGE_FILE", path_string, f"staged or untracked file exceeds {MAX_TRACKED_FILE_BYTES // (1024 * 1024)} MiB"))
 
         components = path.parts
         if any(component.endswith(FORBIDDEN_COMPONENT_SUFFIXES) for component in components):
             findings.append(Finding("FAIL", "QC.REPOSITORY.GENERATED_ARTIFACT", path_string, "generated build or release artifact is tracked"))
+
+    for path in worktree_changed:
+        absolute = ROOT / path
+        try:
+            if absolute.stat().st_size > MAX_TRACKED_FILE_BYTES:
+                findings.append(Finding("FAIL", "QC.REPOSITORY.LARGE_FILE", path.as_posix(), f"staged or untracked file exceeds {MAX_TRACKED_FILE_BYTES // (1024 * 1024)} MiB"))
+        except OSError:
+            pass
 
     text_inputs: list[tuple[Path, str]] = []
     text_inputs.extend(index_texts(cached))
@@ -546,8 +573,8 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
 
     app_target = native_target(project_text, "MVVMExample")
     app_identifier = app_target[0] if app_target else None
-    project_identifier_match = re.search(rf"(?m)^\t\t({PBX_IDENTIFIER}) /\* Project object \*/ = \{{", project_text)
-    project_identifier = project_identifier_match.group(1) if project_identifier_match else None
+    active_project = project_object(project_text)
+    project_identifier = active_project[0] if active_project else None
     for target_name in TEST_ROOTS:
         target = native_target(project_text, target_name)
         target_body = target[1] if target else ""
@@ -634,15 +661,21 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
     return findings
 
 
-def check_resources(files: list[Path]) -> list[Finding]:
+def check_resources(files: list[Path], cached: list[Path], worktree_changed: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
-    for path in files:
+    resource_paths = [path for path in cached if path.suffix in {".json", ".xcstrings"} and (path.parts[:1] == ("MVVMExample",) or any(component.endswith(".xcassets") for component in path.parts))]
+    inputs = index_texts(resource_paths)
+    for path in worktree_changed:
         if path.suffix not in {".json", ".xcstrings"}:
             continue
-        if not (path.parts[:1] == ("MVVMExample",) or "Assets.xcassets" in path.parts):
+        if not (path.parts[:1] == ("MVVMExample",) or any(component.endswith(".xcassets") for component in path.parts)):
             continue
+        text = text_at(path)
+        if text is not None:
+            inputs.append((path, text))
+    for path, text in inputs:
         try:
-            payload = json.loads((ROOT / path).read_text(encoding="utf-8"))
+            payload = json.loads(text)
             if path.suffix == ".xcstrings" and (payload.get("sourceLanguage") != "en" or not isinstance(payload.get("strings"), dict)):
                 raise ValueError("catalog shape")
             if any(component.endswith(".xcassets") for component in path.parts) and (
@@ -677,7 +710,7 @@ def check_app_architecture(files: list[Path], cached: list[Path], worktree_chang
                 findings.append(Finding("FAIL", rule, path.as_posix(), message, line_number(text, match.start())))
         path_string = path.as_posix()
         if "/Presentation/" in path_string or path.name.endswith("ViewModel.swift"):
-            for position in generic_send_positions(source):
+            for position in generic_dispatch_positions(source):
                 findings.append(Finding("FAIL", "QC.MVVM.GENERIC_ACTION_DISPATCH", path_string, "ViewModels must expose explicit intent methods", line_number(text, position)))
             for position in action_enum_positions(source):
                 findings.append(Finding("FAIL", "QC.MVVM.ACTION_ENUM", path_string, "action enums require an approved reducer architecture", line_number(text, position)))
@@ -685,27 +718,33 @@ def check_app_architecture(files: list[Path], cached: list[Path], worktree_chang
             findings.append(Finding("FAIL", "QC.MVVM.DOMAIN_BOUNDARY", path_string, "Domain must not depend on SwiftUI, URLSession, or DTO types"))
         if "/Presentation/" in path_string and re.search(r"\bURLSession\b|\bURLRequest\b|\b(?:URLSession)?APIClient\b|\b(?:URLSession)?NetworkClient\b", source):
             findings.append(Finding("FAIL", "QC.MVVM.PRESENTATION_NETWORKING", path_string, "Presentation must depend on repositories, not transport clients"))
-        if any(component in path_string for component in ("/Data/API/", "/Infrastructure/Networking/", "/Infrastructure/LocalSupport/AppNetworking/")) and "try?" in source:
+        if any(component in path_string for component in ("/Data/API/", "/Features/Auth/Data/", "/Infrastructure/Networking/", "/Infrastructure/LocalSupport/AppNetworking/")) and "try?" in source:
             findings.append(Finding("FAIL", "QC.NETWORK.SILENCED_FAILURE", path_string, "API boundary must not silence errors with try?"))
 
-    receipt_contract = ROOT / APP_ROOT / "Infrastructure/Persistence/PendingMutationStore.swift"
-    interaction_contract = ROOT / APP_ROOT / "Features/News/Domain/ArticleInteractionStore.swift"
-    receipt_text = executable_text(receipt_contract.read_text(encoding="utf-8")) if receipt_contract.exists() else ""
-    interaction_text = executable_text(interaction_contract.read_text(encoding="utf-8")) if interaction_contract.exists() else ""
+    receipt_path = APP_ROOT / "Infrastructure/Persistence/PendingMutationStore.swift"
+    interaction_path = APP_ROOT / "Features/News/Domain/ArticleInteractionStore.swift"
+    receipt_contract = ROOT / receipt_path
+    interaction_contract = ROOT / interaction_path
     receipt_method_contracts = (
         ("clear", r"pendingMutation\s*\(\s*key:\s*receipt\.key\s*\)\?\.payloadData\s*==\s*receipt\.payloadData"),
         ("markAttempt", r"pendingMutation\s*\(\s*key:\s*receipt\.key\s*\).*mutation\.payloadData\s*==\s*receipt\.payloadData"),
         ("markFailure", r"pendingMutation\s*\(\s*key:\s*receipt\.key\s*\).*mutation\.payloadData\s*==\s*receipt\.payloadData"),
     )
-    for method, guard in receipt_method_contracts:
-        body = swift_method_body(receipt_text, method)
-        if body is None or re.search(guard, body, re.DOTALL) is None:
-            findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", receipt_contract.relative_to(ROOT).as_posix(), f"{method} must retain its receipt payload guard"))
-    clear_pending_like = swift_method_body(interaction_text, "clearPendingLike")
-    if clear_pending_like is None or re.search(r"pendingMutationStore\?\.clear\s*\(\s*receipt\s*\)", clear_pending_like) is None:
-        findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", interaction_contract.relative_to(ROOT).as_posix(), "clearPendingLike must clear through its receipt"))
-    if re.search(r"clearPendingLike\s*\(\s*(?:articleID|id)\s*:", interaction_text):
-        findings.append(Finding("FAIL", "QC.MUTATION.UNCONDITIONAL_CLEAR", interaction_contract.relative_to(ROOT).as_posix(), "pending mutations must be cleared by receipt, not logical ID"))
+    contract_inputs = [(index_text_at(receipt_path), index_text_at(interaction_path))]
+    if receipt_path in worktree_changed or interaction_path in worktree_changed:
+        contract_inputs.append((text_at(receipt_path), text_at(interaction_path)))
+    for receipt_input, interaction_input in contract_inputs:
+        receipt_text = executable_text(receipt_input or "")
+        interaction_text = executable_text(interaction_input or "")
+        for method, guard in receipt_method_contracts:
+            body = swift_method_body(receipt_text, method)
+            if body is None or re.search(guard, body, re.DOTALL) is None:
+                findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", receipt_contract.relative_to(ROOT).as_posix(), f"{method} must retain its receipt payload guard"))
+        clear_pending_like = swift_method_body(interaction_text, "clearPendingLike")
+        if clear_pending_like is None or re.search(r"pendingMutationStore\?\.clear\s*\(\s*receipt\s*\)", clear_pending_like) is None:
+            findings.append(Finding("FAIL", "QC.MUTATION.RECEIPT_CONTRACT", interaction_contract.relative_to(ROOT).as_posix(), "clearPendingLike must clear through its receipt"))
+        if re.search(r"clearPendingLike\s*\(\s*(?:articleID|id)\s*:", interaction_text):
+            findings.append(Finding("FAIL", "QC.MUTATION.UNCONDITIONAL_CLEAR", interaction_contract.relative_to(ROOT).as_posix(), "pending mutations must be cleared by receipt, not logical ID"))
     return findings
 
 
@@ -732,7 +771,7 @@ def main() -> int:
         findings = (
             check_repository_hygiene(files, cached, worktree_changed)
             + check_project_contract(files, cached, worktree_changed)
-            + check_resources(files)
+            + check_resources(files, cached, worktree_changed)
             + check_app_architecture(files, cached, worktree_changed)
             + advisory_findings(files)
         )

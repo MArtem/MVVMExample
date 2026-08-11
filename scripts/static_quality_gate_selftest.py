@@ -14,7 +14,7 @@ from static_quality_gate import (
     action_enum_positions,
     contains_pbx_object,
     executable_text,
-    generic_send_positions,
+    generic_dispatch_positions,
     is_allowlisted_demo_credential,
     scheme_action_has_target,
     scheme_reference_matches_target,
@@ -42,6 +42,7 @@ class StaticQualityGateSelfTests(unittest.TestCase):
 
     def test_source_membership_resolves_file_reference_paths(self) -> None:
         project = """\
+\trootObject = A0 /* Project object */;
 \t\tA0 /* Project object */ = {
 \t\t\tisa = PBXProject;
 \t\t\tmainGroup = A1 /* Root */;
@@ -109,8 +110,8 @@ class StaticQualityGateSelfTests(unittest.TestCase):
         self.assertIn("payloadData == receipt.payloadData", swift_method_body(source, "markFailure") or "")
 
     def test_generic_send_detection_does_not_depend_on_parameter_spelling(self) -> None:
-        source = "func send(action: LoginIntent) {}\nfunc send(_ intent: LoginIntent) {}\nfunc sendAnalytics() {}"
-        self.assertEqual(len(generic_send_positions(source)), 2)
+        source = "func send(action: LoginIntent) {}\nfunc dispatch(_ intent: LoginIntent) {}\nfunc sendAnalytics() {}"
+        self.assertEqual(len(generic_dispatch_positions(source)), 2)
 
     def test_action_enum_detection_includes_the_bare_action_name(self) -> None:
         source = "enum Action {}\nenum LoginAction {}\nenum Actionable {}"
