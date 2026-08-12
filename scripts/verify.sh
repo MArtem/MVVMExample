@@ -27,13 +27,19 @@ USAGE
 }
 
 run_static() {
-  git diff --check
+  if [[ -n "${MVVMEXAMPLE_STATIC_DIFF_RANGE:-}" ]]; then
+    git diff --check "${MVVMEXAMPLE_STATIC_DIFF_RANGE}"
+  else
+    git diff --check
+    git diff --cached --check
+  fi
+  ./scripts/static_quality_gate_selftest.py
+  ./scripts/static_quality_gate.py
   ./scripts/check_forbidden_patterns.py
-  ./scripts/check_secrets.py
-  ./scripts/check_large_files.py
   ./scripts/check_localization.py
   ./scripts/check_swiftui_hot_path_patterns.py
   ./scripts/check_docs_index.py
+  ./scripts/validate_ios_production_framework.py
 }
 
 run_list() {
