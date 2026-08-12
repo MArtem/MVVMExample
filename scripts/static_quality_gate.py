@@ -41,6 +41,8 @@ FORBIDDEN_COMPONENT_NAMES = frozenset({
     "node_modules", "temp", "tmp", "xcuserdata",
 })
 FORBIDDEN_COMPONENT_SUFFIXES = (".app", ".dsym", ".dsym.zip", ".ipa", ".result", ".xcarchive", ".xcresult")
+FORBIDDEN_CREDENTIAL_NAMES = frozenset({".env", "googleservice-info.plist"})
+FORBIDDEN_CREDENTIAL_SUFFIXES = (".cer", ".key", ".mobileprovision", ".p12", ".p8", ".provisionprofile", ".xcconfig.local")
 PBX_IDENTIFIER = r"[A-Za-z0-9]+"
 
 
@@ -322,6 +324,11 @@ def test_plan_matches_target(text: str, target_name: str, target_identifier: str
     )
 
 
+def forbidden_credential_artifact(path: Path) -> bool:
+    filename = path.name.casefold()
+    return filename in FORBIDDEN_CREDENTIAL_NAMES or filename.endswith(FORBIDDEN_CREDENTIAL_SUFFIXES)
+
+
 def file_reference_paths(project_text: str) -> dict[str, Path] | None:
     project = project_object(project_text)
     if project is None:
@@ -475,6 +482,8 @@ def check_repository_hygiene(files: list[Path], cached: list[Path], worktree_cha
         components = tuple(component.casefold() for component in path.parts)
         if any(component in FORBIDDEN_COMPONENT_NAMES or component.endswith(FORBIDDEN_COMPONENT_SUFFIXES) for component in components):
             findings.append(Finding("FAIL", "QC.REPOSITORY.GENERATED_ARTIFACT", path_string, "generated build or release artifact is tracked"))
+        if forbidden_credential_artifact(path):
+            findings.append(Finding("FAIL", "QC.SECRET.CREDENTIAL_ARTIFACT", path_string, "local credential artifact must not be tracked"))
 
     for path in worktree_changed:
         absolute = ROOT / path

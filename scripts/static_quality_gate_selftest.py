@@ -15,6 +15,7 @@ from static_quality_gate import (
     action_enum_positions,
     contains_pbx_object,
     executable_text,
+    forbidden_credential_artifact,
     generic_dispatch_positions,
     is_allowlisted_demo_credential,
     scheme_action_has_target,
@@ -40,6 +41,12 @@ class StaticQualityGateSelfTests(unittest.TestCase):
         self.assertTrue(is_allowlisted_demo_credential("fixture-not-a-secret"))
         self.assertFalse(is_allowlisted_demo_credential("real-dev-access-secret"))
         self.assertFalse(is_allowlisted_demo_credential("real-secret-not-a-secret-suffix"))
+
+    def test_credential_artifacts_are_rejected_case_insensitively(self) -> None:
+        self.assertTrue(forbidden_credential_artifact(Path("secrets/Release.P12")))
+        self.assertTrue(forbidden_credential_artifact(Path("config/.ENV")))
+        self.assertTrue(forbidden_credential_artifact(Path("GoogleService-Info.plist")))
+        self.assertFalse(forbidden_credential_artifact(Path("Sources/Configuration.swift")))
 
     def test_source_membership_resolves_file_reference_paths(self) -> None:
         project = """\
