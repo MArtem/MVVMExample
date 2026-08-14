@@ -1,5 +1,17 @@
 # Agent Instructions
 
+## Global Rules Bootstrap
+<!-- AIZENFLOW_GLOBAL_RULES_BOOTSTRAP_V1 -->
+Before any project action, read and apply
+`/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/GLOBAL_RULES_BOOTSTRAP.md`.
+It activates the current reusable rules directly from the canonical documentation repository.
+This repository file is an app/task overlay only: it may strengthen the global baseline, but it
+must not silently replace or weaken it. If the canonical checkout is unavailable, require the
+tracked `./GLOBAL_RULES_PORTABLE_SNAPSHOT.md` snapshot with marker
+`AIZENFLOW_GLOBAL_RULES_PORTABLE_SNAPSHOT_V1`; report `canonical-baseline-unavailable` and do not
+claim that the current canonical revision was applied. The user does not need to remind the agent
+to load it.
+
 ## Mandatory Response Header
 Every working, status, readiness, confirmation, task-orientation, planning, or clarification response must start with:
 
