@@ -1,0 +1,54 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+if [[ $# -lt 3 ]]; then
+  cat <<'USAGE'
+Usage:
+  scripts/api_http_trace METHOD URL BODY_JSON [HEADER=VALUE ...]
+
+Example:
+  scripts/api_http_trace POST https://reqres.in/api/login \
+    '{"email":"eve.holt@reqres.in","password":"cityslicka"}' \
+    'Content-Type=application/json' \
+    'x-api-key=...'
+USAGE
+  exit 1
+fi
+
+method="$1"
+url="$2"
+body="$3"
+shift 3
+
+tmp_headers="$(mktemp)"
+tmp_body="$(mktemp)"
+curl_args=(
+  -sS
+  -X "$method"
+  -D "$tmp_headers"
+  -o "$tmp_body"
+  "$url"
+)
+
+for header in "$@"; do
+  curl_args+=(-H "${header/=/: }")
+done
+
+if [[ "$method" != "GET" && "$method" != "HEAD" ]]; then
+  curl_args+=(-d "$body")
+fi
+
+curl "${curl_args[@]}"
+
+echo "HTTP_TRACE_METHOD=$method"
+echo "HTTP_TRACE_URL=$url"
+echo "HTTP_TRACE_REQUEST_BODY=$body"
+echo "HTTP_TRACE_RESPONSE_HEADERS_BEGIN"
+cat "$tmp_headers"
+echo "HTTP_TRACE_RESPONSE_HEADERS_END"
+echo "HTTP_TRACE_RESPONSE_BODY_BEGIN"
+cat "$tmp_body"
+echo
+echo "HTTP_TRACE_RESPONSE_BODY_END"
+
+rm -f "$tmp_headers" "$tmp_body"

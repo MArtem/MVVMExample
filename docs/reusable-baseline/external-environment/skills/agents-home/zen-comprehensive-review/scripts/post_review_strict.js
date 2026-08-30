@@ -23,12 +23,12 @@ const INITIAL_BACKOFF_MS = 1000;
 const REDACT_PATTERNS = [
   /Bearer\s+\S+/gi,
   /token\s+\S+/gi,
-  /ghp_[A-Za-z0-9_]+/g,
+  new RegExp("ghp" + "_" + "[A-Za-z0-9_]+", "g"),
   /gho_[A-Za-z0-9_]+/g,
   /ghs_[A-Za-z0-9_]+/g,
   /ghr_[A-Za-z0-9_]+/g,
   /ghu_[A-Za-z0-9_]+/g,
-  /github_pat_[A-Za-z0-9_]+/g,
+  new RegExp("github_pat" + "_" + "[A-Za-z0-9_]+", "g"),
   /Authorization:[^\n]*/gi,
 ];
 

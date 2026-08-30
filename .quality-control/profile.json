@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 2,
+  "project": {
+    "kind": "xcodeproj",
+    "path": "MVVMExample.xcodeproj"
+  },
+  "sourcePaths": [
+    "MVVMExample",
+    "AllArchitectureCases"
+  ],
+  "mode": "controlled",
+  "engine": {
+    "version": "git-9f3f3676",
+    "revision": "9f3f3676b56e41e56bc30cd9c6d155738df32f6a"
+  },
+  "xcode": {
+    "sourceMembership": {
+      "authority": "xcode-build-graph"
+    },
+    "schemes": [
+      {
+        "name": "MVVMExample",
+        "targets": [
+          "MVVMExample",
+          "MVVMExampleTests",
+          "MVVMExampleUITests"
+        ],
+        "configurations": [
+          "Debug",
+          "Release"
+        ],
+        "destinations": [
+          "platform=iOS Simulator,name=iPhone 17 Pro,OS=26.5"
+        ],
+        "testPlans": [
+          "MVVMExample.xctestplan",
+          "MVVMExampleUI.xctestplan"
+        ]
+      }
+    ]
+  },
+  "applicability": [
+    {
+      "capability": "tests",
+      "status": "applicable",
+      "reason": "The selected scheme declares unit and UI test targets and test plans.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Reclassify when test targets or test plans change."
+    },
+    {
+      "capability": "snapshotTests",
+      "status": "notApplicable",
+      "reason": "No snapshot-test target or snapshot test plan is declared in the selected scheme.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Reclassify when snapshot testing is introduced."
+    },
+    {
+      "capability": "uiTests",
+      "status": "applicable",
+      "reason": "The selected scheme declares MVVMExampleUITests and a UI test plan.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Reclassify when UI test ownership or scope changes."
+    },
+    {
+      "capability": "archiveSigning",
+      "status": "deferred",
+      "reason": "This pilot adds quality-control wiring only; archive and signing facts require a release decision.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Resolve before any archive, TestFlight, or App Store operation."
+    },
+    {
+      "capability": "featureFlags",
+      "status": "deferred",
+      "reason": "Feature-flag ownership and rollout policy were not established by the pilot inventory.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Resolve when a flag or rollout mechanism is introduced or changed."
+    },
+    {
+      "capability": "privacy",
+      "status": "deferred",
+      "reason": "Privacy and data-collection facts require an app-owner decision beyond static bootstrap.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Resolve before release or any privacy-sensitive capability change."
+    },
+    {
+      "capability": "observability",
+      "status": "deferred",
+      "reason": "Production diagnostics and telemetry ownership were not established by the pilot inventory.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Resolve before production rollout or observability changes."
+    },
+    {
+      "capability": "platformCapabilities",
+      "status": "deferred",
+      "reason": "Platform-capability claims for the architecture cases require app-owner classification.",
+      "owner": "repository maintainer",
+      "revisitCondition": "Resolve when a capability or extension is shipped from this repository."
+    }
+  ],
+  "permissions": {
+    "testCreation": "deny",
+    "testModification": "deny",
+    "localTestExecution": "ask",
+    "githubExecution": "manual",
+    "uiTests": "ask",
+    "simulatorOrDevice": "ask",
+    "performanceOrInstruments": "ask"
+  },
+  "sandbox": {
+    "root": ".quality-control-cache",
+    "cache": ".quality-control-cache/cache"
+  }
+}

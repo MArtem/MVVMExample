@@ -445,7 +445,7 @@ actor DataProcessor {
 4. **Revisit regularly**: Set reminders to check if library has been updated
 
 ```swift
-// TODO: Remove @preconcurrency when SomeLibrary adds Sendable support
+// TODO(owner=platform ticket=DOC-002 expires=2027-12-31): Remove @preconcurrency when SomeLibrary adds Sendable support
 // Last checked: 2026-01-07 (version 2.3.0)
 @preconcurrency import SomeLibrary
 ```
@@ -1101,4 +1101,3 @@ The result is **compile-time thread safety**, more maintainable code, and a futu
 - [Approachable Concurrency Video](https://youtu.be/y_Qc8cT-O_g?si=y4C1XQDGtyIOLW81)
 - [Migration Tooling Video](https://youtu.be/FK9XFxSWZPg?si=2z_ybn1t1YCJow5k)
 - [Swift Concurrency Course](https://www.swiftconcurrencycourse.com) for in-depth migration strategies
-

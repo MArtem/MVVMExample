@@ -1,21 +1,13 @@
 # Agent Rules (Short, Mandatory)
 
 ## Purpose
-This file is the short mandatory rule set for coding work in `<AppName>`.
+This file is the short mandatory rule set for coding work in `MVVMExample`.
 
 Use `docs/IOS_ARCHITECTURE_REFERENCE.md` as **reference**, not as a mechanical checklist. Use `docs/PRODUCTION_QUALITY_GATES.md` and `docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md` as mandatory quality gates/checklists for implementation, refactor, and review work.
 
-
-## Mandatory Response Header Rule
-Every working, status, readiness, or task-orientation response must start with:
-- model
-- active phase
-- files being inspected/changed
-- next safe step
-- whether a build is needed
-- sandbox/worktree confirmation
-
-Short answers like “готов к новым задачам” are not exempt when they relate to project/task readiness.
+## Model Routing Rule
+- Apply `./docs/MODEL_ROUTING_RULE.md` before non-trivial code, docs, git, or project changes.
+- Classify tasks before editing. Use `GPT-5.5` for planning/high-risk work and `GPT-5.4` only for approved low-risk execution.
 
 ## Core Decision Rule
 Always choose the **simplest correct solution** that matches:
@@ -25,6 +17,27 @@ Always choose the **simplest correct solution** that matches:
 4. product fit
 
 Do not add abstractions unless they solve a concrete current problem.
+
+## Filesystem Sandbox Rule
+- All project work must stay inside `/Users/Artem/.zenflow`.
+- Never write build artifacts, package caches, Xcode DerivedData, cloned package state, logs, temporary package verification output, or project traces outside `/Users/Artem/.zenflow`.
+- Before running tools that normally use global caches or DerivedData, override their output/cache paths to `/Users/Artem/.zenflow/...`.
+- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any other external location for project work.
+
+
+## Product-Staff Quality Bar Rule
+- Never lower the engineering bar because a project is described as demo, test, sample, prototype, imported, or pre-production; those words may only describe configuration/risk context, not code quality.
+- Treat every authored or reviewed code path as product-staff-level production code: correct ownership, explicit state, clear failure behavior, performance-aware rendering, privacy-safe logging, accessibility, localization, and supportable verification.
+- Do not wait for Instruments/profilers before fixing statically obvious performance or memory issues. Use profiling to prove behavior, compare alternatives, or validate non-obvious risks, not as an excuse to leave avoidable redraws, broad invalidation, main-thread work, unbounded caches, or lifecycle leaks.
+- Maximize quality through the simplest correct design: improve hot paths, state ownership, and error handling without adding decorative protocols, wrappers, factories, use cases, or interfaces.
+
+
+## Audit / Planning Scope Rule
+- When the user asks to review, audit, inspect a project/code area, evaluate requirements, or plan a task, provide the fullest unbiased high-quality analysis available, even for very small code.
+- Do not silently simplify, defer, dismiss, or complicate scope on the user's behalf. The assistant must surface the full relevant concern set and let the user decide what to execute.
+- Always prioritize findings and recommendations as `must do now`, `should do next`, `later / only if needed`, and `do not do / overengineering for this scope` where applicable.
+- If a concern is intentionally not investigated, state it as an explicit remaining risk; never imply it is irrelevant because the project is small, early, demo-like, or because the assistant judged it unnecessary.
+- During implementation, only execute the scope the user approved, but keep unexecuted review/planning concerns visible as remaining risks or backlog candidates.
 
 ## Context-Reset Bootstrap Rule
 - After a new chat/context reset, re-read the required bootstrap docs **once** before coding.
@@ -42,8 +55,14 @@ Do not add abstractions unless they solve a concrete current problem.
 
 ## Global vs Project Knowledge Rule
 - Reusable cross-project rules and prompts live in `docs/knowledge/global/`.
-- <AppName>-specific rules, contracts, paths, entities, and current task context live in `docs/knowledge/<AppName>/` or in the canonical docs indexed there.
+- MVVMExample-specific rules, contracts, paths, entities, and current task context live in `docs/knowledge/MVVMExample/` or in the canonical docs indexed there.
 - When a new project starts, create a new sibling project folder under `docs/knowledge/` and keep app-specific knowledge out of `global`.
+
+## ViewModel Intent API Rule
+- ViewModels expose explicit intent methods by default, e.g. `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `logoutTapped()`.
+- Do not add or keep generic `send(_ action:)`, `dispatch(_:)`, or UI action-enum dispatch as default MVVM boilerplate.
+- Reducer/action architecture requires explicit user approval and an ADR/state-machine rationale.
+- Apply `./docs/IOS_MVVM_INTENT_API_STANDARD.md` when creating or reviewing ViewModel APIs.
 
 ## Mandatory Priorities
 1. Architecture correctness first.
@@ -126,17 +145,17 @@ Do not add abstractions unless they solve a concrete current problem.
 - If a concern is not applicable, mark it not applicable with a reason instead of silently skipping it.
 - For full production readiness claims, fill or summarize `./docs/IOS_PRODUCTION_SCORECARD.md`; any score below production threshold must be reported as remaining risk.
 
-## Project-Calibrated Working Rules (<AppName>)
+## Project-Calibrated Working Rules (MVVMExample)
 1. Runtime code has priority over test-debt cleanup unless task explicitly says otherwise.
 2. Do not introduce app-local wrappers around reusable package APIs when one direct call is enough.
-3. SwiftUI composition details are governed by `./.zenflow/tasks/<task-id>/ios-engineering-rules.md`; do not duplicate conflicting local style rules.
+3. SwiftUI composition details are governed by `.zenflow/tasks/new-task-be0b/ios-engineering-rules.md`; do not duplicate conflicting local style rules.
 4. Treat unnecessary redraw/invalidation risk as high-priority; prefer narrow-input subviews and explicit render boundaries.
 5. Keep share-extension/app boundaries explicit: shared storage + sync point, no hidden runtime coupling.
-6. Keep feature/entity product contracts stable unless product requirements explicitly change.
-7. ViewModel interaction style must follow `./.zenflow/tasks/<task-id>/ios-engineering-rules.md` (`@MainActor`, `@Observable`, explicit state + intents, no generic `send(action)` default).
+6. Keep feed/composer card contract stable (`text/photo/video/audio/pdf`) unless product contract explicitly changes.
+7. ViewModel interaction style must follow `.zenflow/tasks/new-task-be0b/ios-engineering-rules.md` (`@MainActor`, `@Observable`, explicit state + intents, no generic `send(action)` default).
 8. Before any new abstraction, document one concrete current pain-point it solves in the PR/task notes.
 9. UI/design tasks must follow `docs/UI_PIXEL_PERFECT_WORKFLOW.md`.
-10. Local feature/entity persistence work must follow `the app-specific persistence contract`.
+10. Local feed/card persistence work must follow `docs/LOCAL_FEED_PERSISTENCE_CONTRACT.md`.
 11. Any non-trivial implementation, review, or refactor must apply `docs/PRODUCTION_QUALITY_GATES.md` and `docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md`; if a gate/checklist area is not relevant, state that explicitly in the completion report.
 12. Never close a review as clean when runtime hot-path risks, broad invalidation, main-thread I/O, unbounded memory/cache behavior, unsafe persistence/network side effects, missing failure states, naming/domain impurity, or forbidden-pattern violations remain unchecked.
 
@@ -151,5 +170,5 @@ Do not add abstractions unless they solve a concrete current problem.
 - `docs/PRODUCTION_REVIEW_COMPLETENESS_GATE.md`
 - `docs/IOS_PRODUCTION_READINESS_STANDARD.md`
 - `docs/DEFINITION_OF_DONE.md`
-- `./.zenflow/tasks/<task-id>/ios-engineering-rules.md`
-- `./.zenflow/tasks/<task-id>/services-engineering-rules.md`
+- `.zenflow/tasks/new-task-be0b/ios-engineering-rules.md`
+- `.zenflow/tasks/new-task-be0b/services-engineering-rules.md`

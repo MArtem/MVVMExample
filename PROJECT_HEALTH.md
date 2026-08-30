@@ -1,59 +1,26 @@
-# Project Health
+# MVVMExample Project Health
 
-## Purpose
-Ownership and runtime health map for `MVVMExample`.
+## Current Shape
 
-Use it to decide:
-- what is reusable
-- what must stay app-specific
-- where new behavior should live
-- what risks are known
+- App target: `MVVMExample`; iOS 17+ SwiftUI MVVM demo/pre-production app.
+- App-local support: `MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/`.
+- App unit and UI test targets plus `MVVMExample.xctestplan` and `MVVMExampleUI.xctestplan` exist;
+  running them remains user-owned.
 
-## Root Rule
-Reusable, entity-agnostic mechanics should live in shared docs/skills. App-specific demo behavior, UI composition, and feature contracts stay in the app layer.
+## Active Risks
 
-## Current Project Shape
-- App target: `MVVMExample`
-- Platform: iOS SwiftUI
-- Deployment target: iOS 17.0
-- Initial persistence: none
-- Initial networking: none
-- Core goal: educational MVVM demonstration, not production feature breadth
+- In-memory demo session state is not approved production persistence.
+- Release readiness is not established: signing, bundle identity, privacy manifest, analytics/crash
+  routing, and rollout/rollback need a separate release phase.
+- Demo credentials and test API use must remain explicit debug/demo behavior.
 
-## Module / Package Inventory
-### `MVVMExample`
-Owns:
-- app entry point
-- SwiftUI demo screens
-- app-specific MVVM example feature code
+## Boundaries
 
-Must not know about:
-- unrelated product flows
-- remote services unless explicitly added later
-- speculative infrastructure not needed for the demo
+Feature policy, DTO mapping, routes, ViewModels, and UI remain in the app. The app does not create
+local package mirrors or speculative infrastructure layers. The canonical MVVMExample overlay is
+`/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/project-rules.md`.
 
-### `./docs` and `./.codex/skills`
-Own:
-- reusable production baseline
-- review/checklist rules
-- prompt presets
-- reusable iOS skills
+## Verification
 
-Must not know about:
-- app-specific behavior unless generalized first
-
-## Current Known Risks
-- The MVVM demo feature itself is not implemented yet — status: open.
-- Command-line build has not been run yet; only project listing has been verified — status: open.
-
-## Verification Baseline
-```zsh
-# static
-git diff --check
-
-# project structure
-xcodebuild -list -project MVVMExample.xcodeproj
-
-# build, when approved/needed
-xcodebuild -project MVVMExample.xcodeproj -scheme MVVMExample -configuration Debug -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.0' CODE_SIGNING_ALLOWED=NO build
-```
+Use `./scripts/verify.sh static` for the deterministic local check. Builds, tests, Simulator UI,
+and release verification require user delegation.

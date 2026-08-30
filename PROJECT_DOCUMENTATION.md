@@ -1,50 +1,25 @@
-# MVVMExample Developer Onboarding Guide
+# MVVMExample Developer Orientation
 
-## Purpose
-Stable onboarding document for `MVVMExample`.
+## Authority
 
-Read this file for:
-- app shape
-- architecture boundaries
-- runtime baselines
-- documentation entry points
-- top-level folder ownership
+Start with the canonical global-rules bootstrap in `AGENTS.md`, then read the MVVMExample overlay
+at `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/project-rules.md` when the
+task concerns this app. Do not use the local historical documentation tree as a startup route.
 
-Do not use this file for temporary task history or debugging notes.
+## Current Shape
 
-## First Read For Agents
-When starting or resuming work in this worktree, read in this order:
-1. `./docs/README.md`
-2. `./PROJECT_DOCUMENTATION.md`
-3. `./PROJECT_HEALTH.md`
-4. `./docs/CURRENT_USER_OVERRIDES.md`
-5. `./docs/AGENT_RULES.md`
-6. `./docs/WORK_CONTINUITY.md`
-7. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
+MVVMExample is an iOS 17+ SwiftUI MVVM demo/pre-production app with an auth gate, news list/detail,
+profile editing, an explicitly configured DummyJSON-style API, and in-memory demo session state.
+Feature code, DTO mapping, navigation, and UI composition live under `./MVVMExample/`; minimal
+app-local support lives under `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/`.
 
-For context transfer, include this exact rule:
-**"перечитать весь актуальный набор документации и правил для этого worktree и task-контекста"**.
+## Verification
 
-## Quick Orientation
-`MVVMExample` is an educational SwiftUI iOS sample app for demonstrating a small MVVM flow.
+`./scripts/verify.sh static` is the local deterministic check. Builds, tests, Simulator UI,
+screenshots, Instruments, archive, and signing remain user-owned unless separately delegated.
 
-Replace this section with:
-- main user flows
-- primary modules/features
-- persistence/runtime choices
-- package/shared-code boundaries
-- extension/widget/background capabilities when relevant
+## Documentation Boundaries
 
-## Stable Runtime Baselines
-- Deployment target: `iOS 17.0`
-- UI state approach: SwiftUI state first; introduce ViewModels only when the demo feature needs explicit state ownership
-- Persistence: none for the initial bootstrap; demo data should stay deterministic/offline
-- Networking/API: none for the initial bootstrap
-- Architecture constraints: keep the example small, explicit, and educational; no speculative layers
-
-## Current Task Overrides
-Current task/user overrides live in `./docs/CURRENT_USER_OVERRIDES.md`.
-
-## Knowledge Organization
-- Reusable cross-project knowledge: `./docs/knowledge/global/`
-- App-specific knowledge: `./docs/knowledge/MVVMExample/`
+- Reusable policy is loaded from the canonical vault through the bootstrap.
+- Durable MVVMExample decisions and exceptions belong in `apps/MVVMExample/` in that vault.
+- Local legacy material is recovery-only and must not be copied back into active policy.

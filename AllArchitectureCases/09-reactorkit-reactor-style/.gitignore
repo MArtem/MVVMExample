@@ -1,0 +1,72 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode user/workspace state
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.moved-aside
+*.xccheckout
+*.xcuserdatad
+
+# Swift Package Manager / build artifacts
+.build/
+build/
+Build/
+.swiftpm/
+Package.resolved
+
+# Generated app artifacts
+*.ipa
+*.dSYM.zip
+*.dSYM
+*.xcarchive
+*.result
+*.xcresult
+
+# Logs / cache / temporary files
+*.log
+.cache/
+tmp/
+temp/
+
+# Node / web tooling if ever added
+node_modules/
+dist/
+coverage/
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.cer
+*.key
+*.mobileprovision
+*.provisionprofile
+*.xcconfig.local
+GoogleService-Info.plist
+ServiceAccount*.json
+
+# Fastlane generated output/secrets
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+fastlane/README.md
+fastlane/.env*
+
+# Zenflow local binary artifacts
+.zenflow/**/traces/
+.zenflow/**/screenshots/
+
+# Zenflow local task metadata
+.zenflow/
+# Architecture case local Xcode artifacts
+.xcode-derived-data/
+.xcode-package-cache/
+.xcode-result-bundles/

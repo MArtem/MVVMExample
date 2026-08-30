@@ -1,39 +1,44 @@
 # MVVMExample
 
-`MVVMExample` is a small SwiftUI iOS sample project for demonstrating a clear Model-View-ViewModel flow.
+`MVVMExample` is an iOS 17+ SwiftUI demo/pre-production project that demonstrates a small MVVM app with explicit intent methods, typed navigation, DTO mapping, and neutral reusable infrastructure.
 
-## Current State
+## Current Scope
 
-This repository currently contains:
+- Auth login gate
+- News list/detail flow
+- Profile view/edit flow
+- DummyJSON-style test API integration
+- In-memory demo session store
+- Minimal app-local infrastructure copied from the reusable baseline
 
-- a minimal SwiftUI iOS app target;
-- reusable iOS production documentation and rules;
-- project-local reusable skills under `./.codex/skills`;
-- external skill snapshots under `./docs/reusable-baseline/external-environment`;
-- reusable project quality scripts under `./scripts/`;
-- Zenflow task artifacts under `./.zenflow/tasks/mvvmexample-3c80`.
+## Architecture Rules
 
-## Goal
+- ViewModels expose explicit intent methods such as `appeared()`, `loginTapped()`, `refreshRequested()`, `articleTapped(id:)`, `likeTapped(id:)`, `saveTapped()`, and `logoutTapped()`.
+- Generic `send(_ action:)` ViewModel dispatch is not default project style.
+- UI action enums are not used as feature boilerplate unless a reducer architecture is explicitly approved and documented by ADR.
+- App-specific feature behavior stays in `./MVVMExample/`.
+- This worktree intentionally has no local `./Packages` folder; minimal infrastructure lives in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
 
-The app should stay intentionally small and educational. It should demonstrate how:
+## Demo/Test API Policy
 
-1. user actions enter a view model;
-2. the view model updates presentation state;
-3. SwiftUI renders from that state.
+- Test API base URL is owned by configuration.
+- Demo credentials are allowed only in debug/demo mode.
+- Release/production runtime must not silently use demo credentials, fake sessions, stubs, or token-like fixtures.
 
-## Documentation Entry Point
+## Verification
 
-Start with:
+```zsh
+./scripts/verify.sh static
+```
 
-1. `./docs/README.md`
-2. `./PROJECT_DOCUMENTATION.md`
-3. `./PROJECT_HEALTH.md`
-4. `./docs/CURRENT_USER_OVERRIDES.md`
-5. `./docs/AGENT_RULES.md`
-6. `./docs/WORK_CONTINUITY.md`
+`static` is the canonical deterministic repository check. It validates tracked-file hygiene,
+secrets, Xcode project/scheme/test-plan contracts, resources, and MVVM boundaries without a build,
+Simulator, signing, package download, or generated artifacts.
 
-## Build
+GitHub runs the same command automatically when a pull request is opened, reopened, or updated.
+After the workflow reaches `Development`, it can also be started manually from the Actions tab.
+It uses a standard macOS runner with read-only repository permissions; it does not build or test
+the app.
 
-Open `./MVVMExample.xcodeproj` in Xcode and run the `MVVMExample` scheme.
-
-Command-line build command will be finalized after the first verified build destination is selected.
+Build and test commands remain explicit user-owned verification; tests are not written or modified
+unless explicitly requested.

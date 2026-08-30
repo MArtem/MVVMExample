@@ -1,7 +1,7 @@
 # Production Code Review Checklist
 
 ## Purpose
-This checklist is mandatory for any non-trivial implementation, refactor, cleanup, or review in `<AppName>`.
+This checklist is mandatory for any non-trivial implementation, refactor, cleanup, or review in `MVVMExample`.
 
 It exists to prevent hidden production defects before the project grows: scroll jank, broad state invalidation, bad persistence access, unsafe network/sync behavior, memory leaks, duplicated domain concepts, and speculative architecture.
 
@@ -66,8 +66,8 @@ Every meaningful change must be checked against these areas.
 
 ### Architecture And Abstractions
 - No speculative layers, protocols, factories, adapters, managers, UseCases, services, or per-view models without one concrete current problem.
-- App-specific product policy stays in `./<AppName>`.
-- Reusable entity-agnostic mechanics belong in `./Packages/<ReusableInfrastructurePackage>`.
+- App-specific product policy stays in `./MVVMExample`.
+- Reusable or app-local entity-agnostic mechanics must follow the approved project ownership; in MVVMExample, current app-local support belongs in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
 - Package APIs should be used directly when they already fit; do not wrap them decoratively.
 - Use `./docs/IOS_UI_STATE_RENDERING_STANDARD.md` as the decision gate before adding a dedicated model/view model to any view.
 
@@ -125,7 +125,7 @@ These patterns are blocked by default. If a change truly needs one, document the
 - Multiple owners for the same state concept.
 - Multiple booleans that can represent impossible UI states.
 - Silent state fallback that hides real failures.
-- Generic `send(action)` as the default ViewModel API when explicit intents are clearer.
+- Generic `send(_ action:)`, `dispatch(_:)`, or UI action-enum dispatch as the default ViewModel API. Use explicit intent methods unless reducer/state-machine architecture was explicitly approved and documented.
 
 ### Persistence / Files
 - Fetch-all/save-all for single-record interaction updates without a documented current constraint.

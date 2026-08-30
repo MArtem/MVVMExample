@@ -9,18 +9,25 @@ Entry point for active project documentation, production standards, prompt prese
 3. `./docs/CURRENT_USER_OVERRIDES.md`
 4. `./docs/AGENT_RULES.md`
 5. `./docs/WORK_CONTINUITY.md`
-6. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
-7. scope-specific docs from this index
+6. `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
+7. `./docs/MODEL_ROUTING_RULE.md`
+8. central shared documentation guide: `/Users/Artem/.zenflow/worktrees/documentation-vault/DOCUMENT_LIBRARY_GUIDE.md`
+9. central shared documentation inventory: `/Users/Artem/.zenflow/worktrees/documentation-vault/ALL_DOCUMENTS_INVENTORY.md`
+10. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
+11. scope-specific docs from this index
 
 ## Mandatory Active Documentation Index
 
 ### Project Baseline
+- `./docs/TEST_COVERAGE_PLAN.md`
 - `./PROJECT_DOCUMENTATION.md`
 - `./PROJECT_HEALTH.md`
 - `./TESTING_INSTRUCTIONS.md`
 - `./docs/AGENT_RULES.md`
 - `./docs/WORK_CONTINUITY.md`
 - `./docs/CURRENT_USER_OVERRIDES.md`
+- `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
+- `./docs/MODEL_ROUTING_RULE.md`
 
 ### Reusable Production Standards
 - `./docs/IOS_PRODUCTION_FRAMEWORK.md`
@@ -36,5 +43,21 @@ Entry point for active project documentation, production standards, prompt prese
 ### Reusable Skills
 - `./.codex/skills/`
 
+### Learning / Handbook Plans
+- `./docs/IOS_SENIOR_LEAD_ARCHITECT_STAFF_HANDBOOK_OUTLINE.md`
+
 ### App-Specific Docs
+- `./docs/PACKAGE_USAGE_IN_MVVMEXAMPLE.md`
 Add app-specific docs here after the product shape is known.
+
+
+### Documentation Vault
+- Central git-backed vault: `/Users/Artem/.zenflow/worktrees/documentation-vault`
+- Reusable rules/prompts/templates/scripts belong under `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/`.
+- MVVMExample-specific durable docs belong under `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/`.
+- Do not copy TchopApp-specific docs into MVVMExample docs; read cross-app context through `documentation-vault/apps/<AppName>/`.
+
+## Shared Documentation Library Rule
+- The single shared documentation library is `/Users/Artem/.zenflow/worktrees/documentation-vault`.
+- Do not copy the full shared documentation library into this worktree.
+- Use local docs for MVVMExample-specific state and central docs for reusable/cross-task knowledge.

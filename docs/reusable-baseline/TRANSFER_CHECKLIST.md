@@ -62,3 +62,13 @@ Report:
 - placeholder replacements done
 - checks run
 - remaining risks
+
+
+## Sync Existing Project After Baseline Changes
+When reusable non-app-specific documentation, prompts, scripts, skills, templates, or specs change after a project has already been created, run:
+
+```zsh
+./scripts/sync_reusable_baseline_to_project.sh <target-project-root> <AppName> <task-id>
+```
+
+This refreshes generic docs, scripts, skill snapshots, and `./docs/reusable-baseline/` contents in the target project. Existing project-specific root files are not blindly overwritten; update them explicitly when a global rule must become active in that project.

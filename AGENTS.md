@@ -1,39 +1,32 @@
 # Agent Instructions
 
-## Mandatory Response Header
-Every working, status, readiness, confirmation, task-orientation, planning, or clarification response must start with:
+## Global Rules Bootstrap
 
-- **Модель:** current model
-- **Active phase:** current phase
-- **Файлы смотришь/меняешь:** files being inspected/changed, or `none` if no files
-- **Следующий безопасный шаг:** next safe step
-- **Нужна ли сборка:** yes/no and why
-- **Sandbox:** active worktree/sandbox confirmation
+<!-- AIZENFLOW_GLOBAL_RULES_BOOTSTRAP_V1 -->
+Before any project action, read and apply
+`/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/GLOBAL_RULES_BOOTSTRAP.md`.
+It activates the current reusable rules directly from the canonical documentation repository.
+This file is an MVVMExample overlay only: it may strengthen the global baseline, but must not
+replace or weaken it. If the canonical checkout is unavailable, require the tracked
+`./GLOBAL_RULES_PORTABLE_SNAPSHOT.md` with marker `AIZENFLOW_GLOBAL_RULES_PORTABLE_SNAPSHOT_V1`,
+report `canonical-baseline-unavailable`, and do not claim the current canonical revision was read.
 
-Short answers such as “готов”, “да, всё ясно”, “готов к новым задачам”, or “можешь присылать” are not exempt.
+## MVVMExample Overlay
 
-## Startup Read Rule
-Before code, docs, git, or project changes, read:
-1. `./docs/README.md`
-2. `./PROJECT_DOCUMENTATION.md`
-3. `./PROJECT_HEALTH.md`
-4. `./docs/CURRENT_USER_OVERRIDES.md`
-5. `./docs/AGENT_RULES.md`
-6. `./docs/WORK_CONTINUITY.md`
-7. current Zenflow task plan if present
+- This is an imported SwiftUI MVVM demo/pre-production app, not the retired clean-starter
+  baseline. Do not resume old `TaskDemo`, `TaskDemoViewModel`, or behavior-test plans.
+- DummyJSON/test API and demo credentials are allowed only under explicit debug/demo policy.
+  Release/production runtime must not silently use demo credentials, fake sessions, stubs, or
+  token-like fixtures.
+- The app intentionally owns minimal local infrastructure under
+  `MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/`. Do not introduce a reusable package
+  layer unless a current boundary and explicit user decision justify it.
+- ViewModels expose explicit intent methods. Generic `send(_:)`, `dispatch(_:)`, or UI action
+  enums require an explicitly approved reducer/state-machine architecture.
+- Tests may be written or modified only with explicit user authorization. The project-local static
+  gate must evolve only for demonstrated, high-signal project risks; do not enter a gate-hardening
+  loop without product-quality benefit.
 
-## Current Project Mode
-- This is a clean `MVVMExample` baseline project.
-- Do not implement app-specific demo features unless the user explicitly asks.
-- Do not continue old `TaskDemo` / `TaskDemoViewModel` / behavior-test plans.
-- The user may provide Swift files or text fragments to add iteratively.
-- When the user provides source fragments/files, preserve the code content unless the user explicitly asks for changes.
-- Add files meaningfully to the project structure and Xcode project when requested.
-
-## Tests And Verification
-- Do not write or modify tests unless the user explicitly opens a test-writing phase or asks to fix a specific failing test.
-- Do not run builds/tests/simulator UI/Instruments unless explicitly requested or already approved.
-- `git diff --check`, docs index checks, and project-list checks are allowed when useful.
-
-## Plan Rule
-If new user-approved work benefits from a breakdown, update the local task plan with checkbox steps and mark completed steps before reporting completion.
+The durable app overlay is
+`/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/project-rules.md`.
+Historical local documentation is not a startup authority.
