@@ -147,7 +147,7 @@ When using suppression annotations, document:
 
 ```swift
 /// Thread-safe: Internal lock protects all mutations.
-/// TODO: Remove @unchecked when migrated to actor (JIRA-1234)
+/// TODO(owner=platform ticket=JIRA-1234 expires=2027-12-31): Remove @unchecked when migrated to actor
 final class ThreadSafeCache: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [String: Data] = [:]

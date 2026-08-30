@@ -124,7 +124,7 @@ Example real scripts from other skills:
 
 def main():
     print("This is an example script for {skill_name}")
-    # TODO: Add actual script logic here
+    # TODO(owner=platform ticket=DOC-001 expires=2027-12-31): Add actual script logic here
     # This could be data processing, file conversion, API calls, etc.
 
 if __name__ == "__main__":
