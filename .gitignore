@@ -64,6 +64,7 @@ fastlane/.env*
 .zenflow/**/traces/
 .zenflow/**/screenshots/
 .quality-control/
+.quality-engine/
 
 # Zenflow local task metadata
 .zenflow/
