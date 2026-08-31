@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: cd6f575a99e606496651292e6ee8d43c6c22f8c9
+          ref: 2757d4ad9626275d3cc4be4f8815b64e72c625c9
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -84,6 +84,26 @@ jobs:
               raise SystemExit("Generated ownership check did not report PASS")
           if report.get("checks", [{}])[0].get("id") != "QC.GENERATED.OWNERSHIP":
               raise SystemExit("Unexpected generated ownership check ID")
+          PY
+      - name: Run dependency lock drift check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.DEPENDENCY.LOCK_DRIFT \
+            > "${RUNNER_TEMP}/mvvmexample-dependency-lock-drift.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-dependency-lock-drift.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Dependency lock drift check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.DEPENDENCY.LOCK_DRIFT":
+              raise SystemExit("Unexpected dependency lock drift check ID")
           PY
       - name: Run the same local static gate
         env:
