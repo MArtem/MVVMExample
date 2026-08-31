@@ -26,16 +26,18 @@ jobs:
         with:
           repository: MArtem/AIZenflowQualityControl
           ref: 9f3f3676b56e41e56bc30cd9c6d155738df32f6a
-          path: .quality-engine
+          # Keep the engine checkout outside the repository root. The tracked-tree adapters
+          # require the consumer checkout itself to remain clean.
+          path: ../quality-engine
           fetch-depth: 1
           persist-credentials: false
       - name: Run tracked-secret check
         shell: bash
         run: |
           set -euo pipefail
-          python3 .quality-engine/adapters/deterministic_checks.py \
+            python3 "${GITHUB_WORKSPACE}/../quality-engine/adapters/deterministic_checks.py" \
             --repository-root "${GITHUB_WORKSPACE}" \
-            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --catalog "${GITHUB_WORKSPACE}/../quality-engine/policies/check-catalog.json" \
             --check QC.SECRETS.TRACKED \
             > "${RUNNER_TEMP}/mvvmexample-secrets.json"
           python3 - <<'PY'
@@ -51,9 +53,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 .quality-engine/adapters/deterministic_checks.py \
+          python3 "${GITHUB_WORKSPACE}/../quality-engine/adapters/deterministic_checks.py" \
             --repository-root "${GITHUB_WORKSPACE}" \
-            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --catalog "${GITHUB_WORKSPACE}/../quality-engine/policies/check-catalog.json" \
             --check QC.TODO.OWNER \
             > "${RUNNER_TEMP}/mvvmexample-todo.json"
           python3 - <<'PY'
@@ -80,12 +82,12 @@ jobs:
           set -euo pipefail
           mkdir -p .quality-control-cache/cache
           swift run \
-            --package-path "${GITHUB_WORKSPACE}/.quality-engine" \
+            --package-path "${GITHUB_WORKSPACE}/../quality-engine" \
             --scratch-path "${RUNNER_TEMP}/quality-engine-scratch" \
             -Xswiftc -warnings-as-errors \
             quality static \
             --profile "${GITHUB_WORKSPACE}/.quality-control/profile.json" \
-            --policy "${GITHUB_WORKSPACE}/.quality-engine/policies/static-policy.json" \
+            --policy "${GITHUB_WORKSPACE}/../quality-engine/policies/static-policy.json" \
             --repository-root "${GITHUB_WORKSPACE}" \
             > "${RUNNER_TEMP}/mvvmexample-quality.json"
           python3 - <<'PY'
