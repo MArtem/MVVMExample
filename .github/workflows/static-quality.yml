@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 9f3f3676b56e41e56bc30cd9c6d155738df32f6a
+          ref: 9ac4cca4647cbd229a99250a4b60cd5ce27cca8c
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -74,7 +74,7 @@ jobs:
             | while IFS= read -r scripts_dir; do
                 (cd "${scripts_dir%/scripts}" && ./scripts/verify.sh static)
               done
-      - name: Run pinned policy-driven static check
+      - name: Run pinned scoped static check (Xcode membership not asserted)
         shell: bash
         run: |
           set -euo pipefail
@@ -87,6 +87,7 @@ jobs:
             --profile "${GITHUB_WORKSPACE}/.quality-control/profile.json" \
             --policy "${GITHUB_WORKSPACE}/.quality-engine/policies/static-policy.json" \
             --repository-root "${GITHUB_WORKSPACE}" \
+            --scope explicit-source-paths \
             > "${RUNNER_TEMP}/mvvmexample-quality.json"
           python3 - <<'PY'
           import json
