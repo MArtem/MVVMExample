@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 2757d4ad9626275d3cc4be4f8815b64e72c625c9
+          ref: 096e0d0998efafaedf3ff34c2c180885bd8d2e7f
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -104,6 +104,26 @@ jobs:
               raise SystemExit("Dependency lock drift check did not report PASS")
           if report.get("checks", [{}])[0].get("id") != "QC.DEPENDENCY.LOCK_DRIFT":
               raise SystemExit("Unexpected dependency lock drift check ID")
+          PY
+      - name: Run localization catalog check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.LOCALIZATION.CATALOG \
+            > "${RUNNER_TEMP}/mvvmexample-localization-catalog.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-localization-catalog.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Localization catalog check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.LOCALIZATION.CATALOG":
+              raise SystemExit("Unexpected localization catalog check ID")
           PY
       - name: Run the same local static gate
         env:
