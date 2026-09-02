@@ -7,7 +7,8 @@ Use `docs/IOS_ARCHITECTURE_REFERENCE.md` as **reference**, not as a mechanical c
 
 ## Model Routing Rule
 - Apply `./docs/MODEL_ROUTING_RULE.md` before non-trivial code, docs, git, or project changes.
-- Classify tasks before editing. Use `GPT-5.5` for planning/high-risk work and `GPT-5.4` only for approved low-risk execution.
+- Classify tasks with the current GPT-5.6 sol/tera/luna rule; historical GPT-5.4/5.5 labels do not
+  select the active route.
 
 ## Core Decision Rule
 Always choose the **simplest correct solution** that matches:

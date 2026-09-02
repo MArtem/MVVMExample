@@ -4,17 +4,14 @@
 Entry point for active project documentation, production standards, prompt presets, reusable skills, and static quality gates.
 
 ## Default Read Order
-1. `./PROJECT_DOCUMENTATION.md`
-2. `./PROJECT_HEALTH.md`
-3. `./docs/CURRENT_USER_OVERRIDES.md`
-4. `./docs/AGENT_RULES.md`
-5. `./docs/WORK_CONTINUITY.md`
-6. `./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`
-7. `./docs/MODEL_ROUTING_RULE.md`
-8. central shared documentation guide: `/Users/Artem/.zenflow/worktrees/documentation-vault/DOCUMENT_LIBRARY_GUIDE.md`
-9. central shared documentation inventory: `/Users/Artem/.zenflow/worktrees/documentation-vault/ALL_DOCUMENTS_INVENTORY.md`
-10. current task docs under `./.zenflow/tasks/mvvmexample-3c80/` when available
-11. scope-specific docs from this index
+1. `./docs/TASK_TYPE_DOCUMENTATION_ROUTER.md` and its Level 0 set once.
+2. Current task plan/handoff when present.
+3. Only the selected task routes.
+4. `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/MANIFEST.md` for
+   MVVMExample product work.
+
+The canonical root `MANIFEST.md` is used only for documentation-library completeness/recovery,
+not normal startup.
 
 ## Mandatory Active Documentation Index
 

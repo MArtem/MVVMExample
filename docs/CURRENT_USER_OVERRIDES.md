@@ -6,14 +6,17 @@ Task-local user preferences and hard constraints that apply before general proje
 ## Active Overrides
 
 ### Model Routing
-- Apply `./docs/MODEL_ROUTING_RULE.md`; do not use the old `GPT-5.5 for all work` rule.
-- `GPT-5.4` is allowed only for approved low-risk execution where architecture and ownership are already decided.
-- `GPT-5.5` is required for planning, architecture, persistence, concurrency, navigation, state ownership, public APIs, package/app boundaries, security/privacy, data-loss/sync, performance-sensitive work, Xcode/app runtime integration, and high-risk final review.
-- UI/design work from screenshots/Figma/PDF/SVG/CSS remains `GPT-5.5` unless explicitly relaxed.
+- Apply `./docs/MODEL_ROUTING_RULE.md` as the sole active model/reasoning authority. Available
+  routes are GPT-5.6 sol/tera/luna; retired GPT-5.4/5.5 instructions in historical documents do
+  not select the current model.
+- Preserve the user-selected operating mode and use the command-time adequacy decision before
+  meaningful work.
 
 ### Response Header
 Every working/status/readiness response must start with:
 - **Модель:** current model
+- **Режим:** active operating mode
+- **Смена модели:** current switch decision
 - **Фаза:** current phase
 - **Файлы:** files being inspected/changed, or `none`
 - **Следующий безопасный шаг:** next safe step
