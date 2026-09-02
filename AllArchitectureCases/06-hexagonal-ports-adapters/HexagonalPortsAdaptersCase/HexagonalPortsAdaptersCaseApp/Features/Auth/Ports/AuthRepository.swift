@@ -5,6 +5,6 @@ import Foundation
 /// Responsibilities:
 /// - authenticate credentials against the configured backend or approved demo source;
 /// - return a domain session only, not transport transport models.
-protocol AuthRepository {
+protocol AuthRepository: Sendable {
     func login(username: String, password: String) async throws -> AuthSession
 }

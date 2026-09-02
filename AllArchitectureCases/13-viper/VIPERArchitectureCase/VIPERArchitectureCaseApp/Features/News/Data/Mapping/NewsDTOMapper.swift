@@ -3,7 +3,7 @@ import Foundation
 /// Data-boundary mapping contract that converts transport shapes into app/domain models.
 ///
 /// Failure behavior: throw explicit mapping errors for invalid backend payloads instead of manufacturing silent placeholder domain data.
-enum NewsMappingError: Error {
+enum NewsMappingError: Error, Sendable {
     case missingID
     case missingTitle
 }
@@ -12,8 +12,10 @@ enum NewsMappingError: Error {
 ///
 /// Boundary rule:
 /// Backend naming, URL validation, and date parsing stay in this mapper so presentation code receives stable domain values.
-struct NewsDTOMapper {
-    private static let iso8601DateFormatter = ISO8601DateFormatter()
+struct NewsDTOMapper: Sendable {
+    private static func parseISO8601Date(_ value: String) -> Date? {
+        ISO8601DateFormatter().date(from: value)
+    }
 
     func map(_ dto: ProductDTO) throws -> NewsArticle {
         guard let id = dto.id else {
@@ -24,7 +26,7 @@ struct NewsDTOMapper {
             throw NewsMappingError.missingTitle
         }
 
-        let createdAt = dto.meta?.createdAt.flatMap(Self.iso8601DateFormatter.date(from:))
+        let createdAt = dto.meta?.createdAt.flatMap(Self.parseISO8601Date)
         let imageURLs = (dto.images ?? []).compactMap(URL.init(string:))
         let thumbnailURL = dto.thumbnail.flatMap(URL.init(string:)) ?? imageURLs.first
         let reviewsCount = dto.reviews?.count ?? 0

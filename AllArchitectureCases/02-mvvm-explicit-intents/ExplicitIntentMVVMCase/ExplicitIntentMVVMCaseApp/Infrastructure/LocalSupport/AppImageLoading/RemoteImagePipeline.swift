@@ -73,7 +73,7 @@ struct RemoteImagePipeline: Sendable {
     /// Cancellation before decode/cache insert stops the load and avoids publishing stale work.
     func image(from url: URL, targetSize: CGSize, scale: CGFloat) async throws -> AppPlatformImage {
         let cacheKey = Self.cacheKey(url: url, targetSize: targetSize, scale: scale)
-        if let cached = cache.image(forKey: cacheKey) {
+        if let cached = await cache.image(forKey: cacheKey) {
             return cached
         }
 
@@ -86,7 +86,7 @@ struct RemoteImagePipeline: Sendable {
         guard let image = Self.downsample(data: data, targetSize: targetSize, scale: scale) else {
             throw RemoteImagePipelineError.decodingFailed
         }
-        cache.insert(image, forKey: cacheKey)
+        await cache.insert(image, forKey: cacheKey)
         return image
     }
 

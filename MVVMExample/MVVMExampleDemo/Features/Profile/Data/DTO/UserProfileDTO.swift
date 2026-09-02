@@ -3,7 +3,7 @@ import Foundation
 /// Transport payload owned by the data/API boundary.
 ///
 /// Mapping responsibility: keep backend optionality, naming, and wire-format quirks here so domain and presentation models stay transport-independent.
-struct UserProfileDTO: Decodable {
+struct UserProfileDTO: Decodable, Sendable {
     let id: Int?
     let username: String?
     let email: String?
@@ -17,6 +17,6 @@ struct UserProfileDTO: Decodable {
 /// Transport payload owned by the data/API boundary.
 ///
 /// Mapping responsibility: keep backend optionality, naming, and wire-format quirks here so domain and presentation models stay transport-independent.
-struct CompanyDTO: Decodable {
+struct CompanyDTO: Decodable, Sendable {
     let title: String?
 }

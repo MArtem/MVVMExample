@@ -15,7 +15,7 @@ struct NewsPageRequest: Equatable, Sendable {
 /// - expose domain `NewsArticle` values;
 /// - hide DTO, pagination request, and API mutation details from Reactors;
 /// - keep list, detail, and like/favorite operations behind one feature contract.
-protocol NewsRepository {
+protocol NewsRepository: Sendable {
     func loadNews(page: NewsPageRequest) async throws -> [NewsArticle]
     func refreshNews(page: NewsPageRequest) async throws -> [NewsArticle]
     func loadArticleDetail(id: NewsArticle.ID) async throws -> NewsArticle

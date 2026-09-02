@@ -3,7 +3,7 @@ import Foundation
 /// Data-boundary mapping contract that converts transport shapes into app/domain models.
 ///
 /// Failure behavior: throw explicit mapping errors for invalid backend payloads instead of manufacturing silent placeholder domain data.
-enum ProfileMappingError: Error {
+enum ProfileMappingError: Error, Sendable {
     case missingID
 }
 
@@ -11,7 +11,7 @@ enum ProfileMappingError: Error {
 ///
 /// Boundary rule:
 /// DTO optionality and backend field shape must be handled here before data reaches Interactors.
-struct ProfileDTOMapper {
+struct ProfileDTOMapper: Sendable {
     func map(_ dto: UserProfileDTO) throws -> UserProfile {
         guard let id = dto.id else {
             throw ProfileMappingError.missingID
