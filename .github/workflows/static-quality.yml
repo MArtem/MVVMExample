@@ -2,8 +2,6 @@ name: Static quality
 
 on:
   workflow_dispatch:
-  pull_request:
-    types: [opened, reopened, synchronize, edited]
 
 permissions:
   contents: read
@@ -16,27 +14,167 @@ jobs:
   static:
     name: Repository static gate
     runs-on: macos-15
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       # actions/checkout v5.0.1
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Check out pinned quality engine
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+        with:
+          repository: MArtem/AIZenflowQualityControl
+          ref: 6ebf4b6e41e501fb630da386cc5490bf1495d580
+          path: .quality-engine
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Run tracked-secret check
+        shell: bash
+        run: |
+          set -euo pipefail
+            python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.SECRETS.TRACKED \
+            > "${RUNNER_TEMP}/mvvmexample-secrets.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-secrets.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Tracked-secret check did not report PASS")
+          PY
+      - name: Run TODO ownership check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.TODO.OWNER \
+            > "${RUNNER_TEMP}/mvvmexample-todo.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-todo.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("TODO ownership check did not report PASS")
+          PY
+      - name: Run generated ownership check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.GENERATED.OWNERSHIP \
+            > "${RUNNER_TEMP}/mvvmexample-generated-ownership.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-generated-ownership.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Generated ownership check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.GENERATED.OWNERSHIP":
+              raise SystemExit("Unexpected generated ownership check ID")
+          PY
+      - name: Run dependency lock drift check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.DEPENDENCY.LOCK_DRIFT \
+            > "${RUNNER_TEMP}/mvvmexample-dependency-lock-drift.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-dependency-lock-drift.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Dependency lock drift check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.DEPENDENCY.LOCK_DRIFT":
+              raise SystemExit("Unexpected dependency lock drift check ID")
+          PY
+      - name: Run localization catalog check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.LOCALIZATION.CATALOG \
+            > "${RUNNER_TEMP}/mvvmexample-localization-catalog.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-localization-catalog.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Localization catalog check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.LOCALIZATION.CATALOG":
+              raise SystemExit("Unexpected localization catalog check ID")
+          PY
+      - name: Run resources assets check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.RESOURCES.ASSETS \
+            > "${RUNNER_TEMP}/mvvmexample-resources-assets.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-resources-assets.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Resources assets check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.RESOURCES.ASSETS":
+              raise SystemExit("Unexpected resources assets check ID")
+          PY
       - name: Run the same local static gate
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.sha }}
+          MVVMEXAMPLE_STATIC_DIFF_RANGE: ""
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            git fetch --no-tags origin "${BASE_SHA}:refs/remotes/origin/pr-base"
-            MVVMEXAMPLE_STATIC_DIFF_RANGE="origin/pr-base...${HEAD_SHA}" ./scripts/verify.sh static
-            git diff --name-only "origin/pr-base...${HEAD_SHA}" \
-              | awk -F/ '/^AllArchitectureCases\/[^/]+\// { print $1 "/" $2 }' \
-              | sort -u \
-              | while IFS= read -r architecture_case; do
-                  (cd "${architecture_case}" && ./scripts/verify.sh static)
-                done
-          else
-            ./scripts/verify.sh static
-          fi
+          ./scripts/verify.sh static
+          find AllArchitectureCases -mindepth 2 -maxdepth 2 -name scripts -type d -print \
+            | while IFS= read -r scripts_dir; do
+                (cd "${scripts_dir%/scripts}" && ./scripts/verify.sh static)
+              done
+      - name: Run pinned scoped static check (Xcode membership not asserted)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .quality-control-cache/cache
+          swift run \
+            --package-path "${GITHUB_WORKSPACE}/.quality-engine" \
+            --scratch-path "${RUNNER_TEMP}/quality-engine-scratch" \
+            -Xswiftc -warnings-as-errors \
+            quality static \
+            --profile "${GITHUB_WORKSPACE}/.quality-control/profile.json" \
+            --policy "${GITHUB_WORKSPACE}/.quality-engine/policies/static-policy.json" \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --scope explicit-source-paths \
+            > "${RUNNER_TEMP}/mvvmexample-quality.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-quality.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Policy-driven static check did not report PASS")
+          PY
