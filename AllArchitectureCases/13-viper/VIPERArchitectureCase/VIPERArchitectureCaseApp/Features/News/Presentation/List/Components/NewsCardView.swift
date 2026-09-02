@@ -4,7 +4,7 @@ import SwiftUI
 ///
 /// Performance contract:
 /// The row receives narrow immutable state and callbacks only; it must not observe the whole list Presenter or perform expensive formatting in `body`.
-struct NewsCardView: View, Equatable {
+struct NewsCardView: View, @MainActor Equatable {
     let state: NewsCardViewState
     let onOpen: () -> Void
     let onLike: () -> Void

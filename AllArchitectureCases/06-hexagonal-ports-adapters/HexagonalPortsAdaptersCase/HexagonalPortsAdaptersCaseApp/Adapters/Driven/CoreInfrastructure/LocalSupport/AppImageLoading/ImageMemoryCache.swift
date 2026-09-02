@@ -6,18 +6,18 @@ import UIKit
 
 /// Bounded in-memory image cache for already-downsampled UI images.
 ///
-/// Thread safety:
-/// `NSCache` is thread-safe for concurrent access. The class is marked `@unchecked Sendable` to expose that runtime guarantee to Swift concurrency.
+/// Concurrency:
+/// This actor exclusively owns the mutable cache and its memory-warning task.
 ///
 /// Invariant:
 /// Store images after downsampling to the intended render size, not original remote dimensions.
-final class ImageMemoryCache: @unchecked Sendable {
+actor ImageMemoryCache {
     static let shared = ImageMemoryCache()
 
     private let cache = NSCache<NSString, AppPlatformImage>()
 
     #if canImport(UIKit)
-    private var memoryWarningObserver: NSObjectProtocol?
+    private var memoryWarningTask: Task<Void, Never>?
     #endif
 
     init(countLimit: Int = 200, totalCostLimit: Int = 48 * 1024 * 1024) {
@@ -25,21 +25,27 @@ final class ImageMemoryCache: @unchecked Sendable {
         cache.totalCostLimit = totalCostLimit
 
         #if canImport(UIKit)
-        memoryWarningObserver = NotificationCenter.default.addObserver(
-            forName: UIApplication.didReceiveMemoryWarningNotification,
-            object: nil,
-            queue: nil
-        ) { [weak self] _ in
-            self?.removeAll()
+        Task { [weak self] in
+            await self?.startObservingMemoryWarnings()
         }
         #endif
     }
 
+    #if canImport(UIKit)
+    private func startObservingMemoryWarnings() {
+        guard memoryWarningTask == nil else { return }
+        memoryWarningTask = Task { [weak self] in
+            for await _ in NotificationCenter.default.notifications(named: UIApplication.didReceiveMemoryWarningNotification) {
+                guard let self else { return }
+                await self.removeAll()
+            }
+        }
+    }
+    #endif
+
     deinit {
         #if canImport(UIKit)
-        if let memoryWarningObserver {
-            NotificationCenter.default.removeObserver(memoryWarningObserver)
-        }
+        memoryWarningTask?.cancel()
         #endif
     }
 

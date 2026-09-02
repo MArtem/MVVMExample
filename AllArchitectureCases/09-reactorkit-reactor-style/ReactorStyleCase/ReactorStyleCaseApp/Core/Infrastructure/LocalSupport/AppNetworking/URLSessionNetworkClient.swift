@@ -13,7 +13,7 @@ typealias NetworkRetrySleeper = @Sendable (_ delaySeconds: TimeInterval) async t
 ///
 /// Concurrency:
 /// Individual requests are cancellable through Swift concurrency. Cancellation is surfaced through the configured error mapper.
-final class URLSessionNetworkClient: NetworkClient {
+actor URLSessionNetworkClient: NetworkClient {
     private let configuration: NetworkClientConfiguration
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -46,7 +46,7 @@ final class URLSessionNetworkClient: NetworkClient {
     ///
     /// Side effects:
     /// May perform bounded retries for idempotent GET requests according to configuration.
-    func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
+    func send<Response: Decodable & Sendable>(_ request: any NetworkRequest) async throws -> Response {
         var attempt = 0
         while true {
             do {
@@ -61,7 +61,7 @@ final class URLSessionNetworkClient: NetworkClient {
         }
     }
 
-    private func perform<Response: Decodable>(_ request: NetworkRequest) async throws -> Response {
+    private func perform<Response: Decodable & Sendable>(_ request: any NetworkRequest) async throws -> Response {
         var components = URLComponents(
             url: configuration.baseURL.appendingPathComponent(request.path),
             resolvingAgainstBaseURL: false
@@ -119,7 +119,7 @@ final class URLSessionNetworkClient: NetworkClient {
         }
     }
 
-    private func shouldRetry(request: NetworkRequest, error: any Error, attempt: Int) -> Bool {
+    private func shouldRetry(request: any NetworkRequest, error: any Error, attempt: Int) -> Bool {
         guard attempt < configuration.retryPolicy.maxRetries else { return false }
         if configuration.retryPolicy.retriesIdempotentGETOnly && request.method != .get {
             return false

@@ -3,8 +3,8 @@ import SwiftUI
 /// Equatable SwiftUI row for the news feed.
 ///
 /// Performance contract:
-/// The row receives narrow immutable state and callbacks only; it must not observe the whole list ViewModel or perform expensive formatting in `body`.
-struct NewsCardView: View, Equatable {
+/// The row receives narrow immutable state and callbacks only; it must not observe the whole list Model or perform expensive formatting in `body`.
+struct NewsCardView: View, @MainActor Equatable {
     let state: NewsCardViewState
     let onOpen: () -> Void
     let onLike: () -> Void

@@ -11,7 +11,7 @@ enum ProfileMappingError: Error {
 ///
 /// Boundary rule:
 /// DTO optionality and backend field shape must be handled here before data reaches ViewModels.
-struct ProfileDTOMapper {
+struct ProfileDTOMapper: Sendable {
     func map(_ dto: UserProfileDTO) throws -> UserProfile {
         guard let id = dto.id else {
             throw ProfileMappingError.missingID

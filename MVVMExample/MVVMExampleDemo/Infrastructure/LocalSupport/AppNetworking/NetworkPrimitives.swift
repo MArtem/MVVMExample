@@ -177,7 +177,7 @@ struct NetworkErrorMapping: Sendable {
 /// Responsibilities:
 /// - provide path, method, query, headers, and an optional throwing body encoder;
 /// - avoid hiding body-encoding failures.
-protocol NetworkRequest {
+protocol NetworkRequest: Sendable {
     var path: String { get }
     var method: NetworkHTTPMethod { get }
     var queryItems: [URLQueryItem] { get }
@@ -195,6 +195,6 @@ extension NetworkRequest {
 ///
 /// Errors:
 /// Implementations preserve cancellation behavior and either throw `NetworkClientError` or host-app errors supplied through `NetworkErrorMapping`.
-protocol NetworkClient {
-    func send<Response: Decodable>(_ request: NetworkRequest) async throws -> Response
+protocol NetworkClient: Sendable {
+    func send<Response: Decodable & Sendable>(_ request: any NetworkRequest) async throws -> Response
 }
