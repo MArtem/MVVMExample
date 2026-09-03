@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 6ebf4b6e41e501fb630da386cc5490bf1495d580
+          ref: cb81e49662d90c06c8618747bc7f8a760d79fae6
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
@@ -144,6 +144,26 @@ jobs:
               raise SystemExit("Resources assets check did not report PASS")
           if report.get("checks", [{}])[0].get("id") != "QC.RESOURCES.ASSETS":
               raise SystemExit("Unexpected resources assets check ID")
+          PY
+      - name: Run privacy manifest check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .quality-engine/adapters/deterministic_checks.py \
+            --repository-root "${GITHUB_WORKSPACE}" \
+            --catalog "${GITHUB_WORKSPACE}/.quality-engine/policies/check-catalog.json" \
+            --check QC.PRIVACY.MANIFEST \
+            > "${RUNNER_TEMP}/mvvmexample-privacy-manifest.json"
+          python3 - <<'PY'
+          import json
+          import os
+
+          with open(os.path.join(os.environ["RUNNER_TEMP"], "mvvmexample-privacy-manifest.json"), encoding="utf-8") as source:
+              report = json.load(source)
+          if report.get("status") != "PASS":
+              raise SystemExit("Privacy manifest check did not report PASS")
+          if report.get("checks", [{}])[0].get("id") != "QC.PRIVACY.MANIFEST":
+              raise SystemExit("Unexpected privacy manifest check ID")
           PY
       - name: Run the same local static gate
         env:
