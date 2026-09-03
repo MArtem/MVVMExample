@@ -543,7 +543,8 @@ def check_project_contract(files: list[Path], cached: list[Path], worktree_chang
         for configuration_name, settings in configurations.items():
             for key, expected_value in (
                 ("IPHONEOS_DEPLOYMENT_TARGET", "17.0"),
-                ("SWIFT_VERSION", "5.0"),
+                ("SWIFT_VERSION", "6.0"),
+                ("SWIFT_STRICT_CONCURRENCY", "complete"),
                 ("PRODUCT_BUNDLE_IDENTIFIER", expected_bundle_identifier),
             ):
                 if settings.get(key) != expected_value:
