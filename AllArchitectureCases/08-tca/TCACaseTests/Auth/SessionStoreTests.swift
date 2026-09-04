@@ -1,4 +1,5 @@
 import Foundation
+import os.lock
 import SwiftData
 import Testing
 @testable import TCACase
@@ -44,23 +45,23 @@ private func makeSessionStoreSession() -> AuthSession {
     )
 }
 
-private final class InMemoryKeychainSessionStorage: KeychainSessionStorage, @unchecked Sendable {
-    private var values: [String: Data] = [:]
+private final class InMemoryKeychainSessionStorage: KeychainSessionStorage, Sendable {
+    private let values = OSAllocatedUnfairLock(initialState: [String: Data]())
 
     func load(service: String, account: String) -> Data? {
-        values[key(service: service, account: account)]
+        values.withLock { $0[key(service: service, account: account)] }
     }
 
     func save(_ data: Data, service: String, account: String) throws {
-        values[key(service: service, account: account)] = data
+        values.withLock { $0[key(service: service, account: account)] = data }
     }
 
     func clear(service: String, account: String) {
-        values.removeValue(forKey: key(service: service, account: account))
+        values.withLock { $0.removeValue(forKey: key(service: service, account: account)) }
     }
 
     func setRawData(_ data: Data, service: String, account: String) {
-        values[key(service: service, account: account)] = data
+        values.withLock { $0[key(service: service, account: account)] = data }
     }
 
     private func key(service: String, account: String) -> String {
