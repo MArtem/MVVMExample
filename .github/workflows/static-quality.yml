@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
         with:
           repository: MArtem/AIZenflowQualityControl
-          ref: 0d3045921727720b357590f94488a57ce687c363
+          ref: b197bd5e8983b5c7cfd1d277dd2540d7bb352a15
           path: .quality-engine
           fetch-depth: 1
           persist-credentials: false
