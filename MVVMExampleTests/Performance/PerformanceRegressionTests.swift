@@ -38,18 +38,19 @@ struct PerformanceRegressionTests {
     }
 
     @Test("Image memory cache insert and lookup stays within unit budget")
-    func imageMemoryCacheInsertAndLookupStaysWithinUnitBudget() throws {
+    func imageMemoryCacheInsertAndLookupStaysWithinUnitBudget() async throws {
         let cache = ImageMemoryCache(countLimit: 2_000, totalCostLimit: 64 * 1024 * 1024)
         let image = try #require(makePerformanceImage())
 
-        let elapsed = measureSeconds {
-            for index in 0..<1_000 {
-                cache.insert(image, forKey: "image-\(index)")
-            }
-            for index in 0..<1_000 {
-                #expect(cache.image(forKey: "image-\(index)") != nil)
-            }
+        let start = Date()
+        for index in 0..<1_000 {
+            await cache.insert(image, forKey: "image-\(index)")
         }
+        for index in 0..<1_000 {
+            let cachedImage = await cache.image(forKey: "image-\(index)")
+            #expect(cachedImage != nil)
+        }
+        let elapsed = Date().timeIntervalSince(start)
 
         #expect(elapsed < 0.5, "Expected 1,000 cache inserts/lookups under 0.5s, got \(elapsed)s")
     }

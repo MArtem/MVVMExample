@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import UIKit
+import os
 @testable import MVVMExample
 
 @Suite("Infrastructure support tests")
@@ -99,13 +100,14 @@ struct InfrastructureSupportTests {
     }
 
     @Test("Image memory cache stores downsampled images by key")
-    func imageMemoryCacheStoresImagesByKey() throws {
+    func imageMemoryCacheStoresImagesByKey() async throws {
         let cache = ImageMemoryCache(countLimit: 1, totalCostLimit: 512 * 1024)
         let image = try #require(Self.makeImage())
 
-        cache.insert(image, forKey: "avatar")
+        await cache.insert(image, forKey: "avatar")
 
-        #expect(cache.image(forKey: "avatar") === image)
+        let cachedImage = await cache.image(forKey: "avatar")
+        #expect(cachedImage === image)
     }
 
     @Test("RemoteImagePipeline downsampling uses memory cache on repeat load")
@@ -165,35 +167,38 @@ private struct TestGETRequest: NetworkRequest {
 private enum URLProtocolStubRegistry {
     typealias StubResponse = Result<(HTTPURLResponse, Data), Error>
 
-    private static let lock = NSLock()
-    private static var responsesByURL: [URL: [StubResponse]] = [:]
-    private static var countsByURL: [URL: Int] = [:]
+    private struct State {
+        var responsesByURL: [URL: [StubResponse]] = [:]
+        var countsByURL: [URL: Int] = [:]
+    }
+
+    private static let state = OSAllocatedUnfairLock(initialState: State())
 
     static func register(responses: [StubResponse], for url: URL) {
-        lock.withLock {
-            responsesByURL[url] = responses
-            countsByURL[url] = 0
+        state.withLock { state in
+            state.responsesByURL[url] = responses
+            state.countsByURL[url] = 0
         }
     }
 
     static func nextResponse(for url: URL) -> StubResponse? {
-        lock.withLock {
-            countsByURL[url, default: 0] += 1
-            guard var responses = responsesByURL[url], !responses.isEmpty else { return nil }
+        state.withLock { state in
+            state.countsByURL[url, default: 0] += 1
+            guard var responses = state.responsesByURL[url], !responses.isEmpty else { return nil }
             let response = responses.removeFirst()
-            responsesByURL[url] = responses
+            state.responsesByURL[url] = responses
             return response
         }
     }
 
     static func requestCount(for url: URL) -> Int {
-        lock.withLock { countsByURL[url, default: 0] }
+        state.withLock { $0.countsByURL[url, default: 0] }
     }
 
     static func remove(_ url: URL) {
-        lock.withLock {
-            responsesByURL.removeValue(forKey: url)
-            countsByURL.removeValue(forKey: url)
+        state.withLock { state in
+            state.responsesByURL.removeValue(forKey: url)
+            state.countsByURL.removeValue(forKey: url)
         }
     }
 }
