@@ -11,7 +11,7 @@ Do not write code yet.
 
 Context:
 - SwiftUI
-- feature-based MVVM
+- existing project architecture/profile; preserve the selected style
 - iOS 17+
 - production app
 - small team
@@ -27,7 +27,7 @@ For the provided code, return:
 6. Long-term scalable refactor
 7. Recommended option
 8. Step-by-step PR plan
-9. Tests to add before each step
+9. Tests or other permitted verification before each step
 10. Rollback strategy
 11. What not to refactor now
 

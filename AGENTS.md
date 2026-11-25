@@ -10,7 +10,7 @@ must not silently replace or weaken it. If the canonical bootstrap is unavailabl
 changing the project and report the missing global-rule source; the user does not need to remind
 the agent to load it. If the canonical checkout is unavailable, require the tracked
 `./GLOBAL_RULES_PORTABLE_SNAPSHOT.md` with marker `AIZENFLOW_GLOBAL_RULES_PORTABLE_SNAPSHOT_V1`,
-report `canonical-baseline-unavailable`, and do not claim the current canonical revision was read.
+report `canonical-baseline-unavailable`, and do not claim the current canonical revision was read. The snapshot supports read-only context; this project overlay still requires stopping before project changes while the canonical bootstrap is unavailable.
 
 ## Mandatory Response Header
 Every working, status, readiness, confirmation, task-orientation, planning, or clarification response must start with:
@@ -28,16 +28,17 @@ Short answers such as “готов”, “да, всё ясно”, “гото
 
 ## Startup Read Rule
 Before code, docs, git, project, build, or task changes:
-1. Read `./docs/TASK_TYPE_DOCUMENTATION_ROUTER.md`.
+1. Apply the canonical bootstrap and read the canonical `reusable/baseline/docs/TASK_TYPE_DOCUMENTATION_ROUTER.md`.
 2. Read its current Level 0 set once, including current task plan/handoff when present.
-3. Load only task-relevant routes.
+3. Load only task-relevant canonical routes and applicable project overlays.
 4. For MVVMExample product work, read
    `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/MANIFEST.md`.
 
 The canonical reusable source is
-`/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/`. If a selected local route file is
-missing or known stale, load the same path from `reusable/baseline/` and report the drift. Do not
-read the full manifest, archived task history, legacy-reference tree, or all docs by default.
+`/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/`. Local docs are distribution or
+project-specific overlays, not an independent reusable authority. If the canonical checkout is
+unavailable, apply the governed portable snapshot and report `canonical-baseline-unavailable`.
+Do not read archived task history, legacy-reference trees, or all docs by default.
 
 ## Filesystem Sandbox
 - Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow`.

@@ -1,178 +1,158 @@
 # Current User Overrides
 
 ## Purpose
-Task-local user preferences and hard constraints that apply before general project defaults.
 
-## Active Overrides
+Compact cross-project constraints that override general defaults. App/product decisions belong in
+the current app or task boundary, not here.
 
-### Model Routing
-- Apply `./docs/MODEL_ROUTING_RULE.md` as the sole active model/reasoning authority. Available
-  routes are GPT-5.6 sol/tera/luna; retired GPT-5.4/5.5 instructions in historical documents do
-  not select the current model.
-- Preserve the user-selected operating mode and use the command-time adequacy decision before
-  meaningful work.
+## Authority And Loading
 
-### Response Header
-Every working/status/readiness response must start with:
-- **Модель:** current model
-- **Режим:** active operating mode
-- **Смена модели:** current switch decision
-- **Фаза:** current phase
-- **Файлы:** files being inspected/changed, or `none`
-- **Следующий безопасный шаг:** next safe step
-- **Build/tests:** whether build/tests are needed and why
-- **Sandbox:** confirmation that work stays inside `/Users/Artem/.zenflow`
-- Readiness/status answers such as “готов к новым задачам” are not exempt.
+- `MArtem/AIZenflowDocumentation` is the canonical repository for reusable rules, prompts,
+  skills, templates, package docs, scripts, and app/task snapshots. Its checkout is
+  `/Users/Artem/.zenflow/worktrees/documentation-vault`.
+- Global documentation work is complete only after the canonical checkout is checked, committed,
+  pushed, clean, and synchronized with `origin/main`. Those bounded canonical commits and pushes
+  are standing-authorized after the required checks.
+- A current task plan or handoff may grant standing authority for an exact repository, scope, and
+  remote target. Otherwise obtain an explicit decision before commit, push, or PR mutation.
+- Read `./docs/TASK_TYPE_DOCUMENTATION_ROUTER.md` and its Level 0 set once, then only the selected
+  routes. Use `DOCUMENT_BOUNDARY_STANDARD.md` and `SOURCE_OF_TRUTH_MAP.md` for documentation moves
+  or reusable-rule changes.
 
-### Filesystem Sandbox
-- Keep all project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts inside `/Users/Artem/.zenflow`.
-- Do not use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any path outside `/Users/Artem/.zenflow` for project work.
-- If a tool defaults outside the Zenflow sandbox, override its output/cache/DerivedData paths before running it.
+## Canonical Knowledge Home
 
-### Verification / Builds / Tests
-- Do not write or modify tests unless the user explicitly opens a test-writing phase or asks to fix a specific failing test.
-- Do not run builds/tests/simulator UI/Instruments unless explicitly requested or already approved for the current block.
-- `git diff --check` and read-only/static documentation checks are allowed when useful.
+<!-- Rule ID: USER.KB.SINGLE_HOME v1.0 -->
+User-directed 2026-11-11: `/Users/Artem/.zenflow/worktrees/documentation-vault` is the single
+canonical home and authoring destination for durable shared knowledge across projects: reusable
+rules, skills, prompts, references, indexes/manifests, app-specific decisions, and completed task
+knowledge/recovery records. Add or update that material only in its correct owner inside this
+repository. Existing project-worktree `docs/`, `.codex/skills/`, portable snapshots, and `AGENTS.md`
+files are distribution or operational entrypoints, not competing knowledge sources; do not author
+new durable KB content in them. Active task execution state may remain in its governed task
+checkout while work is in progress, but durable conclusions belong in this vault. The separate
+`/Users/Artem/.zenflow/profiling-results/` root remains the dedicated profiling-output store, not a
+second knowledge base. Preserve user-provided exports as source material unless separately asked
+to move or delete them.
 
-### Implementation Style
-- No speculative UI.
-- No speculative business logic.
-- No extra layers, protocols, UseCases, factories, adapters, interfaces, or abstractions unless they solve a concrete current problem.
-- If anything is unclear, ask first.
+## Model, Reporting, And Economy
 
-### Product-Staff Quality Bar
-- Never lower the engineering bar because a project is described as demo, test, sample, prototype, imported, or pre-production; those words may only describe configuration/risk context, not code quality.
-- Treat every authored or reviewed code path as product-staff-level production code: correct ownership, explicit state, clear failure behavior, performance-aware rendering, privacy-safe logging, accessibility, localization, and supportable verification.
-- Do not wait for Instruments/profilers before fixing statically obvious performance or memory issues. Use profiling to prove behavior, compare alternatives, or validate non-obvious risks, not as an excuse to leave avoidable redraws, broad invalidation, main-thread work, unbounded caches, or lifecycle leaks.
-- Maximize quality through the simplest correct design: improve hot paths, state ownership, and error handling without adding decorative protocols, wrappers, factories, use cases, or interfaces.
+- Apply `MODEL_ROUTING_RULE.md` before meaningful work. If the current route is inadequate, stop
+  before acting and request the documented switch; otherwise proceed without proposing a change.
+- Every working, status, readiness, planning, or clarification response states model/reasoning,
+  mode, switch state, phase, files, next safe step, build/test need, and sandbox. Meaningful
+  results also state docs route and context health.
+- Priority is: quality, then token/resource economy, then minimum user involvement. Economy removes
+  repetition, broad rereads, noisy logs, needless model handoffs, and repeated PASS gates; it never
+  removes relevant correctness or evidence.
+- On every new meaningful task request, decide whether a context refresh is needed under
+  `CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md`. Proceed immediately when it is not; otherwise stop
+  before task actions and provide the user a ready-to-paste transition prompt. The user must not
+  have to monitor or request context refreshes.
+- Before an optional expansive action (subagent, browsing, broad reread, runtime verification, or
+  scope sweep), explain need, cost, benefit, trade-off, and smaller alternative; wait for a user
+  decision. Use targeted reads and one consolidated patch by default.
+- An approved coding block is targeted inspection → one patch → one relevant static check →
+  user-run build/UI feedback → stop. Do not rerun unchanged PASS evidence, and report successful
+  command output only as compact results, counts, failures, and needed evidence identifiers.
+- One approved same-pattern sweep covers at most two or three source files. Before a block over
+  three source files or roughly 2–3% of the weekly budget, provide a checkpoint and wait.
+- Synchronize canonical documentation once at a meaningful boundary or on explicit request. Stop
+  and report when work becomes a repeating correction loop or no longer materially advances the
+  approved goal.
 
-### Audit / Planning Scope Rule
-- When the user asks to review, audit, inspect a project/code area, evaluate requirements, or plan a task, provide the fullest unbiased high-quality analysis available, even for very small code.
-- Do not silently simplify, defer, dismiss, or complicate scope on the user's behalf. The assistant must surface the full relevant concern set and let the user decide what to execute.
-- Always prioritize findings and recommendations as `must do now`, `should do next`, `later / only if needed`, and `do not do / overengineering for this scope` where applicable.
-- If a concern is intentionally not investigated, state it as an explicit remaining risk; never imply it is irrelevant because the project is small, early, demo-like, or because the assistant judged it unnecessary.
-- During implementation, only execute the scope the user approved, but keep unexecuted review/planning concerns visible as remaining risks or backlog candidates.
+## Partnership Communication
 
-### No-Loss Transfer
-- Every new project/task must receive the full reusable non-app-specific baseline accumulated so far.
-- If any reusable documentation, prompt, rule, skill, template, or script cannot be copied or activated, report it as an explicit remaining risk.
+- Treat the user as the active engineering partner, not merely an approval endpoint. Before a
+  non-trivial block, surface only the decision-relevant facts: material ambiguity or missing
+  information, assumptions, risks, priorities/trade-offs, viable options, the recommended option,
+  and the smallest safe alternative.
+- During work, promptly report a discovery that changes product behavior, scope, authority,
+  evidence, resource cost, or the economic value of continuing. Do not silently infer a new
+  priority or compensate for uncertainty with speculative implementation. Continue without
+  interruption only when the assumption is safe, reversible, and within the approved contract.
 
+## Tool And Filesystem Boundaries
 
-### Saved User Command Registry
-Purpose: the user may forget exact rule/command names. When the user asks for "список всех наших правил команд", "покажи команды", "покажи правила" or similar wording, return this registry with command names and action descriptions.
+- Do not recommend or install an external development tool for convenience. If an approved task is
+  materially blocked and XcodeBuildMCP is specifically relevant, explain the capability, benefit,
+  cost/privacy trade-off, and smallest alternative; wait for approval.
+- **Absolute boundary:** without separate explicit authorization naming action and path, do not
+  read, inspect, create, modify, move, download into, delete, or execute against locations outside
+  `/Users/Artem/.zenflow`.
+- An otherwise-authorized command may read only the already-installed system executables and SDK
+  files it requires. It never permits unrelated external browsing, external writes, or toolchain/
+  Simulator installation. Profiling reports, traces, screenshots, result bundles, logs, and other
+  retained diagnostic outputs belong only under `/Users/Artem/.zenflow/profiling-results/`; see the
+  scoped Xcode DerivedData exception below.
+- Do not install, download, replace, detach, mount, unmount, or delete Simulator runtimes or other
+  machine-wide developer assets without separate authorization.
+- **Secret deny boundary:** do not access `/Users/Artem/.zenflow/secrets/` during normal work.
+  Only an explicit security pass naming that path may override this. Keep real secrets out of chat,
+  Git, bundles, and normal AI-readable worktree files.
 
-#### Command: `очисти DerivedData`
-- **Aliases:** `очистка DerivedData`, `удали DerivedData`, `почисти DerivedData`, `очисти дерайвед дату`.
-- **Action:** delete DerivedData-like folders created/used by the agent only inside `/Users/Artem/.zenflow`.
-- **Allowed targets:** `.xcode-derived-data`, `.zenflow-derived-data`, `DerivedData`, and explicitly named sandboxed DerivedData paths under `/Users/Artem/.zenflow`.
-- **Forbidden targets:** anything outside `/Users/Artem/.zenflow`, especially `/Users/Artem/Library`, `/tmp`, global Xcode DerivedData, global SwiftPM caches, source files, project files, git metadata, user documents.
-- **Required report:** list found/deleted/remaining DerivedData-like paths and run a relevant `git status`/static check showing source files were not changed.
+## Native Xcode And Simulator Paths
 
-#### Command: `добавь метрику`
-- **Aliases:** `добавь runtime diagnostics baseline`, `добавь диагностику`, `добавь baseline диагностики`, `добавь тестово-диагностический baseline`.
-- **Action:** add the minimal production-useful iOS diagnostics and verification baseline for the current project.
-- **Explicit approval:** this command explicitly opens the test-writing phase for the listed baseline work only.
-- **Baseline scope:**
-  1. XCUITest smoke flows for core scenarios.
-  2. Accessibility identifiers on important UI elements.
-  3. Debug/deep-link entry points for fast state/screen access, debug/dev only.
-  4. `os_log` and `os_signpost` for lifecycle/performance/navigation/sync diagnostics with privacy redaction.
-  5. Simulator video/log capture workflow with artifacts inside `/Users/Artem/.zenflow`.
-  6. `xcodebuild` + `xcresult` feedback commands with sandboxed outputs.
-- **Implementation rule:** keep the simplest correct design; do not add decorative protocols/factories/managers or production fake/demo behavior.
-- **Verification:** run `git diff --check`; run build/tests only as required by the Swift/Xcode changes and approved command scope; clean sandboxed DerivedData when no longer needed.
+<!-- Rule ID: USER.XCODE.RUNTIME.PATHS v1.2 -->
+User-approved 2026-10-22 and clarified 2026-10-30, cross-project: when a build is separately
+authorized, keep Xcode DerivedData at Xcode's normal system location outside `.zenflow`; do not
+redirect it into the profiling-results tree, copy it there, or clean it as profiling output. This is
+the narrow explicit exception for Xcode's DerivedData writes and does not itself authorize an
+otherwise unrequested build or test.
 
-#### Command: `покажи список правил команд`
-- **Aliases:** `покажи наши команды`, `дай список правил`, `какие у нас команды`, `список всех наших правил команд`.
-- **Action:** return the saved command registry with each command name, aliases, purpose, action, restrictions and verification/reporting expectations.
-- **No file changes:** this is read-only unless the user explicitly asks to update the registry.
+All retained profiling outputs across projects have one canonical location:
+`/Users/Artem/.zenflow/profiling-results/<ProjectSlug>/<TaskId>/`. Put traces, `.xcresult` bundles,
+screenshots, logs, metric exports and reports there using task-owned subdirectories. Do not retain
+profiling results in `tmp/ActionArtifacts`, project folders, or the documentation vault.
 
+XcodeService may independently create temporary files such as MCP `ActionArtifacts` outside
+`.zenflow`. The user explicitly authorizes read-only access to MCP-generated report/artifact files
+inside an `ActionArtifacts` directory when the MCP response directly returns their paths, solely
+to interpret that operation's result. Read only the referenced files needed for interpretation; do
+not enumerate unrelated directory contents or inspect sibling/system files. Do not modify, copy,
+move, delete, or treat those temporary files as retained profiling results. Keep retained reports,
+traces and other evidence under the shared `profiling-results` root. If the active sandbox blocks
+the authorized read, stop and report the technical limit; never bypass or expand sandbox access.
+Report service-created external paths and any limits on containment. Other system service state is
+not evidence storage. Toolchain/runtime installation, unrelated host changes,
+credentials/signing/publication and other external actions still require their own explicit scope.
 
-#### Command: `запусти поверхностную проверку`
-- **Aliases:** `поверхностная проверка`, `быстрая проверка`, `легкая проверка`, `минимальная проверка`.
-- **Action:** run the cheapest non-simulator verification appropriate for the current diff.
-- **Default scope:** `git diff --check` plus relevant static/read-only checks. For MVVMExample this usually maps to `./scripts/verify.sh static` when source/docs scope makes it useful.
-- **Does not run by default:** Xcode build, tests, Simulator UI, Instruments, manual flows.
-- **Report:** commands run, pass/fail, skipped checks with reasons, remaining risks.
+Maintained source code, project files, source dependency checkouts, fixtures and project resources
+must remain under `/Users/Artem/.zenflow`. Dependency source resolution needs a contained source
+checkout path and its own current authority; a default external package cache is not permission
+to relocate maintained inputs. Do not read unrelated personal Library data or manually inspect,
+move, or delete DerivedData. Preserve source, resources, reports, evidence and ambiguous files.
 
-#### Command: `запусти неполную проверку`
-- **Aliases:** `не полную проверку`, `частичную проверку`, `targeted проверку`, `среднюю проверку`.
-- **Action:** run targeted verification for the changed scope without the full matrix.
-- **Default scope:** `git diff --check`, relevant static checks, and one focused build or targeted unit lane only if the change requires it and current task approval allows it.
-- **Does not include by default:** UI tests, full test matrix, manual simulator, Instruments.
-- **Report:** why the selected subset is sufficient, what remains unverified.
+## Verification And Quality
 
-#### Command: `запусти полную проверку`
-- **Aliases:** `полная проверка`, `full verification`, `полный прогон`, `запусти все проверки`.
-- **Action:** run the approved full non-UI verification lane for the current project.
-- **MVVMExample mapping:** `./scripts/verify.sh all`, which runs static, list, build, and unit tests. UI tests remain explicit and are not included unless the user says `с UI`, `UI smoke`, or `test-ui`.
-- **Artifacts:** all build/test outputs must remain under `/Users/Artem/.zenflow`.
-- **Aftercare:** apply `очисти DerivedData` when DerivedData is no longer needed.
+<!-- Rule ID: USER.VERIFICATION.SCOPE v1.0 -->
+User-approved cross-project rule, 2026-10-04: exclude all iPad verification and every
+check requiring a physical device, including actual VoiceOver sessions, from plans,
+acceptance prerequisites and required follow-ups for every project and task. Do not
+propose, schedule, execute or ask the user to perform these checks unless a later
+explicit instruction changes this rule. Continue applicable static review and permitted
+iPhone Simulator verification. This does not change supported app platforms, remove
+accessibility implementation requirements, or grant test/runtime authority. Retain prior
+results as history; excluded checks are OMITTED_BY_USER, never PASS. Do not claim
+hardware/iPad/actual VoiceOver coverage from Simulator evidence. Owner: user / canonical
+rules maintainer; revisit only on explicit user change or a conflicting requested claim.
 
-#### Command: `запусти UI smoke`
-- **Aliases:** `test-ui`, `UI проверка`, `UI smoke проверка`, `запусти UI тесты`.
-- **Action:** run the explicit UI accessibility smoke lane only when the user asks for it.
-- **MVVMExample mapping:** `./scripts/verify.sh test-ui`.
-- **Notes:** requires Simulator execution; may be slower/flakier than unit lane; report simulator/device/runtime used.
+- The user owns builds, tests, Simulator UI, screenshots, Instruments, archive, and signing until
+  delegating a specific verification action. Do not write/modify tests or touch test files without
+  that permission. Read-only static checks and `git diff --check` remain allowed when relevant.
+- Every project uses the highest reusable standards unless the user approves a narrower local
+  exception. Prefer the simplest correct design; do not add speculative UI/business logic or
+  decorative abstractions. Generic ViewModel action dispatch requires explicit approval and
+  rationale. Do not guess product behavior, ownership, state, persistence, privacy, navigation, or
+  acceptance criteria.
+- Ask one focused clarification when it can materially improve correctness, scope, UX, sequencing,
+  or evidence; never ask duplicate or ceremonial questions. Present viable alternatives for
+  planning or decisions when more than one materially differs.
+- Reviews are evidence-based and identify severity, evidence, impact, target state, remediation,
+  and required verification. Do not claim completion or safety without routed evidence; report
+  unverified gates as residual risk. Keep app-specific decisions and exceptions in app/task state.
 
-#### Command: `запусти билд`
-- **Aliases:** `build`, `собери проект`, `проверь сборку`.
-- **Action:** run the project-approved sandboxed build command.
-- **MVVMExample mapping:** `./scripts/verify.sh build` unless a task-specific build command is required.
-- **Artifacts:** DerivedData/logs/results must remain under `/Users/Artem/.zenflow`.
+## Context Transfer
 
-#### Command: `запусти unit tests`
-- **Aliases:** `unit тесты`, `test-unit`, `запусти юнит тесты`.
-- **Action:** run deterministic unit test lane when tests are approved/needed.
-- **MVVMExample mapping:** `./scripts/verify.sh test-unit`.
-- **Does not include:** UI tests unless explicitly requested.
+Every handoff includes: **перечитать весь актуальный набор документации и правил для этого worktree и task-контекста**.
 
-#### Command: `покажи доступные проверки`
-- **Aliases:** `список проверок`, `verify list`, `что можно запустить`, `какие проверки есть`.
-- **Action:** show project-supported verification commands without running build/tests.
-- **MVVMExample mapping:** `./scripts/verify.sh list`.
-
-#### Command: `ревью`
-- **Aliases:** `review`, `code review`, `аудит`, `проверь качество`, `проверь production-ready`.
-- **Action:** run the production review trigger rule: apply production review completeness gates and relevant iOS standards before saying something is clean/ready.
-- **Default output:** prioritized findings: `must do now`, `should do next`, `later / only if needed`, `do not do / overengineering for this scope`.
-- **No silent narrowing:** do not limit review to the latest visible bug unless the user explicitly narrows scope.
-- **No code changes by default:** review is read-only unless the user asks to fix findings.
-
-#### Rule: `review gate`
-- **Aliases:** `ревью-гейт`, `проверка перед коммитом`, `review перед коммитом`, `оценка риска перед коммитом`.
-- **Purpose:** avoid wasting tokens on mandatory full review for every commit while still forcing review on risk-significant changes.
-- **Action:** before committing or reporting completion, classify the change risk and decide the review level.
-- **Low-risk:** use self-review plus `git diff --check`; full review is not required by default. Examples: typo/docs-only changes, formatting, mechanical rename, small localized UI text changes, command registry edits.
-- **Medium-risk:** run targeted review for the affected scope. Examples: localized feature logic, focused ViewModel behavior, small networking/UI state changes, project configuration with limited blast radius.
-- **High-risk:** run full production review before commit/report. Triggers: architecture/state ownership/navigation, persistence/migration/data loss, concurrency/lifecycle/background, security/privacy/PII/tokens/logging, networking/sync/auth/retry/idempotency, performance-sensitive UI/render/cache/media, release/build/project configuration, large cross-cutting refactors.
-- **Required report:** risk class, review level used, why full review was or was not run, commands/checks executed, and remaining risks.
-- **Restriction:** do not call a change clean/production-ready if relevant high-risk gates were not checked or explicitly reported as remaining risk.
-
-#### Rule: `учебник на паузе`
-- **Status:** the senior iOS handbook filling task is paused and not active by default.
-- **Action:** do not continue filling handbook sections unless the user explicitly resumes it.
-- **Resume examples:** `продолжай учебник`, `вернись к handbook`, `продолжай разделы учебника`.
-
-#### Rule: `Xcode MCP capability check`
-- **Action:** when Xcode-related work starts, or when the user asks about Xcode MCP, check whether the current Zenflow session exposes actual Xcode MCP tools/capabilities.
-- **Important limitation:** the assistant cannot monitor Zenflow feature rollout out-of-band. If new tools appear in a future session/tool list, report that to the user. Otherwise the user may ask periodically: `проверь Xcode MCP`.
-- **Current stance:** Xcode MCP may be useful, but the toggle in Xcode helps only when Zenflow actually exposes callable Xcode MCP tools to the agent.
-
-
-## Notes
-If this file conflicts with a newer explicit user instruction in chat, the newer instruction wins.
-
-### Cross-Project Live User Protocol
-- The newest explicit user instruction supersedes the older model and verification defaults in this file. Apply the canonical `MODEL_ROUTING_RULE.md`: proceed on an adequate current route; otherwise stop before task actions and require the documented switch. Do not use older GPT-5.4/5.5 routing text.
-- Work code-first in self-contained iterations: targeted inspection → one patch → one relevant static check → stop for the user's build/UI QA.
-- Before any optional or expansive action — subagent, model/reasoning switch, browsing, extended research, broad documentation reread, runtime verification, or scope sweep — explain need, expected token cost, benefits, trade-offs, and the smaller alternative; wait for approval.
-- Read mandatory documentation once per selected route and use targeted reads thereafter. Do not run builds, tests, Simulator UI, screenshots, Instruments, archive, or signing while the user owns runtime verification.
-- Require a checkpoint before work expected to touch more than three source files or consume roughly more than 2–3% of the weekly budget.
-
-
-### Documentation Vault Ownership
-- Durable reusable docs/rules/prompts/skills/templates/scripts live in `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/` as the central canonical library; do not copy the full library into this worktree.
-- MVVMExample-specific durable snapshots belong in `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/`; local MVVMExample docs should stay minimal and operational.
-- Do not change TchopApp-specific docs from MVVMExample tasks unless explicitly requested.
-- Do not commit or push without explicit user approval.
+Newer explicit user instructions override this file.

@@ -1,6 +1,6 @@
 ---
 name: ios-code-documentation
-description: Use this skill for iOS/Swift inline code documentation standards and reviews involving documentation comments, API contracts, ownership, created-by/runtime owner, external usage/call context, side effects, concurrency, errors, invariants, rationale, and temporary workaround comments. Trigger whenever the user mentions code documentation, comments, doc comments, ownership comments, callers, or documenting methods/types/properties.
+description: Write or review Swift documentation comments and inline code-documentation standards; not for ordinary caller, ownership, or API analysis without a documentation task.
 ---
 
 # iOS Code Documentation
@@ -13,5 +13,7 @@ description: Use this skill for iOS/Swift inline code documentation standards an
 5. Reject comments that repeat the code, promise unsupported guarantees, or have temporary workaround text without reason and revisit condition.
 
 ## References
-- `./docs/IOS_CODE_DOCUMENTATION_STANDARD.md`
-- `./docs/EVIDENCE_BASED_ENGINEERING_RULES.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_CODE_DOCUMENTATION_STANDARD.md`
+- `DOC:EVIDENCE_BASED_ENGINEERING_RULES.md`

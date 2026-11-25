@@ -13,5 +13,7 @@ description: Use this skill for iOS input validation and content safety involvin
 5. Report manual/device validation needed for permissions/import flows.
 
 ## References
-- `./docs/IOS_INPUT_VALIDATION_CONTENT_SAFETY_STANDARD.md`
-- `./docs/IOS_CAMERA_PHOTOS_FILES_PERMISSIONS_STANDARD.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_INPUT_VALIDATION_CONTENT_SAFETY_STANDARD.md`
+- `DOC:IOS_CAMERA_PHOTOS_FILES_PERMISSIONS_STANDARD.md`

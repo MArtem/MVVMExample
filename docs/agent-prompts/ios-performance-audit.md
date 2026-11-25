@@ -1,19 +1,64 @@
 # iOS Performance Audit Prompt
 
 ```markdown
-Проведи iOS performance audit.
+Профилируй указанный iOS-проект, feature/screen/module и data scope. Используй
+ios-performance-profiler. Сначала восстанови реальные пользовательские пути из
+актуальной документации, требований, навигации и кода проекта; составь матрицу
+сценариев и всех применимых metric domains с приоритетом и явными пробелами.
 
-Проверь:
-- launch path;
-- SwiftUI body/render hot paths;
-- lazy list structure and stable identity;
-- scroll callbacks and state invalidation;
-- media/image/video/PDF decoding;
-- main-thread work;
-- memory/cache growth;
-- heavy visual effects;
-- database/network/file work on interaction paths;
-- Instruments/signpost availability.
+Перед новым захватом зафиксируй readiness: target/build, OS/runtime/tool versions,
+доступные метрики и экспорт, driver/PID attachment, fixture/reset/backend и приватный
+путь для артефактов. Наличие инструмента не означает разрешение на изменение кода
+или тестов, запуск сборки/тестов/приложения, UI/Simulator, Instruments или внешние эффекты.
+Доступность окна Simulator и `simctl`
+проверяй как разные факты; не запускай неподтверждённое действие.
 
-Вывод: findings P0-P3, evidence, target state, profiling plan, and remaining risks.
+Выбери инструменты по вопросу: CPU/latency, hitches/rendering, memory/lifetime,
+concurrency, launch, I/O/network, media или energy. Для каждого захвата проверь
+target process, интервал, единицы, строки/сэмплы и фактические ветви сценария.
+Статика находит кодовые риски и помогает искать владельца, но не подменяет
+runtime-доказательства. Не трактуй отсутствующую/пустую метрику как PASS или
+отсутствие дефекта; учитывай цену XCTest/accessibility и инструментирования.
+
+Для каждого сигнала проследи путь от действия и измерения до app stack/signpost,
+потока/view/lifetime и конкретного кода, отделяя подтверждённые причины от гипотез.
+Если пользователь включил исправления и активные правила разрешают их, исправь
+в границах запроса и повтори тот же сценарий/fixture/configuration для сравнения.
+Не расширяй права, target, fixture, устройства или внешние эффекты по умолчанию.
+
+Каждое подтверждённое или подозреваемое кодовое нарушение обязательно получит отдельную запись:
+evidence/confidence/severity, затронутый сценарий и code owner, затем конкретные шаги диагностики,
+локализации и исправления, разрешённая проверка и решение о сопоставимом re-profile. Не завершайся
+списком сигналов. Продолжай по каждому пункту до исправления в текущих разрешённых границах либо
+до точного блокера. Гипотеза сама по себе не оправдывает спекулятивный рефакторинг: сначала
+подтверди нарушение или сузь неопределённость; затем исправь доказанную причину минимально.
+В отчёте для каждого пункта укажи, проверено ли исправление, остаётся ли runtime re-profile,
+заблокирована ли работа с конкретным планом или гипотеза отклонена с доказательствами; используй
+существующие статусы проекта, не вводи новую статусную систему. Performance improvement без
+сопоставимого измерения не заявляй.
+
+Сохраняй три отдельных проверяемых выхода:
+1. Discovery: приоритетные сценарии, фактически полученные outcomes, статус каждой метрики,
+   observations, candidate signals, gaps и ссылки на артефакты. Если capture не было, явно отметь
+   planned/unmeasured; не выводи результаты из предположений.
+2. Cause localization: evidence bundle с revision/config/runtime/tool versions, permissions,
+   fixture/branch, metric/unit/process/interval/sample counts, artifact refs и limitations; затем
+   code locations, подтверждённая причина vs hypothesis, confidence и минимальный fix plan.
+3. Только разрешённый repair/re-profile: те же сценарий/fixture/configuration и интервалы,
+   comparable before/after, variance и guardrails.
+
+Bundle должен позволить следующей модели продолжить анализ без повторения валидного discovery и без
+утечки private data. Не начинай следующую фазу до проверяемого результата предыдущей; если
+пользователь остановил работу на фазе, отчитайся и остановись на её границе.
+
+Учёт покрытия discovery завершён только когда каждый найденный путь имеет измеренный outcome
+либо явный статус/причину, все применимые metric domains имеют result или gap, а приоритетные
+сценарии не скрыты. Это учёт заявленного scope, а не заявление, что всё измерено. Явно перечисли
+пробелы; завершение отчёта не означает PASS или отсутствие других дефектов.
+
+Отчёт: scope/permissions/environment; сценарии и реальные outcomes; metric/tool,
+unit, interval, raw evidence, result и limitations; findings с code location,
+causal evidence, severity по действующему стандарту и confidence; выполненные
+изменения и before/after; blocked, omitted и unmeasured coverage; remaining risk
+и наименьший следующий разрешённый шаг.
 ```

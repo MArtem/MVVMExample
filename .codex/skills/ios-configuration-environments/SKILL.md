@@ -1,17 +1,17 @@
 ---
 name: ios-configuration-environments
-description: Use this skill for iOS configuration and environment reviews involving dev/staging/production routing, base URLs, auth modes, feature flags, secrets, debug-only behavior, analytics/crash routing, and production fallback safety. Trigger whenever environment, config, staging, production, debug, feature flag, base URL, or secret source is mentioned.
+description: Review or change iOS environment selection, build configuration, base URLs, feature flags, secret sources, debug-only behavior, or production fallback; not for an incidental mention of production or debug.
 ---
 
 # iOS Configuration Environments
 
 ## Workflow
-1. Enumerate environments and runtime/build-time settings.
-2. Check production cannot silently use demo/stub/local services.
-3. Check secret sources and debug-only gating.
-4. Verify flag defaults, diagnostics, analytics, and crash routing.
-5. Report release verification requirements.
+1. Identify the affected environment and build-time/runtime selection path; enumerate other environments only when the contract crosses them.
+2. Check that production cannot silently use demo/stub/local services, and inspect relevant secret sources and debug-only gating without opening real secrets.
+3. Check affected flag defaults, diagnostics, analytics, and crash routing; report release verification requirements and unknowns.
 
 ## References
-- `./docs/IOS_CONFIGURATION_ENVIRONMENTS_STANDARD.md`
-- `./docs/FEATURE_FLAGS_AND_ROLLOUTS.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_CONFIGURATION_ENVIRONMENTS_STANDARD.md`
+- `DOC:FEATURE_FLAGS_AND_ROLLOUTS.md`

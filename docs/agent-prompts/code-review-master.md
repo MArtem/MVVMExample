@@ -24,7 +24,7 @@ Project type:
 - Production iOS app
 - SwiftUI
 - iOS 17+
-- Feature-based MVVM
+- Existing project architecture/profile
 - Small team: 2–3 iOS developers
 - Code should be high-quality but not overengineered
 
@@ -33,20 +33,20 @@ Architecture conventions:
 - Presentation / Domain / Data separation when feature complexity justifies it
 - ViewModel is usually @MainActor when it owns UI state
 - Dependencies should be injected through init
-- Repository protocols should define data boundaries
+- Repository protocols should define a real data boundary when one exists
 - DTO must not be used directly by SwiftUI Views
-- SwiftUI Views should receive ViewState, not DTO/API/DB models
-- View should render state and send actions/callbacks
+- SwiftUI Views should receive render-ready state when the feature needs that mapping, not DTO/API/DB models
+- View should render state and use explicit intents/callbacks or an approved reducer action contract
 - No direct URLSession in View/ViewModel
 - No hidden singleton dependencies
 - No force unwrap
 - No try!
 - No print for production logging
 - Use Logger / AnalyticsClient / APIClient abstractions
-- Use AppTheme / AppSpacing / AppTypography / AppRadius / AppLocalization
+- Use existing project design/localization tokens where they exist
 - Prefer component-first SwiftUI
 - Avoid large private var some View and @ViewBuilder private func helpers inside screen-level Views
-- Prefer separate small View structs and Renderer Views
+- Prefer separate small View structs and Renderer Views when they improve ownership or reviewability
 - Avoid overengineering
 
 ============================================================
@@ -150,13 +150,13 @@ Check:
 Prefer:
 - enum state for screen-level state;
 - ViewState for presentation;
-- explicit Action enum or clear callbacks;
+- explicit intent methods/callbacks, or an Action enum only for an approved reducer/UDF contract;
 - derived state computed/mapped in controlled places.
 
 Flag:
 - isLoading + error + content unclear combination;
 - duplicated filteredCards/cards/searchQuery without sync logic;
-- state mutated from View directly when UDF/action style is expected;
+- state mutated from View directly when the selected ownership contract forbids it;
 - @Published on every small property without reason.
 
 5. Swift Concurrency
@@ -173,7 +173,9 @@ Check:
 - Are there Task leaks?
 - Are actors used appropriately?
 - Is shared mutable state protected?
-- Are Sendable issues ignored or hidden with unjustified @unchecked Sendable?
+- Are unsafe-concurrency workarounds (`@unchecked Sendable`, `nonisolated(unsafe)`,
+  `@preconcurrency`, warning suppressions, or blanket/fake `@MainActor`) absent? Treat any active
+  occurrence as a blocking finding.
 - Are async sequences terminated correctly?
 - Does AsyncStream have onTermination if wrapping callbacks?
 - Are callbacks/continuations resumed exactly once?
@@ -191,10 +193,10 @@ Look specifically for:
 6. SwiftUI and layout
 
 Check:
-- Is the View component-first?
+- Is the View component-first without decorative splitting?
 - Are screen-level Views too large?
 - Are helper View methods/properties overused?
-- Are separate components created for SearchField, EmptyState, ErrorState, Card, Header, Footer, Renderer?
+- Are components extracted only where SearchField, EmptyState, ErrorState, Card, Header, Footer, or Renderer have real reuse/ownership value?
 - Does layout use flexible SwiftUI primitives?
 - Are there absolute positions copied from Figma?
 - Are there fixed screen widths/heights?
@@ -570,17 +572,17 @@ Review this Swift/SwiftUI code for production readiness.
 Project context:
 - SwiftUI
 - iOS 17+
-- feature-based MVVM
+- existing project architecture/profile
 - ViewModel usually @MainActor
 - DTO must not be used in Views
-- View receives ViewState
+- View receives ViewState when a render-ready mapping is needed
 - dependencies through init
 - async/await
 - cancellation-aware
 - no direct URLSession in View/ViewModel
 - no hidden singletons
 - no force unwrap / try! / print
-- use AppTheme/AppSpacing/AppTypography/AppRadius/AppLocalization
+- use existing project design/localization tokens where they exist
 - avoid overengineering
 - component-first SwiftUI
 

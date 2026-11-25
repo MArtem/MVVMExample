@@ -16,3 +16,16 @@ Provide generic production rules for subscriptions, purchases, paywalls, and ent
 - Is restore available and discoverable?
 - Are subscription states represented correctly?
 - Are analytics privacy-safe and useful?
+
+## Delivery And Recovery Procedure
+For each product type, trace verified transaction → owned content/entitlement delivery →
+durable reconciliation → finish. A pending result is not access; an unverified transaction
+is not a successful validation. Repeated transaction delivery after relaunch must not duplicate
+consumable credits. Current entitlements and unfinished transactions answer different questions.
+
+Use `knowledge/global/ios/APP_STORE_PRIVACY_AND_COMPLIANCE.md`, StoreKit and Transaction Delivery
+And Recovery Example, when the transaction lifecycle or compliance boundary is in scope.
+That reference supplies the explanation and interrupted-delivery scenario. The selected
+`ios-storekit-payments` route lists it as an optional candidate, not an automatic full read.
+Select conceptual/static review or currently permitted StoreKit evidence for the claim;
+this procedure grants no purchases, sandbox session, server or release action.

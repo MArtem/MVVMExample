@@ -24,8 +24,8 @@ Do not recreate `./Packages/AppInfrastructure` or generic `./Packages/<AppPackag
 ## Ownership Rules
 - `LocalSupport` owns entity-agnostic mechanics needed by this app.
 - App feature folders own DTOs, endpoint semantics, routing, ViewModels, UI composition, and product behavior.
-- Reusable/cross-project documentation and source context live in `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/reusable/`.
-- MVVMExample-specific durable docs live in `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/apps/MVVMExample/`.
+- Reusable/cross-project documentation and source context live in `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/`.
+- MVVMExample-specific durable docs live in `/Users/Artem/.zenflow/worktrees/documentation-vault/apps/MVVMExample/`.
 - Cross-app context must be read through `documentation-vault/apps/<AppName>/`; do not copy TchopApp-specific rules into MVVMExample docs.
 
 ## Future Package Adoption

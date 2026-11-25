@@ -15,14 +15,13 @@ Rules:
 - Fixed size only for icons, avatars, small controls, FAB, or media aspect ratio.
 - Use adaptive SwiftUI layout: VStack/HStack/ZStack, ScrollView/LazyVStack, frame(maxWidth: .infinity), padding, safeAreaInset, aspectRatio.
 - Do not manually draw status bar, Dynamic Island, or home indicator.
-- Use design tokens: AppTheme, AppSpacing, AppTypography, AppRadius.
-- Use AppLocalization for strings.
-- Break UI into separate View structs.
+- Use existing project design and localization tokens where they exist.
+- Extract separate View structs only when they improve ownership, reuse, or reviewability.
 - Avoid large private var some View and @ViewBuilder private func helpers inside screen-level Views.
-- Use ViewState models.
-- Views render ViewState and emit actions/callbacks.
+- Use a render-ready state model when the selected architecture needs that mapping.
+- Views render state and emit explicit intents/callbacks, or an approved reducer action contract.
 - No DTO/API/DB models in Views.
-- Support loading, content, empty, error, offline states.
+- Support only the loading, content, empty, error, or offline states required by the approved feature contract.
 - Support long text, Dynamic Type, iPhone SE, normal iPhone, Pro Max.
 - Add accessibility labels for icon-only buttons.
 - Add accessibilityIdentifiers for important UI-test targets.
@@ -30,16 +29,16 @@ Rules:
 
 Before code:
 1. Analyze layout.
-2. Extract design tokens.
+2. Identify existing design tokens and propose additions only when justified by the design and project.
 3. Explain what from Figma is literal and what must be adapted.
-4. Define components.
-5. Define ViewState.
-6. Define previews.
+4. Identify component boundaries when they improve the design or ownership.
+5. Define the selected state contract.
+6. Define previews only when the preview seam is in scope.
 
 Then generate:
 - file structure;
 - SwiftUI components;
-- ViewState models;
-- preview data;
-- previews for content/loading/empty/error/offline/long text/Dynamic Type/small device/large device;
+- state models only when needed by the selected architecture;
+- preview data when previews are in scope;
+- previews for relevant states and devices when previews are in scope;
 - final review checklist.

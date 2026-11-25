@@ -1,6 +1,6 @@
 ---
 name: ios-test-strategy
-description: Use this skill to decide the right iOS verification strategy for a change: unit tests, integration tests, UI tests, manual QA, relaunch checks, migration checks, offline/network checks, performance profiling, or CI gates. Trigger whenever the user asks what/how to test, asks for verification scope, or wants production confidence.
+description: Use this skill to choose a permission-bounded iOS verification strategy when the user asks what/how to test, requests a verification matrix, or explicitly opens a production-confidence planning phase. Do not trigger for an ordinary code review merely because verification is mentioned.
 ---
 
 # iOS Test Strategy
@@ -18,5 +18,7 @@ description: Use this skill to decide the right iOS verification strategy for a 
 - Remaining risks.
 
 ## References
-- `./docs/IOS_TESTING_STRATEGY.md`
-- `./TESTING_INSTRUCTIONS.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_TESTING_STRATEGY.md`
+- Project-root `TESTING_INSTRUCTIONS.md`, when present; resolve from the active project root, not this skill directory.

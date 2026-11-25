@@ -19,6 +19,8 @@ description: Use this skill for broad production-readiness audits of any iOS app
 - Remaining risks.
 
 ## References
-- `./docs/IOS_PRODUCTION_READINESS_STANDARD.md`
-- `./docs/PRODUCTION_REVIEW_COMPLETENESS_GATE.md`
-- `./docs/DEFINITION_OF_DONE.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_PRODUCTION_READINESS_STANDARD.md`
+- `DOC:PRODUCTION_REVIEW_COMPLETENESS_GATE.md`
+- `DOC:DEFINITION_OF_DONE.md`

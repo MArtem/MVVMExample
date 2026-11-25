@@ -9,10 +9,21 @@ Uniform checklist for broad iOS audits. Use for whole-app, feature, PR, release,
 - **P2**: incorrect pattern that should be fixed before expanding the affected area.
 - **P3**: cleanup, consistency, docs, or maintainability issue.
 
+These categories are examples, not automatic classifications from a keyword or API name. Assess the actual affected path, exposure, consequences and likelihood before assigning severity.
+
+Severity describes impact. Record `confidence`, `applicability`, `evidence status`, and `decision`
+as separate axes using the shared Quality Control governance contract. Low confidence does not make
+a high-impact finding low severity, and `skipped`, `denied`, `unavailable`, `stale`, or `partial`
+evidence is not a normal PASS.
+
 ## Required Finding Format
 - Severity
+- Confidence
+- Applicability
 - Affected files
 - Evidence
+- Evidence status
+- Decision and readiness level (`local`, `merge`, or `release`)
 - Why it matters
 - Target state
 - Remediation order

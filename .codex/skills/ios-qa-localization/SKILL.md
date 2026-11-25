@@ -1,24 +1,23 @@
 ---
 name: ios-qa-localization
-description: Use this skill for iOS QA plans, device/iOS compatibility matrices, localization/i18n reviews, Apple platform capability checks, accessibility QA, and release test matrices. Trigger whenever the user mentions QA, test plan, compatibility, localization, i18n, RTL, device matrix, widgets, push, IAP, universal links, or platform capabilities.
+description: Plan iOS QA or review localization, accessibility QA, device/iOS compatibility, or release test coverage; not for ordinary widget, push, or IAP implementation.
 ---
 
 # iOS QA Localization
 
 ## Workflow
-1. Build a risk-based QA matrix.
-2. Include devices/iOS versions, accounts/test data, critical paths, offline, accessibility, localization, migration, media/files, and platform capabilities.
-3. Check localization/i18n and Apple capability risks.
-4. Define exit criteria and remaining risks.
+1. Choose the requested QA plan or focused localization/compatibility review; do not build a full matrix for an unrelated narrow task.
+2. Cover only applicable device/iOS versions, accounts/test data, critical paths, offline, accessibility, localization, migration, media/files, and platform capabilities.
+3. Define relevant exit criteria, user-owned verification, and remaining risks.
 
 ## Output
-- QA matrix.
-- Compatibility requirements.
-- Localization/platform findings.
-- Verification plan.
+- Task-relevant QA matrix or focused localization/compatibility findings.
+- Applicable verification plan and evidence gaps.
 
 ## References
-- `./docs/QA_TEST_PLAN_STANDARD.md`
-- `./docs/LOCALIZATION_INTERNATIONALIZATION_STANDARD.md`
-- `./docs/APPLE_PLATFORM_CAPABILITIES_STANDARD.md`
-- `./docs/COMPATIBILITY_MATRIX.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:QA_TEST_PLAN_STANDARD.md`
+- `DOC:LOCALIZATION_INTERNATIONALIZATION_STANDARD.md`
+- `DOC:APPLE_PLATFORM_CAPABILITIES_STANDARD.md`
+- `DOC:COMPATIBILITY_MATRIX.md`

@@ -4,6 +4,12 @@
 Tracks known accepted risks so they are not forgotten.
 
 ## Entry Template
+
+For each accepted risk, also record its trigger/exposure, supporting evidence and confidence,
+mitigation, evidence owner, revisit condition and exit/closure criterion. Maintain the decision
+until those criteria are met; a TODO or a heuristic suspicion is not an accepted risk, and the owner
+decision required below is unchanged.
+
 - ID
 - Date
 - Risk

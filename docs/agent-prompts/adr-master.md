@@ -29,7 +29,7 @@ Project:
 - Production iOS app
 - SwiftUI
 - iOS 17+
-- Feature-based MVVM by default
+- Existing project architecture; select MVVM or another style from the project profile and current boundary
 - Small team: 2–3 iOS developers
 - Backend/API exists or will exist
 - Offline/cache/database may be needed
@@ -44,7 +44,7 @@ General engineering preferences:
 - Dependencies through init
 - Repository protocols where they protect real boundaries
 - DTO must not leak into SwiftUI Views
-- View receives ViewState, not DTO/API/DB models
+- View receives render-ready state when the selected architecture needs that mapping, not DTO/API/DB models
 - ViewModel is usually @MainActor if it owns UI state
 - async/await
 - cancellation-aware code
@@ -54,7 +54,7 @@ General engineering preferences:
 - design tokens via AppTheme/AppSpacing/AppTypography/AppRadius
 - AppLocalization for strings
 - feature flags for risky rollout
-- tests and CI are part of architecture quality
+- verification strategy and CI implications are part of architecture quality when applicable and permitted
 
 ============================================================
 DECISION INPUT
@@ -276,14 +276,14 @@ Neutral / accepted trade-offs:
 
 Turn the decision into concrete rules.
 
-For example:
+For example, when the chosen architecture and boundary require them:
 - Views must not receive DTOs.
-- ViewModels must depend on repository protocols.
+- ViewModels may depend on repository protocols at real data boundaries.
 - Repositories must not be @MainActor unless justified.
 - Feature modules must not import other feature internals.
 - DesignSystem must not depend on features.
 - AI clients must be hidden behind protocols.
-- Feature flags are required for risky rollout.
+- Feature flags may be required for risky rollout when the project has that capability.
 
 14. File structure impact
 
@@ -363,7 +363,7 @@ If legacy code exists, define:
 
 18. Testing strategy
 
-List required tests:
+List required or recommended verification, subject to the current project permissions:
 - unit tests;
 - mapper tests;
 - async/concurrency tests;
@@ -394,7 +394,7 @@ Include:
 - code review checklist;
 - forbidden patterns;
 - required file structure;
-- required tests;
+- required verification, including tests only when relevant and permitted;
 - examples of acceptable vs unacceptable AI-generated code.
 
 21. Release safety

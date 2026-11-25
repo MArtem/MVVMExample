@@ -3,6 +3,10 @@
 ## Purpose
 Make API integrations reliable under mobile network conditions.
 
+For retry/replay, transfers, pagination or realtime recovery, consult
+`./docs/knowledge/global/ios/NETWORKING_WEB_AND_REALTIME_SYSTEMS.md` for the relevant
+contract and failure paths; static review does not establish server behavior.
+
 ## Required Rules
 - Define request timeout, cancellation, retry, backoff, idempotency, and offline behavior per endpoint class.
 - Map transport, server, auth, decoding, validation, rate-limit, and cancellation errors separately.
@@ -20,5 +24,10 @@ Make API integrations reliable under mobile network conditions.
 - Are retries bounded?
 
 ## Required Verification
-- Stubbed transport tests or equivalent static proof for error mapping.
-- Manual/offline validation for user-critical flows.
+- Choose evidence appropriate to the changed endpoint and current permissions.
+  Test creation/execution and manual/offline runtime validation remain
+  user-owned unless separately delegated; otherwise mark them not run and
+  state the unverified failure-path risk.
+- Select permitted evidence for error mapping and failure paths. Static inspection can establish
+  source-level mapping, but does not prove runtime transport, server behavior or cancellation.
+- For user-critical flows, perform manual/offline validation only when currently authorized; otherwise report it as not run and retain the associated risk.

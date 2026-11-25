@@ -11,7 +11,7 @@ Create a practical Architecture Decision Record for a production SwiftUI iOS app
 Context:
 - SwiftUI
 - iOS 17+
-- feature-based MVVM
+- existing project architecture/profile; use MVVM or another style selected by the project
 - small team 2–3 iOS developers
 - best practices without overengineering
 - AI-assisted development is part of workflow
@@ -43,7 +43,7 @@ Create an ADR with:
 10. Positive consequences
 11. Negative consequences
 12. Accepted trade-offs
-13. Concrete architecture rules
+13. Concrete architecture rules for the selected project style
 14. File structure impact
 15. Dependency graph
 16. Migration plan

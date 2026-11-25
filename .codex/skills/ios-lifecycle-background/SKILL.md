@@ -1,17 +1,19 @@
 ---
 name: ios-lifecycle-background
-description: Use this skill for iOS app lifecycle reviews involving cold launch, foreground activation, scene lifecycle, background tasks, push notifications, deep links, widgets, extensions, background modes, and entitlements. Trigger whenever lifecycle, launch, background, push, notification, deep link, widget, extension, or scene is mentioned.
+description: Review or change iOS app or extension lifecycle behavior, including launch/scene transitions, background execution, notification or deep-link entry, and widget/extension execution boundaries; not for an incidental mention of these surfaces or a UI-only text/layout change.
 ---
 
 # iOS Lifecycle Background
 
 ## Workflow
-1. Map cold launch, foreground, background, scene, notification, and deep-link paths.
-2. Check startup work budget, cancellation, and observability.
-3. Verify background task triggers, deadlines, retry, and user-visible effects.
-4. Check extension/widget independence from app process memory.
+1. Map the entry, transition, and exit paths affected by the task.
+2. Check startup work budget, cancellation, and observability when launch or activation is affected.
+3. Check background task triggers, deadlines, retry, and user-visible effects when background execution is affected.
+4. Check extension/widget independence from app process memory when their execution or shared data is affected.
 5. Report verification needed for simulator/device/manual flows.
 
 ## References
-- `./docs/IOS_APP_LIFECYCLE_BACKGROUND_STANDARD.md`
-- `./docs/APPLE_PLATFORM_CAPABILITIES_STANDARD.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_APP_LIFECYCLE_BACKGROUND_STANDARD.md`
+- `DOC:APPLE_PLATFORM_CAPABILITIES_STANDARD.md`

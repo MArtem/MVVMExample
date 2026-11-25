@@ -1,7 +1,24 @@
 # Evidence-Based Completion Review Prompt
 
+Use when reviewing completion, optimization, safety or readiness claims. The reusable prompt
+boundary maintains this aid; `ENGINEERING_CHANGE_QUALITY_STANDARD.md` owns the review gate and
+`COMPLETION_REPORT_CONTRACT.md` owns reporting. This prompt adds no execution permission.
+
 ```markdown
-Проверь completion claims.
-Для каждого claim “готово/fixed/optimized/secure/production-ready/done” потребуй evidence: code evidence, build, test, static check, manual check, profiler, CI/release result, или remaining risk.
-Вывод: supported claims, unsupported claims, required verification.
+Проверь фактический результат в пределах согласованного контракта.
+1. Для существенного claim «готово/fixed/optimized/secure/production-ready» укажи конкретное
+   подтверждение и его область: source/diff, разрешённая проверка, версия/среда, результат.
+   Раздели наблюдение, гипотезу и неизвестное; отсутствие ошибки в выводе не доказывает успех.
+2. Для каждого предполагаемого дефекта проследи trigger → путь исполнения/состояния → нарушение
+   контракта → наблюдаемый эффект. Найди существующую защиту и попробуй опровергнуть замечание.
+   Сохраняй реальные дефекты с evidence и severity; гипотезу, которой не хватает данных, обозначь
+   как риск/неизвестное, а не подтверждённый баг. Не придумывай замечания ради количества.
+3. Сопоставь проверенную область с утверждением: чтение части кода не равно полному аудиту,
+   static review не равно runtime, self-review не равно независимому ревью, чужой отчёт не равно
+   собственной выполненной проверке. Учитывай актуальность исходников и доказательств.
+4. Укажи поддержанные и неподдержанные claims, оставшиеся блокеры и минимальную полезную
+   разрешённую проверку. Невыполненное обозначай NOT RUN/UNKNOWN; исключённое пользователем —
+   OMITTED_BY_USER, никогда PASS. Не выдавай новый план за выполненное действие.
+5. Дай краткий результат: что изменилось и почему; evidence; существенные ограничения и следующий
+   шаг, если он нужен. Не называй улучшение качества/скорости измеренным без сопоставимых данных.
 ```

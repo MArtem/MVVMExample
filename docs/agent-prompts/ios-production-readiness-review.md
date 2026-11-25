@@ -1,7 +1,13 @@
 # iOS Production Readiness Review Prompt
 
+<!-- Refer to QC.VERDICT.READINESS, QC.EVIDENCE.FRESHNESS, and QC.EXCEPTION.CONTRACT. -->
+
 ```markdown
 Проведи iOS production readiness review без узкого фокуса.
+
+Перед выводом свяжи каждый finding и общий verdict с применимым Rule ID из
+`./docs/QUALITY_RULE_CATALOG.md`. Разделяй severity, confidence, applicability, evidence status и
+readiness level; отсутствие runtime/build/test evidence оставляй как remaining risk.
 
 Проверь:
 - product contract and core flows;

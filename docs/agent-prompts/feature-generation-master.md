@@ -60,32 +60,28 @@ Deployment target:
 iOS 17+
 
 Project architecture:
-SwiftUI production app.
-Feature-based MVVM.
-Small team: 2–3 iOS developers.
+[EXISTING PROJECT STYLE / PROFILE]
+Use feature-based MVVM only when the project profile and current boundary select it.
+Small team/context:
+[TEAM AND PROJECT CONTEXT]
 Backend/API exists or will exist.
 Offline/cache/database may be needed depending on feature.
 Avoid overengineering.
 
 Existing project conventions:
-- SwiftUI.
-- ViewModel is usually @MainActor.
+- SwiftUI/UIKit and platform versions as stated by the project.
+- ViewModel is `@MainActor` when it owns UI state.
 - Dependencies through init.
-- Repository protocols at feature/domain boundary.
+- Repository protocols only at real feature/domain or infrastructure boundaries.
 - DTO must not be used directly by SwiftUI Views.
-- View should receive ViewState, not DTO or raw API models.
+- View should receive render-ready state when mapping is non-trivial, not DTO or raw API models.
 - Use async/await.
 - Use cancellation-aware tasks.
 - Do not block MainActor with heavy work.
 - Prefer component-first SwiftUI.
 - Avoid large private var some View helpers and @ViewBuilder private func helpers inside screen-level Views.
-- Prefer separate small View structs and Renderer Views for branching.
-- Use design tokens:
-- AppTheme
-- AppSpacing
-- AppTypography
-- AppRadius
-- Use AppLocalization for strings.
+- Prefer separate small View structs or Renderer Views when they improve ownership or reviewability.
+- Use existing project design/localization tokens where they exist.
 - Use existing APIClient/Logger/AnalyticsClient/FeatureFlagClient abstractions if needed.
 - No direct URLSession in View/ViewModel.
 - No singleton hidden dependencies.
@@ -138,7 +134,7 @@ For each state, explain:
 - which analytics event should be logged.
 
 4. Architecture options.
-Propose 3 options:
+When the architecture choice is material, compare up to 3 options:
 
 Option A — MVP / minimal production-safe.
 Option B — balanced production solution.
@@ -149,7 +145,7 @@ For each option, include:
 - pros;
 - cons;
 - risks;
-- testability;
+- verification/testability subject to current permissions;
 - migration path;
 - what is deferred.
 
@@ -171,25 +167,25 @@ Generate Swift code file by file.
 
 Required layers when relevant:
 
-Presentation:
+Presentation (include only applicable roles):
 - FeatureView
 - ContentView
-- StateRenderer View
+- StateRenderer View when branching complexity warrants it
 - Components
-- ViewModel
-- ViewState
-- Action enum
+- ViewModel with explicit intents when MVVM is selected
+- ViewState when a render-ready mapping is needed
+- Action/reducer contract only for an approved reducer/state-machine architecture
 
-Domain:
+Domain (only when a real domain boundary exists):
 - Domain models
-- Repository protocol
+- Repository protocol at a real boundary
 - Domain errors if needed
 
-Data:
+Data (only when API/cache/persistence boundaries exist):
 - DTO
 - Mapper
 - LiveRepository
-- MockRepository or LocalJSONRepository
+- Fake/mock or LocalJSONRepository only for an allowed dev/test/preview seam
 - Cache/Persistence adapter if needed
 
 Infrastructure usage:
@@ -200,20 +196,10 @@ Infrastructure usage:
 - Clock/Scheduler if useful for tests
 
 7. SwiftUI rules.
-Follow these strictly:
-- screen-level View should be composition-only;
-- avoid large private computed View properties returning some View;
-- avoid @ViewBuilder private func helpers in screen-level View;
-- create separate View structs for:
-- SearchField;
-- EmptyState;
-- ErrorState;
-- Loading/Skeleton;
-- Cards;
-- Footers;
-- Headers;
-- Renderers with switch over state/content;
-- Views receive ViewState and callbacks/actions;
+Apply the relevant rules for the selected project style:
+- keep screen-level Views focused on composition and render work;
+- extract helpers or separate View structs when they improve ownership, reuse, or reviewability;
+- use render-ready state and callbacks/explicit intents at the UI boundary;
 - Views must not know DTO, repositories, API clients, database models;
 - no heavy mapping/formatting in body;
 - no absolute positioning from Figma unless truly necessary;
@@ -240,7 +226,9 @@ Follow these strictly:
 - avoid heavy work on MainActor;
 - shared mutable state must be protected by actor, lock, or appropriate isolation;
 - use Sendable where appropriate;
-- avoid @unchecked Sendable unless explicitly justified.
+- never use or retain `@unchecked Sendable`, `nonisolated(unsafe)`, `@preconcurrency`, warning
+  suppressions, or blanket/fake `@MainActor` annotations to silence Swift 6 diagnostics; resolve
+  them through actual actor isolation, ownership, lifecycle, or value/sendability boundaries.
 
 9. State management rules.
 Prefer explicit enum state over many booleans.
@@ -341,7 +329,7 @@ Use a feature flag if:
 - feature may need kill switch.
 
 15. Testing.
-Generate meaningful tests, not fake tests.
+Recommend or generate meaningful tests only when test creation is permitted or explicitly requested.
 
 Required tests when relevant:
 - ViewModel load success;
@@ -358,18 +346,14 @@ Required tests when relevant:
 - analytics events;
 - async tests with fake clock if debounce/search exists.
 
-Use:
-- MockRepository;
-- FakeAnalyticsClient;
-- FakeLogger;
-- FakeClock for time/debounce;
-- deterministic fixtures.
+Use fakes, mocks, clocks, and deterministic fixtures only when the selected verification scope needs
+them and the permission state allows their creation.
 
 No real network in tests.
 No arbitrary sleeps in tests.
 
 16. Previews.
-Generate previews for:
+When previews are in the approved scope and the project has a preview seam, cover the relevant:
 - loading;
 - content;
 - empty;
@@ -422,7 +406,9 @@ Return:
 OUTPUT FORMAT
 ============================================================
 
-Use this exact output structure:
+Use a compact output containing only sections needed for the approved scope. For broad/high-risk
+features, use the full structure below; otherwise omit irrelevant sections and state any deferred
+verification or decision.
 
 1. Assumptions and open questions
 2. Product and UX analysis
@@ -435,7 +421,7 @@ Use this exact output structure:
 9. State and action model
 10. DTO / Domain / DB / ViewState models
 11. Swift implementation by file
-12. Previews
+12. Previews when in approved scope
 13. Unit tests
 14. Optional snapshot/UI tests recommendations
 15. Analytics events
@@ -456,7 +442,7 @@ The result must be:
 - testable;
 - cancellation-aware;
 - consistent with SwiftUI best practices;
-- consistent with feature-based MVVM;
+- consistent with the selected project architecture;
 - ready to integrate into an existing app;
 - easy for a human senior engineer to review.
 

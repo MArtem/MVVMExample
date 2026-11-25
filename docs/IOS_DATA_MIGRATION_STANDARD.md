@@ -11,6 +11,9 @@ Rules for SwiftData/CoreData/UserDefaults/files/app-group data compatibility and
 - Consider app group and extension shared data separately.
 - Define rollback behavior if a release is pulled.
 - Define cleanup for temporary/imported files.
+- When migration involves supported old stores, interruption/retry, rollback or downgrade, consult
+  `./docs/knowledge/global/ios/PERSISTENCE_DATA_AND_CLOUDKIT.md` for migration and
+  data-preservation details. A successful forward migration alone does not prove recovery.
 
 ## Pre-Production Exception
 If the app is explicitly pre-production and the user approves destructive migration, document:

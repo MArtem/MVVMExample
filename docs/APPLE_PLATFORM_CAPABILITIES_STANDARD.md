@@ -3,6 +3,8 @@
 ## Purpose
 Review gate for Apple platform integrations.
 
+The mandatory reusable core is iPhone+iPad as defined by `./docs/IOS_PLATFORM_SCOPE_AND_KNOWLEDGE_POLICY.md`. Use `./docs/knowledge/global/ios/APPLE_CAPABILITIES_AND_EXTENSIONS.md` for capability prerequisites, ownership, lifecycle, alternatives, and evidence classes.
+
 ## Capability Checks
 ### Push Notifications
 - Permission rationale, token lifecycle, payload routing, notification settings, privacy.
@@ -27,3 +29,10 @@ Review gate for Apple platform integrations.
 
 ### App Intents / Siri / Shortcuts
 - Privacy, user confirmation, failure states, localization.
+
+### Live Activities / Spotlight / Associated Domains / App Groups
+- Authorization and token lifecycle, stable identifiers, shared-data versioning, privacy, entitlement/server configuration, stale-state recovery.
+
+### Evidence Classification
+- State separately what is statically inspectable, Simulator-verifiable, physical-device-only, multi-device/service-dependent, and distribution-dependent.
+- Compilation does not prove entitlement, provisioning, account, server, region, hardware, or App Review readiness.

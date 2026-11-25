@@ -25,24 +25,24 @@ Project:
 - Production iOS app
 - SwiftUI
 - iOS 17+
-- Feature-based MVVM
+- Existing project architecture/profile; MVVM only when selected by the project
 - Small team: 2–3 iOS developers
 - async/await
 - ViewModel is usually @MainActor
 - Dependencies through init
-- Repository protocols at boundaries
+- Repository protocols only at real boundaries
 - DTO must not be used directly by SwiftUI Views
-- View receives ViewState
+- View receives render-ready state when the selected architecture needs that mapping
 - No real network in tests
 - No hidden singleton dependencies
 - No force unwrap / try! / print
 
-Architecture:
+Architecture when applicable to the selected project style:
 - Presentation:
   - View
-  - ViewModel
-  - ViewState
-  - Action
+  - ViewModel/state owner
+  - render-ready state model
+  - approved action/reducer contract
   - Components
 
 - Domain:

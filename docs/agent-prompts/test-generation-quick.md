@@ -11,11 +11,11 @@ Generate meaningful production-grade tests for this Swift/SwiftUI feature.
 Project context:
 - SwiftUI
 - iOS 17+
-- feature-based MVVM
-- ViewModel usually @MainActor
+- existing project architecture/profile; MVVM only when selected by the project
+- ViewModel is `@MainActor` when it owns UI state
 - async/await
 - dependencies through init
-- repository protocols
+- repository protocols only at real boundaries
 - DTO must not be used in Views
 - no real network in tests
 - no arbitrary sleep

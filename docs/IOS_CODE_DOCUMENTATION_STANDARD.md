@@ -8,6 +8,31 @@ Document contracts, not obvious code.
 
 A comment is required when a future developer or AI agent could misuse the type, method, property, or flow without understanding ownership, usage context, side effects, concurrency, errors, invariants, or rationale.
 
+## Default Project Documentation Scope
+When the user asks to add, improve, refresh, or review code documentation for a project and does not specify exact files, the scope is the whole project.
+
+Treat that as an inventory and completion target, not permission for an
+unbounded edit. Apply the current small-batch, source-file, token-budget,
+test, and build authority limits; seek the required scope decision before a
+larger implementation block. Report a bounded partial pass honestly and
+retain the remaining-file inventory rather than claiming project-wide
+completion.
+
+Every logically significant executable source file must contain contract-level code documentation for its primary responsibility. This applies to Swift files that define or coordinate app behavior, UI behavior, state ownership, navigation, persistence, services, platform capabilities, scripts, reusable package code, or build/runtime tooling.
+
+The required minimum is:
+- each significant file documents its main type, owner, or file-level responsibility;
+- each ViewModel/state owner/service/repository/store/actor/coordinator/router documents purpose, responsibilities, ownership/lifecycle, and relevant invariants;
+- each async, side-effecting, persistence, file, network, navigation, privacy, or platform-capability entry point documents behavior plus concurrency/cancellation/error or failure behavior where relevant;
+- project documentation files explain scope, ownership, and source-of-truth placement.
+
+Trivial private helpers, generated files, pure data literals, simple view fragments, and self-evident one-line glue may remain undocumented only when a better name or surrounding documented type makes the contract obvious. This is an exception, not the default.
+
+Therefore:
+- “add documentation to the project” means “document all significant executable files and project documentation surfaces”;
+- “add comments” means “add contract comments everywhere they are required by this standard”, not only in the currently edited file;
+- partial documentation passes must be reported as partial, with the remaining files listed as follow-up work.
+
 ## What To Document
 Document these by default:
 - public/internal protocols and APIs
@@ -163,6 +188,7 @@ var visibleContent: FeedVisibleContent {
 
 ## Review Checklist
 Before adding a comment, ask:
+- Has every significant executable file in the requested scope received contract-level documentation or an explicit trivial-file rationale?
 - Does this explain a contract rather than repeat code?
 - Is ownership/lifecycle unclear without it?
 - Is this API used outside its declaring type?
@@ -172,7 +198,7 @@ Before adding a comment, ask:
 - Will this comment stay true if a concrete caller changes?
 
 ## Stop Rules
-- Do not document every method mechanically.
+- Do not document every method mechanically, but do document every significant executable file's contract surface.
 - Do not duplicate the method name in prose.
 - Do not list fragile callers unless the caller is contractual.
 - Do not claim thread safety, performance, or failure behavior that code does not guarantee.

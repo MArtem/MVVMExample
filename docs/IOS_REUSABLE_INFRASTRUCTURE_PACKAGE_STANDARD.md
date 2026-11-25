@@ -1,7 +1,7 @@
 # iOS Reusable Infrastructure Package Standard
 
 ## Purpose
-Define how reusable package/manager behavior should be promoted across iOS projects without carrying source-app branding or product assumptions.
+Define how reusable package/manager behavior should be promoted across iOS projects without carrying app branding or product assumptions.
 
 ## Default Package Shape For New Projects
 For a new unrelated iOS project, start with a neutral infrastructure package only when the project has current implementation pressure for shared mechanics.
@@ -36,7 +36,8 @@ AppPayments
 ## Naming Rule
 Reusable infrastructure copied into a new generic project must use neutral names such as `AppInfrastructure`, `AppNetworking`, `AppLocalization`, or `AppConfiguration`.
 
-Do not copy source-app branded names such as `Tchop*` into unrelated projects unless the user explicitly accepts that branding.
+Do not copy an existing app's branded names into unrelated projects unless the user explicitly
+accepts that branding.
 
 ## Promotion Rule
 When promoting behavior from an existing app package into the reusable baseline:
@@ -122,4 +123,4 @@ Demo/test APIs and test credentials are allowed in demo/pre-production projects 
 - Do not create decorative wrappers around a package API that already fits.
 - Do not introduce database/sync/media/widgets/push/share/AI/payments modules before the project has current requirements.
 - Do not put app-specific endpoint semantics, DTOs, copy, routing, schemas, or session product policy into generic packages.
-- Do not let source-app naming leak into reusable packages for unrelated projects.
+- Do not let existing app naming leak into reusable packages for unrelated projects.

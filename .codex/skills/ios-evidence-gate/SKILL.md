@@ -1,6 +1,6 @@
 ---
 name: ios-evidence-gate
-description: Use this skill whenever an iOS completion claim needs validation: done, fixed, optimized, safe, secure, production-ready, no risk, or clean review. Trigger whenever the user challenges confidence, asks for proof, or wants assurance that issues were not missed.
+description: "Use this skill whenever an iOS completion claim needs validation: done, fixed, optimized, safe, secure, production-ready, no risk, or clean review. Trigger whenever the user challenges confidence, asks for proof, or wants assurance that issues were not missed."
 ---
 
 # iOS Evidence Gate
@@ -18,5 +18,7 @@ description: Use this skill whenever an iOS completion claim needs validation: d
 - Required verification.
 
 ## References
-- `./docs/EVIDENCE_BASED_ENGINEERING_RULES.md`
-- `./docs/DEFINITION_OF_DONE.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:EVIDENCE_BASED_ENGINEERING_RULES.md`
+- `DOC:DEFINITION_OF_DONE.md`

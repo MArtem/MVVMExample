@@ -19,5 +19,7 @@ description: Use this skill for iOS release readiness, TestFlight, App Store, si
 - Release recommendation.
 
 ## References
-- `./docs/IOS_RELEASE_CHECKLIST.md`
-- `./docs/CI_CD_QUALITY_GATES.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_RELEASE_CHECKLIST.md`
+- `DOC:CI_CD_QUALITY_GATES.md`

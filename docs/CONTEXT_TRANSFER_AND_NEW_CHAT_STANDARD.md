@@ -6,6 +6,11 @@ Prevent context overload and preserve work continuity when a chat becomes too la
 ## Agent Responsibility
 The agent must proactively tell the user when it is time to move to a new chat. Do not wait until the context is already unreliable.
 
+On every new meaningful task request, decide before task actions whether the current chat needs a
+context refresh. If it does not, proceed without asking the user to monitor context health. If it
+does, stop before the task, state the reason briefly, and provide a ready-to-paste new-chat prompt
+that includes the required transition spec. Do not create or move the user to a new chat silently.
+
 ## Trigger Conditions
 Recommend a new chat when one or more conditions are true:
 
@@ -30,8 +35,24 @@ When recommending a new chat, provide a compact handoff spec with:
 8. what must not be done;
 9. the rule: **перечитать весь актуальный набор документации и правил для этого worktree и task-контекста**.
 
+## Meaning Of "Current Set"
+
+For this rule, the current set is only the documentation that can govern the resumed work:
+
+1. the router's Level 0 baseline;
+2. the active task handoff and plan, when present;
+3. the routes selected for the resumed task;
+4. the current app or project overlay when the task uses one; and
+5. any document changed since the preceding receipt or explicitly required by the user.
+
+It does not mean the entire documentation library, archives, unrelated app boundaries, or every
+deep reference. Load a deep reference only when its selected route requires it, its stated trigger
+applies, the task risk or ambiguity rises, or the user asks for it. When classification is unclear,
+broaden the route before acting rather than guessing.
+
 ## Output Size Rule
 The transition spec should be complete but compact. Do not include raw command logs, full diffs, tool output, or long scripts unless the user explicitly requests them.
 
 ## After Transfer
-The new chat must start by rereading the current documentation and rules before making code, docs, git, or project changes.
+The new chat must start by rereading the defined current set before making code, docs, git, or
+project changes.

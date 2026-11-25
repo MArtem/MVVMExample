@@ -9,14 +9,14 @@ They extend the active documentation set with reusable workflows for feature gen
 ## Mandatory Project Overrides
 Before applying any prompt here, apply the current project/task rules first:
 
-1. Read the active docs/rules from `../README.md` when bootstrapping or when documentation state is refreshed.
-2. Apply `../MODEL_ROUTING_RULE.md`; historical GPT-5.4/5.5 labels do not select the current GPT-5.6 route.
+1. Apply the canonical bootstrap, Level 0, selected routes and MVVMExample project overlay.
+2. Apply the current canonical `MODEL_ROUTING_RULE.md`; historical model labels are not active routes.
 3. Do not add speculative UI, logic, tests, layers, protocols, UseCases, factories, or adapters.
 4. Tests are not written or run by default. Use test prompts only when the user explicitly asks for tests, test review, flaky-test diagnosis, or when a separately justified verification strategy requires it.
 5. Repository protocols, ViewState, and extra layers are allowed only when they protect a real boundary or solve a concrete current problem. UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate; use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
 6. SwiftUI design work from screenshots/Figma/PDF/CSS uses the current routed model/reasoning level and must stay pixel-focused.
 7. Verification commands follow `../../TESTING_INSTRUCTIONS.md`; do not run builds/tests unless the user asks or the current agreed verification policy allows it.
-8. Preserve `MVVMExample` conventions, design tokens, localization, SwiftData-first persistence, and feed/composer card contract.
+8. Preserve verified `MVVMExample` conventions, localization, design tokens and product contracts; do not import another app's assumptions.
 
 ## Prompt Selection Index
 
@@ -75,5 +75,5 @@ Before applying any prompt here, apply the current project/task rules first:
 - Several prompts recommend generating tests as part of feature work. In this project, tests remain opt-in unless the user explicitly asks.
 - Several prompts mention repository protocols and Action enums as defaults. In this project, repository protocols are allowed only at real seams, and UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate. Use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
 - Apply the active `../MODEL_ROUTING_RULE.md`; retired model labels in imported prompt history are non-authoritative.
-- The prompts are generic iOS production templates. Existing `MVVMExample` architecture, task rules, feed/composer contract, localization, design tokens, and verification policy are higher priority.
+- The prompts are generic iOS production templates. Existing `MVVMExample` architecture, task rules, verified product contracts, localization, design tokens, and verification policy are higher priority.
 - Evidence-based completion prompt is mandatory before claiming work is done when verification is non-trivial.

@@ -1,38 +1,46 @@
 # Work Continuity
 
 ## Purpose
-Durable resume checkpoint for `MVVMExample` when chat/task context is lost.
+Define compact resume-state ownership without duplicating task history or the Level 0 list.
 
-## Chat Transition Rule
-- Keep and update a universal transition prompt here.
-- After reset, run bootstrap read once per new chat.
-- Every context-transfer prompt must include:
-  **"перечитать весь актуальный набор документации и правил для этого worktree и task-контекста"**.
+## Canonical State
+- `plan.md` contains only the current executable checklist.
+- `handoff.md` contains the compact current resume state.
+- App decisions and ADRs belong in the matching app documentation boundary.
+- Superseded plans, long logs, and recovery snapshots belong in task archive/history.
+- Reusable rules stay in the canonical reusable baseline, not in task docs.
 
-## Filesystem Sandbox Rule
-- All project work, build output, package caches, Xcode DerivedData, cloned package state, logs, traces, and temporary project artifacts must stay inside `/Users/Artem/.zenflow`.
-- Never use `/Users/Artem/Library`, `/tmp`, global SwiftPM/Xcode caches, or any other path outside `/Users/Artem/.zenflow` for project work.
-- If a command/tool would default outside the worktrees sandbox, override its output paths before running it.
+Apply `./docs/TASK_STATE_DOCUMENTATION_STANDARD.md` before moving or rewriting task state.
 
-## Universal Transition Prompt Template
-```text
-Работаем в проекте `MVVMExample` в worktree:
-`/Users/Artem/.zenflow/worktrees/mvvmexample-3c80`
+## Resume Rule
+On a new chat or explicit rules refresh:
 
-Перед началом прочитай:
-1) ./docs/README.md
-2) ./PROJECT_DOCUMENTATION.md
-3) ./PROJECT_HEALTH.md
-4) ./docs/CURRENT_USER_OVERRIDES.md
-5) ./docs/AGENT_RULES.md
-6) ./docs/WORK_CONTINUITY.md
-7) ./docs/CONTEXT_TRANSFER_AND_NEW_CHAT_STANDARD.md
-8) ./docs/MODEL_ROUTING_RULE.md
-9) текущие task docs under ./.zenflow/tasks/mvvmexample-3c80/ если есть
+1. Read `./docs/TASK_TYPE_DOCUMENTATION_ROUTER.md`.
+2. Read its current Level 0 set once.
+3. Select only task-relevant routes.
+4. Re-read additional files only when their source changed or the task route changes.
 
-Правило после очистки контекста:
-- перечитать весь актуальный набор документации и правил для этого worktree и task-контекста
-- reusable baseline является накопительным и не должен теряться при переходе между проектами
-- никогда не выходить за файловую границу `/Users/Artem/.zenflow`; build/cache/DerivedData/package verification output тоже должны быть внутри этой границы
-- применять `./docs/MODEL_ROUTING_RULE.md`, не старое правило GPT-5.5-for-all
-```
+Do not duplicate the numbered Level 0 list here; the router is its sole source of truth.
+
+## Transition Spec
+When recommending a new chat, provide a compact spec with:
+
+- worktree/task/app identifiers;
+- current restrictions and permissions;
+- changed files and verification state;
+- exact current task state and next safe step;
+- must-not-do items;
+- selected documentation route;
+- context-health reason;
+- **перечитать весь актуальный набор документации и правил для этого worktree и task-контекста**.
+
+Do not include raw logs, full diffs, tool output, or long scripts unless requested.
+
+## Context Health
+Meaningful completion reports state one of:
+
+- `контекст обновлять не нужно`;
+- `желательно обновить контекст`;
+- `нужен новый чат`.
+
+Recommend a new chat before reliability degrades, especially at a major phase boundary or before high-risk work after a long context.

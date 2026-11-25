@@ -25,7 +25,7 @@ Project:
 - Xcode-based project
 - May use SPM packages
 - May use CI/CD: GitHub Actions / Bitrise / Codemagic / Fastlane / Xcode Cloud
-- Feature-based MVVM
+- Existing project architecture/profile
 - Small team: 2–3 iOS developers
 - AI-generated code may be involved
 

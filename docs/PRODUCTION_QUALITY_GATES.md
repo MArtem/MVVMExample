@@ -1,7 +1,7 @@
 # Production Quality Gates
 
 ## Purpose
-This document defines mandatory production-quality review gates for any `MVVMExample` implementation, refactor, review, or cleanup.
+This document defines mandatory production-quality review gates for any app implementation, refactor, review, or cleanup.
 
 These gates are intentionally broader than the current app surface. They apply to future features as the project grows.
 
@@ -9,6 +9,10 @@ These gates are intentionally broader than the current app surface. They apply t
 A change is not production-ready just because it compiles or matches the visible UI. It must also be safe for runtime performance, state ownership, persistence correctness, memory, networking, error handling, accessibility, and future maintenance.
 
 When reviewing or implementing code, explicitly check the relevant gates below. If a gate is skipped because it is not relevant, say so in the task notes. Apply `./docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md` together with this file; its forbidden-pattern stop list is blocking by default.
+
+Apply `./docs/ENGINEERING_CHANGE_QUALITY_STANDARD.md` first for the app-neutral change contract,
+verification ladder, final adversarial review, and escaped-finding feedback loop. The gates below
+add iOS-specific product and runtime checks; they do not replace or duplicate that standard.
 
 ## Universal Definition Of Done
 Every non-trivial code change must answer:
@@ -40,8 +44,8 @@ Stop and fix or escalate before continuing if any of these appear:
 ## Architecture And Ownership Gate
 Check:
 
-- App-specific product policy stays in `MVVMExample`.
-- Reusable or app-local entity-agnostic mechanics must follow the approved project ownership; in MVVMExample, current app-local support belongs in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
+- App-specific product policy stays in the app/feature layer.
+- Reusable, entity-agnostic mechanics belong in the current package layer: `./PackagesInUse` for active source-only app integration and `./PackagesForReuse` for validated reusable package vault code.
 - DTO/domain/UI models are not collapsed unless the type is truly local and trivial.
 - View code does not own business rules, persistence policy, retry policy, or backend mapping.
 - View models expose explicit state and explicit intent methods; generic `send(_ action:)` / UI action-enum dispatch is forbidden as the default MVVM API unless explicitly approved and documented as reducer/state-machine architecture.
@@ -253,11 +257,14 @@ When the user asks for review/refactor/cleanup, the review must explicitly cover
 Do not return a purely stylistic review if runtime hot-path issues exist.
 
 ## Severity Classification
-Use this severity model:
+Use the single P0–P3 impact scale in
+`./docs/IOS_PRODUCTION_AUDIT_MATRIX.md` and the separate confidence/evidence
+axes in `./docs/UNIVERSAL_XCODE_QUALITY_CONTROL_GOVERNANCE.md`. A category
+name such as crash, performance, security, or maintainability does not assign
+severity by itself: establish the affected path, exposure, user impact, and
+failure likelihood. P2 includes incorrect patterns that must be fixed before
+expanding the affected area; ordinary cleanup belongs at P3.
 
-- **P0 Blocker**: crash, data loss, broken core flow, severe jank, main-thread stalls in primary UI, security/privacy leak.
-- **P1 Production Risk**: likely performance degradation, incorrect state ownership, broad invalidation, bad persistence/network shape, memory growth, brittle migration.
-- **P2 Maintainability Risk**: duplication, naming confusion, unnecessary abstraction, unclear ownership, hard-to-test structure.
-- **P3 Polish**: visual/wording cleanup that does not threaten correctness or runtime quality.
-
-P0/P1 must be surfaced immediately and fixed before cosmetic work unless the user explicitly chooses otherwise.
+Surface P0/P1 immediately. Resolve P0–P2 before commit or push under the
+engineering change gate unless a higher-authority scoped exception applies;
+report or resolve P3 explicitly. Do not convert unknown evidence into PASS.

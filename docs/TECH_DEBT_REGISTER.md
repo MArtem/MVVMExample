@@ -16,4 +16,7 @@ Tracks intentional technical debt separately from unknown defects.
 - Status
 
 ## Rule
+Prioritize debt by concrete risk, change frequency and expected outcome. Name a bounded payoff
+and cleanup trigger; debt accounting does not authorize an automatic rewrite.
+
 Do not use “tech debt” to hide correctness, data loss, security, or severe performance problems.

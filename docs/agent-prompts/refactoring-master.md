@@ -22,7 +22,7 @@ Project:
 - Production iOS app
 - SwiftUI
 - iOS 17+
-- Feature-based MVVM
+- Existing project architecture/profile
 - Small team: 2–3 iOS developers
 - AI-assisted development is part of workflow
 - Codebase should remain readable and maintainable for 3–5 years
@@ -34,18 +34,18 @@ Architecture conventions:
 - Dependencies through init
 - Repository protocols at real boundaries
 - DTO must not be used directly by SwiftUI Views
-- SwiftUI Views should receive ViewState
-- View should render state and send actions/callbacks
+- SwiftUI Views should receive render-ready state when the selected architecture needs that mapping
+- View should render state and use explicit intents/callbacks or an approved reducer action contract
 - No direct URLSession in View/ViewModel
 - No hidden singleton dependencies
 - No force unwrap
 - No try!
 - No print for production logging
 - Use Logger / AnalyticsClient / APIClient abstractions
-- Use AppTheme / AppSpacing / AppTypography / AppRadius / AppLocalization
+- Use existing project design/localization tokens where they exist
 - Prefer component-first SwiftUI
 - Avoid large private var some View and @ViewBuilder private func helpers inside screen-level Views
-- Prefer separate small View structs and Renderer Views
+- Prefer separate small View structs and Renderer Views when they improve ownership or reviewability
 - Avoid overengineering
 
 ============================================================
@@ -195,14 +195,14 @@ Architecture:
 - Keep code understandable for a small team.
 
 SwiftUI:
-- Break large screen Views into components.
-- Prefer separate View structs over large private var some View helpers.
-- Use Renderer Views for switch/branching.
-- Views should receive ViewState and callbacks.
+- Break large screen Views into components when that improves ownership or reviewability.
+- Prefer separate View structs over large private var some View helpers when there is a real boundary.
+- Use Renderer Views when switch/branching complexity warrants one.
+- Views should receive render-ready state when the selected architecture needs that mapping and use explicit intents/callbacks.
 - Views should not know DTO/API/Repository/DB.
 - Avoid heavy work in body.
 - Avoid fixed Figma-style layout unless justified.
-- Use design tokens.
+- Use the existing project design tokens where they exist.
 
 State:
 - Prefer explicit enum state for screen-level state.

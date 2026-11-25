@@ -19,4 +19,6 @@ description: Use this skill for iOS data migration, SwiftData/CoreData/UserDefau
 - Verification plan.
 
 ## References
-- `./docs/IOS_DATA_MIGRATION_STANDARD.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_DATA_MIGRATION_STANDARD.md`

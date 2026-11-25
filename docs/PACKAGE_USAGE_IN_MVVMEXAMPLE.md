@@ -8,7 +8,7 @@
 ./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport/
 ```
 
-This avoids duplicating reusable package source in this app worktree. Reusable and cross-app source context is tracked through `/Users/Artem/.zenflow/worktrees/new-task-be0b/documentation-vault/reusable/`.
+This avoids duplicating reusable package source in this app worktree. Reusable and cross-app source context is tracked through `/Users/Artem/.zenflow/worktrees/documentation-vault/reusable/`.
 
 ## Local Support Areas
 

@@ -18,4 +18,6 @@ description: Use this skill for iOS accessibility reviews or implementation invo
 - Manual verification steps.
 
 ## References
-- `./docs/IOS_ACCESSIBILITY_STANDARD.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_ACCESSIBILITY_STANDARD.md`

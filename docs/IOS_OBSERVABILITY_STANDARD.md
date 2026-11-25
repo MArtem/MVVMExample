@@ -3,6 +3,11 @@
 ## Purpose
 Defines production diagnostics for crash, non-fatal error, analytics, logging, and performance instrumentation.
 
+For crash/hang diagnosis or incident telemetry, consult the relevant sections of
+`./docs/knowledge/global/ios/TESTING_DEBUGGING_AND_DIAGNOSTICS.md` and
+`./docs/knowledge/global/ios/PERFORMANCE_OBSERVABILITY_AND_OPERATIONS.md`; distinguish
+observed evidence from proposed instrumentation.
+
 ## Required Signals
 ### Crash And Non-Fatal Reporting
 - Crash reporting configured before release.

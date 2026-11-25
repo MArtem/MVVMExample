@@ -8,6 +8,10 @@ Production rules for backend/API integration, DTOs, error mapping, retry, sync, 
 - DTO/backend shapes do not leak into UI rows.
 - Mapping handles missing/unknown/extra fields.
 - API versioning and compatibility are considered.
+- Define nullability and unknown-enum policy, timestamp encoding/units/timezone, and backward-compatible
+  decoding from the backend contract; do not guess these semantics.
+- For versioned JSON, define polymorphic discrimination, schema-skew handling and intentional
+  lossy-field policy; preserve explicit failure for fields required for integrity or behavior.
 
 ### Errors
 - Transport, auth, validation, permission, rate-limit, server, timeout, and decode errors are distinct where behavior differs.

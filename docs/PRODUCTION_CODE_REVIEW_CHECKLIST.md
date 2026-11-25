@@ -1,7 +1,7 @@
 # Production Code Review Checklist
 
 ## Purpose
-This checklist is mandatory for any non-trivial implementation, refactor, cleanup, or review in `MVVMExample`.
+This checklist is mandatory for any non-trivial app implementation, refactor, cleanup, or review.
 
 It exists to prevent hidden production defects before the project grows: scroll jank, broad state invalidation, bad persistence access, unsafe network/sync behavior, memory leaks, duplicated domain concepts, and speculative architecture.
 
@@ -10,12 +10,24 @@ Before starting implementation or declaring a review complete:
 
 1. Read the active docs index in `./docs/README.md`.
 2. Apply `./docs/CURRENT_USER_OVERRIDES.md` before general defaults.
-3. Apply this checklist together with `./docs/PRODUCTION_QUALITY_GATES.md`.
+
+3. Apply `./docs/ENGINEERING_CHANGE_QUALITY_STANDARD.md`, then this checklist together with
+   `./docs/PRODUCTION_QUALITY_GATES.md`.
 4. If a section is irrelevant, explicitly state why in the completion report.
+
+Record the applicable rule IDs in the review receipt: `QC.CHANGE.CONTRACT` for the change
+contract and final diff, `QC.VERDICT.READINESS` for the decision/readiness axes,
+`QC.EVIDENCE.FRESHNESS` for claim evidence, and `QC.EXCEPTION.CONTRACT` for any accepted risk.
 5. If intent, ownership, state flow, or product behavior is unclear, stop and ask the user before implementing.
 
 ## Mandatory Review Areas
 Every meaningful change must be checked against these areas.
+
+The final diff must first satisfy the standard's change contract: authority and trust boundaries,
+producer/consumer agreement, time ordering, aggregate input/resource limits, failure/rollback
+semantics, and affected call sites or mirrored claims. Before push, review the committed `HEAD` from
+its trusted base, retain the exact-SHA receipt, and repeat it after any new commit. The sections
+below add iOS-specific lenses.
 
 ### UI Hot Path
 - SwiftUI `body`, row builders, layout callbacks, scroll callbacks, gestures, and animations must stay cheap and side-effect free.
@@ -66,8 +78,8 @@ Every meaningful change must be checked against these areas.
 
 ### Architecture And Abstractions
 - No speculative layers, protocols, factories, adapters, managers, UseCases, services, or per-view models without one concrete current problem.
-- App-specific product policy stays in `./MVVMExample`.
-- Reusable or app-local entity-agnostic mechanics must follow the approved project ownership; in MVVMExample, current app-local support belongs in `./MVVMExample/MVVMExampleDemo/Infrastructure/LocalSupport`.
+- App-specific product policy stays in the app/feature layer.
+- Reusable entity-agnostic mechanics belong in the current package layer: `./PackagesInUse` for active source-only app integration and `./PackagesForReuse` for validated reusable package vault code.
 - Package APIs should be used directly when they already fit; do not wrap them decoratively.
 - Use `./docs/IOS_UI_STATE_RENDERING_STANDARD.md` as the decision gate before adding a dedicated model/view model to any view.
 
@@ -160,11 +172,38 @@ These patterns are blocked by default. If a change truly needs one, document the
 - Business rules split accidentally across View, ViewModel, Repository, and package code.
 - Marking repositories/services/packages `@MainActor` for UI convenience.
 
+## Finding Applicability And Adjudication
+
+Adjudicate existing candidate findings before adding more. Trace the actual caller/input producer,
+allowed value range and current product/deployment contract. A direct call with an impossible
+current input, future consumer or unapproved product assumption does not establish a present
+failure. Preserve the static fact and unresolved risk; record confidence/applicability separately
+from impact severity under current governance. Record duplicate, rejected and refined findings;
+zero incremental findings is an honest outcome.
+
+Assess a current wrong-language defect against supported locales or an explicit requirement;
+retain required localization resources and future-readiness work. An unused enum case, asymmetric
+presentation or plausible domain convention does not establish a product defect without the
+current behavior contract. Report the observed asymmetry and missing product decision.
+
 ## Severity Policy
-- **P0 Blocker**: crash, data loss/corruption, broken core flow, severe jank/main-thread stalls in primary UI, security/privacy leak.
-- **P1 Production Risk**: likely performance degradation, incorrect state ownership, broad invalidation, bad persistence/network/sync shape, memory growth, brittle migration.
-- **P2 Maintainability Risk**: duplicated concepts, naming confusion, unnecessary abstraction, unclear ownership, hard-to-test structure, hidden coupling.
-- **P3 Polish/Consistency**: wording, visual polish, documentation, naming consistency, or cleanup that does not threaten correctness/runtime quality.
+
+Do not turn purely subjective style preferences into findings unless the repository explicitly gates
+that convention or the user requested that cleanup. Report an objective P3 contract/consistency
+defect when evidenced, and distinguish an optional cleanup suggestion from a production defect. This
+eligibility rule does not change the canonical severity matrix or hide a demonstrated P0-P2 impact.
+
+Use `./docs/IOS_PRODUCTION_AUDIT_MATRIX.md` / Severity as the single severity definition,
+and `./docs/UNIVERSAL_XCODE_QUALITY_CONTROL_GOVERNANCE.md` for confidence, applicability,
+evidence status, decisions and readiness. Do not derive a blocking severity from a style label alone.
+
+For an eligible finding or requested cleanup under the rule above, an inconsistent internal name
+with no demonstrated correctness or consumer impact is P3 cleanup/consistency. A misleading name that causes a concrete wrong consumer or violates the
+current ownership/behavior contract is assessed by that demonstrated impact under the audit matrix;
+it is not automatically cosmetic. Report missing impact evidence separately from severity.
+
+A `READY_WITH_ACCEPTED_RISK` result is not normal `PASS`; unresolved P0–P2 findings require closure
+or an explicit higher-authority accepted-risk record. No severity rule grants execution permission.
 
 ## Required Audit/Review Output
 For each finding include:

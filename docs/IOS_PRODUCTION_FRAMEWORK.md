@@ -8,11 +8,18 @@ This framework is not app-specific. It defines the minimum operating system for 
 ## Non-Negotiable Principle
 A feature is not production-grade because it compiles or looks correct. It is production-grade only when product behavior, architecture, runtime performance, data safety, privacy/security, accessibility, observability, verification, release, rollback, and operational ownership are covered or explicitly marked not applicable with evidence.
 
+Readiness and review decisions use the shared Quality Control governance contract. Local readiness,
+merge readiness, and release readiness are separate decisions; a recorded risk or missing runtime
+evidence must remain visible rather than being promoted to normal PASS.
+
 
 ## Framework Operating Documents
+- `./docs/IOS_PLATFORM_SCOPE_AND_KNOWLEDGE_POLICY.md`
+- `./docs/IOS_KNOWLEDGE_COVERAGE_REGISTRY.json`
 - `./docs/IOS_FEATURE_LIFECYCLE_PLAYBOOK.md`
 - `./docs/IOS_PRODUCTION_AUDIT_MATRIX.md`
 - `./docs/IOS_PR_REVIEW_TEMPLATE.md`
+- `./docs/ENGINEERING_CHANGE_QUALITY_STANDARD.md`
 - `./docs/IOS_PROJECT_BOOTSTRAP_TEMPLATE.md`
 - `./docs/IOS_AGENT_PROMPT_ROUTER.md`
 - `./docs/IOS_PRODUCTION_EXCEPTION_POLICY.md`
@@ -38,7 +45,7 @@ A feature is not production-grade because it compiles or looks correct. It is pr
 4. If architecture changes, apply `./docs/ARCHITECTURE_DECISION_GOVERNANCE.md`.
 5. Implement the simplest correct solution.
 6. Apply `./docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md`.
-7. Apply `./docs/EVIDENCE_BASED_ENGINEERING_RULES.md` before claiming completion.
+7. Apply `./docs/ENGINEERING_CHANGE_QUALITY_STANDARD.md` and `./docs/EVIDENCE_BASED_ENGINEERING_RULES.md` before claiming completion.
 8. Run appropriate static/build/test/manual/profiler gates.
 9. Record remaining risks, exceptions, or deferred debt.
 10. Update docs/risk/debt/runbooks when behavior or ownership changes.
@@ -47,12 +54,16 @@ A feature is not production-grade because it compiles or looks correct. It is pr
 | Area | Standard |
 |---|---|
 | Product requirements | `./docs/PRODUCT_REQUIREMENTS_STANDARD.md` |
+| Platform scope and knowledge completeness | `./docs/IOS_PLATFORM_SCOPE_AND_KNOWLEDGE_POLICY.md` |
+| Knowledge maturity registry | `./docs/IOS_KNOWLEDGE_COVERAGE_REGISTRY.json` |
 | Definition of done | `./docs/DEFINITION_OF_DONE.md` |
 | Evidence | `./docs/EVIDENCE_BASED_ENGINEERING_RULES.md` |
+| Change quality and review receipt | `./docs/ENGINEERING_CHANGE_QUALITY_STANDARD.md` |
 | Production gates | `./docs/PRODUCTION_QUALITY_GATES.md` |
 | Review completeness | `./docs/PRODUCTION_REVIEW_COMPLETENESS_GATE.md` |
 | Code review checklist | `./docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md` |
 | Architecture decisions | `./docs/ARCHITECTURE_DECISION_GOVERNANCE.md` |
+| Architecture style routing | `./docs/IOS_ARCHITECTURE_STYLE_ROUTER.md` |
 | Modular architecture | `./docs/MODULAR_ARCHITECTURE_STANDARD.md` |
 | Code ownership | `./docs/CODE_OWNERSHIP_AND_REVIEW_POLICY.md` |
 | UI state/rendering | `./docs/IOS_UI_STATE_RENDERING_STANDARD.md` |

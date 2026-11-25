@@ -19,6 +19,8 @@ description: Use this skill for large iOS codebase architecture, modules/package
 - Build/dev-experience impact.
 
 ## References
-- `./docs/MODULAR_ARCHITECTURE_STANDARD.md`
-- `./docs/DEVELOPER_EXPERIENCE_STANDARD.md`
-- `./docs/CODE_OWNERSHIP_AND_REVIEW_POLICY.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:MODULAR_ARCHITECTURE_STANDARD.md`
+- `DOC:DEVELOPER_EXPERIENCE_STANDARD.md`
+- `DOC:CODE_OWNERSHIP_AND_REVIEW_POLICY.md`

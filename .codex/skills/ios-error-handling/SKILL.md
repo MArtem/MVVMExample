@@ -13,5 +13,7 @@ description: Use this skill for iOS user-visible error handling involving loadin
 5. Require observability without sensitive-data leakage.
 
 ## References
-- `./docs/IOS_ERROR_HANDLING_USER_FEEDBACK_STANDARD.md`
-- `./docs/IOS_OBSERVABILITY_STANDARD.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:IOS_ERROR_HANDLING_USER_FEEDBACK_STANDARD.md`
+- `DOC:IOS_OBSERVABILITY_STANDARD.md`

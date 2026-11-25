@@ -11,17 +11,17 @@ Refactor this Swift/SwiftUI code for production quality.
 Project context:
 - SwiftUI
 - iOS 17+
-- feature-based MVVM
+- existing project architecture; use MVVM when the project profile selects it
 - ViewModel usually @MainActor
 - dependencies through init
 - DTO must not be used in Views
-- View receives ViewState
+- View receives ViewState when a render-ready presentation mapping is needed
 - async/await
 - cancellation-aware
 - no direct URLSession in View/ViewModel
 - no hidden singletons
 - no force unwrap / try! / print
-- use AppTheme/AppSpacing/AppTypography/AppRadius/AppLocalization
+- use existing project design/localization tokens where they exist
 - avoid overengineering
 - component-first SwiftUI
 
@@ -56,14 +56,15 @@ Output:
    - long-term scalable
 4. Recommended option
 5. Incremental refactoring plan
-6. Tests to add before/with refactor
+6. Tests or other verification to add before/with refactor when permitted
 7. Refactored code
 8. Self-review
 9. Final checklist
 
 Rules:
 - Prefer small PR-sized steps.
-- Add tests before risky changes.
+- Recommend tests before risky changes when test creation is permitted; otherwise state the smallest
+  available verification and remaining risk.
 - Preserve behavior unless explicitly changing it.
 - Avoid Clean Architecture boilerplate unless justified.
 - Avoid UseCase/protocol/factory unless needed.

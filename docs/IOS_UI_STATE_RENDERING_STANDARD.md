@@ -3,6 +3,8 @@
 ## Purpose
 Make SwiftUI/UIKit UI predictable, performant, accessible, and maintainable.
 
+For UIKit interoperability and the mandatory iPhone+iPad adaptive core, including multitasking, multiple windows, keyboard, pointer, drag and drop, and resizing, load `./docs/knowledge/global/ios/SWIFTUI_UIKIT_AND_ADAPTIVE_IPAD_UI.md`.
+
 ## Required Rules
 - Repeated rows receive narrow immutable input and explicit callbacks, not broad global state unless justified.
 - Derived presentation state should be precomputed or memoized when it is read in hot paths.
@@ -11,6 +13,35 @@ Make SwiftUI/UIKit UI predictable, performant, accessible, and maintainable.
 - Avoid side effects in `body`, layout callbacks, and computed view properties.
 - Avoid broad animations without a specific `value` and review repeated shadows, blurs, masks, and clips.
 - Keep empty/loading/error/offline/permission states explicit.
+- Do not treat a scaled phone layout as sufficient iPad support when the workflow requires simultaneous context, stable selection, resizable windows, or keyboard/pointer interaction.
+
+## Stateful Screen State Contract
+
+Every new stateful product screen needs one explicit state owner, a render-ready state model, and
+named lifecycle/failure semantics when they affect correctness. Select the simplest project-approved
+shape that satisfies those invariants. MVVM is a common default for ordinary screen-level state when
+the project profile selects it, but a reducer/store, coordinator-owned flow, or native SwiftUI state
+can be correct when the current boundary justifies it.
+
+When MVVM is selected and the mapping is non-trivial, this is a valid shape:
+
+`Screen -> explicit ViewModel intent -> dependency/domain work -> ViewStateBuilder -> ViewState -> StateRenderer -> passive Components`
+
+- The Screen receives an owning state object or narrow immutable state/callbacks appropriate to
+  the selected architecture, plus external navigation or dismissal callbacks.
+- An MVVM `@MainActor @Observable` ViewModel owns lifecycle, domain/dependency work, state
+  transitions, and explicit public intent methods.
+- When a `ViewState` representation is used, its render states are mutually exclusive; do not
+  expose parallel mutable loading/data/error flags that can disagree.
+- `ViewStateBuilder` is a pure mapper and appears only when domain/error-to-presentation mapping
+  or derived display decisions are non-trivial. It never creates SwiftUI views.
+- `StateRenderer` selects visual branches only when that extraction improves clarity or reuse.
+  Components receive narrow immutable input and callbacks; they do not receive repositories or
+  broad ViewModels.
+
+This contract applies to stateful screens, not every small visual component. Do not add builders,
+renderers, ViewModels, reducers, or protocols merely for symmetry when a passive component or
+native state is sufficient.
 
 
 ## ViewModel API Rule
@@ -54,7 +85,8 @@ Prefer this progression:
 If a dedicated model/view model is introduced, document its ownership, creation point, external usage/call context, side effects, cancellation/error behavior, and invariants according to `./docs/IOS_CODE_DOCUMENTATION_STANDARD.md`.
 
 ## Review Checklist
-- What state change invalidates this view?
+- What state change invalidates this view, and which observed dependency reaches the intended
+  consumer? Check concrete transitions before diagnosing a syntax pattern or adding refresh hacks.
 - Which rows redraw for one item update?
 - Is any map/sort/filter/formatting happening during render?
 - Are gesture targets accessible and deterministic?
@@ -63,4 +95,8 @@ If a dedicated model/view model is introduced, document its ownership, creation 
 ## Stop Rules
 - No heavy sync work in render path.
 - No hidden eager rendering inside an opaque section wrapper for large feeds/lists.
-- No production screen without explicit failure/empty state.
+- No stateful production screen may omit a failure or empty state when that
+  state can actually occur; do not add unreachable placeholder branches.
+- Do not initially implement a new stateful screen with ad-hoc observable flags when this
+  baseline is applicable and defer its required ownership/render-state contract to a later
+  refactor. Select MVVM, native SwiftUI state, or another approved style by the actual boundary.

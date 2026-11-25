@@ -18,5 +18,7 @@ description: Use this skill for iOS product requirement reviews, acceptance crit
 - Implementation blockers and risks.
 
 ## References
-- `./docs/PRODUCT_REQUIREMENTS_STANDARD.md`
-- `./docs/ARCHITECTURE_DECISION_GOVERNANCE.md`
+Resolve `DOC:` identifiers through the active task router in canonical
+`reusable/baseline/docs/` or the project-root `docs/` mirror, not relative to this skill.
+- `DOC:PRODUCT_REQUIREMENTS_STANDARD.md`
+- `DOC:ARCHITECTURE_DECISION_GOVERNANCE.md`
