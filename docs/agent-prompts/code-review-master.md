@@ -23,7 +23,7 @@ PROJECT CONTEXT
 Project type:
 - Production iOS app
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - Existing project architecture/profile
 - Small team: 2–3 iOS developers
 - Code should be high-quality but not overengineered
@@ -571,7 +571,7 @@ Review this Swift/SwiftUI code for production readiness.
 
 Project context:
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - existing project architecture/profile
 - ViewModel usually @MainActor
 - DTO must not be used in Views

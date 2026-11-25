@@ -10,7 +10,7 @@ description: Review or change iOS app or extension lifecycle behavior, including
 2. Check startup work budget, cancellation, and observability when launch or activation is affected.
 3. Check background task triggers, deadlines, retry, and user-visible effects when background execution is affected.
 4. Check extension/widget independence from app process memory when their execution or shared data is affected.
-5. Report verification needed for simulator/device/manual flows.
+5. Select only currently authorized verification for affected flows. Apply `DOC:CURRENT_USER_OVERRIDES.md`: omit iPad, physical-device and actual VoiceOver checks from plans and gates; mark excluded evidence `OMITTED_BY_USER`, never PASS. Report unverified lifecycle behavior and do not run runtime checks without current authorization.
 
 ## References
 Resolve `DOC:` identifiers through the active task router in canonical

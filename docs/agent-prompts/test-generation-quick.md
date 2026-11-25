@@ -10,7 +10,7 @@ Generate meaningful production-grade tests for this Swift/SwiftUI feature.
 
 Project context:
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - existing project architecture/profile; MVVM only when selected by the project
 - ViewModel is `@MainActor` when it owns UI state
 - async/await

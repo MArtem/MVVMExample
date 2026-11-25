@@ -194,18 +194,19 @@ smallest next permitted step.
   worktrees, or the documentation vault. Create a unique run subdirectory and use private
   permissions where supported. If the active sandbox cannot write the root, stop; do not substitute
   an outside temp directory.
-- The current user explicitly keeps Xcode `DerivedData` at Xcode's normal system location outside
-  `.zenflow`. Do not pass a custom `.zenflow` DerivedData path, copy DerivedData into the evidence
-  root, or clean/read it manually. This narrow build-cache exception is not a profiling-result
-  location and does not authorize a build by itself.
+- The reusable user override permits Xcode `DerivedData` at its normal system location only when
+  the active task and technical sandbox also permit that external path. A stricter current task
+  boundary takes precedence: use an authorized contained DerivedData path if permitted, or do not
+  run the dependent build if no compliant path exists. Never treat DerivedData as retained profiling
+  evidence or clean/read it manually without authority; no path rule authorizes a build by itself.
 - Set `TMPDIR` to a run-local directory where the tool honors it. For `xcodebuild`, explicitly set
   supported result-bundle and other retained-output paths inside the central evidence root, and
-  redirect stdout/stderr there; let DerivedData use the normal Xcode location. For `xctrace`, pass
+  redirect stdout/stderr there; apply the task-authorized DerivedData path above. For `xctrace`, pass
   an explicit trace output path inside the evidence root. These options do not prove that every
   tool cache, Simulator/CoreSimulator file, service log or temporary file is confined there;
   record what remains uncontrolled.
-- Read-only exception: the user authorizes opening MCP-generated report/artifact files inside an
-  `ActionArtifacts` directory when the MCP response directly returns their paths, solely to
+- When the active task and sandbox permit the reusable read-only exception, the user authorizes
+  opening MCP-generated report/artifact files inside an `ActionArtifacts` directory when the MCP response directly returns their paths, solely to
   interpret that operation's result. Read only the referenced files needed for interpretation;
   do not enumerate unrelated directory contents or inspect sibling/system files. Do not modify,
   copy, move, delete, or treat those temporary files as retained profiling results. Keep retained

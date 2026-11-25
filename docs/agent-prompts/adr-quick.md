@@ -10,7 +10,7 @@ Create a practical Architecture Decision Record for a production SwiftUI iOS app
 
 Context:
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - existing project architecture/profile; use MVVM or another style selected by the project
 - small team 2–3 iOS developers
 - best practices without overengineering

@@ -4,8 +4,11 @@
 Keep memory bounded and scrolling responsive when handling images, video, audio, PDFs, files, and caches.
 
 ## Required Rules
-- Decode/downsample media before display; never keep unnecessary full-resolution assets in repeated UI rows.
-- Cache by stable identity and size class, not by transient view lifecycle.
+- Decode media for its actual use; downsample image/preview derivatives when appropriate and
+  avoid retaining unnecessary full-resolution assets in repeated UI rows. Preserve originals
+  when the product requires them.
+- Key each cache by stable identity and applicable transformation dimensions, such as output size
+  for image derivatives; define cache ownership and lifetime from its actual consumers.
 - Define memory limit, eviction behavior, and invalidation triggers for every cache.
 - Avoid synchronous media/file work in SwiftUI `body`, repeated rows, layout callbacks, and gesture paths.
 - Use placeholders with stable dimensions to avoid layout jumps.

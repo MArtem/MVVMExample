@@ -61,7 +61,7 @@ When the selected iOS profile requires `./docs/STATIC_GATE_ADOPTION.md`, complet
 an adopted configuration or an owned deferral before claiming that profile passes. The bootstrap
 checker blocks an empty required record. A deferral does not grant engine coverage or runtime rights.
 
-The workflow is user-triggered by default. Do not add `pull_request`, `push`, `schedule`, merge-queue,
+The GitHub workflow is user-triggered via `workflow_dispatch` by default. Do not add `pull_request`, `push`, `schedule`, merge-queue,
 or release triggers without an explicit local exception. Tests, snapshots/UI tests, archive/signing,
 feature flags, privacy, observability, and platform capabilities must each be marked applicable,
 not applicable, or deferred with an owner and revisit condition.

@@ -16,7 +16,7 @@ Before code:
 4. Choose the simplest option that satisfies the project contract; do not force a balanced stack.
 
 Hard rules:
-- SwiftUI, iOS 17+.
+- SwiftUI; read the deployment target from the active project configuration and do not assume a default.
 - A ViewModel is `@MainActor` when it owns UI state; use the selected state owner otherwise.
 - async/await.
 - cancellation-aware.

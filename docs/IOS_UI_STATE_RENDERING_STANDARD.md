@@ -3,11 +3,14 @@
 ## Purpose
 Make SwiftUI/UIKit UI predictable, performant, accessible, and maintainable.
 
-For UIKit interoperability and the mandatory iPhone+iPad adaptive core, including multitasking, multiple windows, keyboard, pointer, drag and drop, and resizing, load `./docs/knowledge/global/ios/SWIFTUI_UIKIT_AND_ADAPTIVE_IPAD_UI.md`.
+For UIKit interoperability or adaptive behavior on supported platforms, load the relevant sections of
+`./docs/knowledge/global/ios/SWIFTUI_UIKIT_AND_ADAPTIVE_IPAD_UI.md`. Apply multitasking, windows,
+keyboard, pointer, drag and drop, resizing, and iPad requirements only where the product supports
+them; current user verification exclusions remain in force.
 
 ## Required Rules
 - Repeated rows receive narrow immutable input and explicit callbacks, not broad global state unless justified.
-- Derived presentation state should be precomputed or memoized when it is read in hot paths.
+- Keep hot-path derivation cheap; precompute or cache expensive work only when justified, with explicit invalidation and ownership.
 - `ScrollView` + `LazyVStack`/`LazyHStack`/`LazyVGrid` lists should expose repeated items directly to the lazy container.
 - Use stable identity; never use unstable indices for persisted/user-interactive rows.
 - Avoid side effects in `body`, layout callbacks, and computed view properties.

@@ -28,7 +28,7 @@ PROJECT CONTEXT
 Project:
 - Production iOS app
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - Existing project architecture; select MVVM or another style from the project profile and current boundary
 - Small team: 2–3 iOS developers
 - Backend/API exists or will exist

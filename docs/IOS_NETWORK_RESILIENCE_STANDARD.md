@@ -13,7 +13,9 @@ contract and failure paths; static review does not establish server behavior.
 - Never expose raw backend DTOs directly to UI if they can change independently of presentation needs.
 - Token refresh and session expiration must be single-owner flows.
 - Pagination must define ordering, duplication, refresh, and partial failure behavior.
-- Upload/download flows must support progress, cancellation, retry, and cleanup.
+- Upload/download flows define cancellation, owned temporary-file cleanup and failure semantics.
+  Provide progress and retry only where the product and operation contract require them; progress
+  is not exact without a trustworthy total, and replay must be safe and bounded.
 - Logs must redact tokens, secrets, PII, and request bodies unless explicitly safe.
 
 ## Review Checklist

@@ -7,7 +7,7 @@ description: Plan iOS QA or review localization, accessibility QA, device/iOS co
 
 ## Workflow
 1. Choose the requested QA plan or focused localization/compatibility review; do not build a full matrix for an unrelated narrow task.
-2. Cover only applicable device/iOS versions, accounts/test data, critical paths, offline, accessibility, localization, migration, media/files, and platform capabilities.
+2. Cover applicable iOS versions, accounts/test data, critical paths, offline, accessibility, localization, migration, media/files, and platform capabilities. Apply `DOC:CURRENT_USER_OVERRIDES.md`: omit iPad, physical-device and actual VoiceOver checks from plans and gates; mark excluded evidence `OMITTED_BY_USER`, never PASS. Preserve implementation requirements and unverified behavior.
 3. Define relevant exit criteria, user-owned verification, and remaining risks.
 
 ## Output

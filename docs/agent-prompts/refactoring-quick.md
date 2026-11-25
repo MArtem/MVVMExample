@@ -10,7 +10,7 @@ Refactor this Swift/SwiftUI code for production quality.
 
 Project context:
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - existing project architecture; use MVVM when the project profile selects it
 - ViewModel usually @MainActor
 - dependencies through init

@@ -75,6 +75,15 @@ unavailable, or bypassed evidence cannot produce overall PASS.
 - A requested scan root that is excluded or has no eligible source universe is invalid scope and
   must produce non-PASS evidence rather than a vacuous success.
 
+## Baseline-scanner scope history
+
+Older baseline versions of `check_secrets.py`, `check_large_files.py`,
+`check_forbidden_patterns.py`, `check_localization.py`, and `check_swiftui_hot_path_patterns.py`
+ignored requested path arguments while their wrapper could label results as scoped. Do not use
+those older revisions as evidence of the requested scope. Revisions with the shared
+`iter_baseline_gate_files` iterator route both eligibility and scanning through that iterator;
+verify the actual producer and wrapper revision and report any unavailable checks honestly.
+
 ## Universal shipped-Swift controls
 
 The reusable QualityControl engine provides two blocking, app-neutral source contracts:

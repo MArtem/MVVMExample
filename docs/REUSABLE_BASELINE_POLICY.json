@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "ignored_local_patterns": [
+    "**/.DS_Store"
+  ],
+  "file_mappings": [
+    {
+      "source": "AGENTS.md",
+      "target": "AGENTS.md",
+      "mode": "overlay"
+    },
+    {
+      "source": "GLOBAL_RULES_PORTABLE_SNAPSHOT.md",
+      "target": "GLOBAL_RULES_PORTABLE_SNAPSHOT.md",
+      "mode": "exact"
+    },
+    {
+      "source": "PROJECT_DOCUMENTATION.md",
+      "target": "PROJECT_DOCUMENTATION.md",
+      "mode": "overlay"
+    },
+    {
+      "source": "PROJECT_HEALTH.md",
+      "target": "PROJECT_HEALTH.md",
+      "mode": "overlay"
+    }
+  ],
+  "tree_mappings": [
+    {
+      "source": "docs",
+      "target": "docs",
+      "default_mode": "exact",
+      "overlay_patterns": [
+        "CI_CD_QUALITY_GATES.md",
+        "DOCS_REPO_OPERATIONS.md",
+        "DOCUMENT_LIBRARY_GUIDE.md",
+        "DOCUMENT_ROUTING_REGISTRY.json",
+        "IOS_OFFLINE_SYNC_STANDARD.md",
+        "IOS_PERFORMANCE_BUDGETS.md",
+        "IOS_SECURITY_PRIVACY_GATE.md",
+        "README.md",
+        "REUSABLE_BASELINE_POLICY.json",
+        "STATIC_GATE_ADOPTION.md",
+        "TASK_TYPE_DOCUMENTATION_ROUTER.md"
+      ],
+      "canonical_only_patterns": [
+        "AGENT_PREFLIGHT_CHECKLIST.md",
+        "COMPLETION_REPORT_CONTRACT.md",
+        "DOCS_REPO_OPERATIONS.md",
+        "DOCUMENTATION_VAULT_SUMMARY.md",
+        "DOCUMENT_BOUNDARY_STANDARD.md",
+        "DOCUMENT_CHANGE_GOVERNANCE_STANDARD.md",
+        "DOCUMENT_LIBRARY_GUIDE.md",
+        "DOCUMENT_ROUTING_REGISTRY.json",
+        "ENGINEERING_CHANGE_QUALITY_STANDARD.md",
+        "IOS_ARCHITECTURE_STYLE_ROUTER.md",
+        "IOS_KNOWLEDGE_COVERAGE_REGISTRY.json",
+        "IOS_PLATFORM_SCOPE_AND_KNOWLEDGE_POLICY.md",
+        "IOS_PROJECT_WORK_SYSTEM.md",
+        "IOS_RELEASE_PRIVACY_PERFORMANCE_MATRIX.md",
+        "IOS_TOOLCHAIN_PROFILE_STANDARD.md",
+        "IOS_UNIVERSAL_ENGINEERING_QUALITY_STANDARD.md",
+        "LOCAL_EXCEPTION_ADR_TEMPLATE.md",
+        "NEW_PROJECT_START_CONTRACT.md",
+        "PACKAGE_DOC_MIRROR_CONTRACT.md",
+        "PACKAGE_OWNERSHIP_AND_ADOPTION_STANDARD.md",
+        "QUALITY_RULE_CATALOG.md",
+        "SECRET_HANDLING_AND_SECURITY_INTAKE_STANDARD.md",
+        "SOURCE_OF_TRUTH_MAP.md",
+        "STATIC_GATE_ADOPTION.md",
+        "TASK_DOCUMENT_ROUTES.json",
+        "TASK_STATE_DOCUMENTATION_STANDARD.md",
+        "UI_PIXEL_PERFECT_WORKFLOW.md",
+        "UNIVERSAL_XCODE_QUALITY_CONTROL_GOVERNANCE.md",
+        "knowledge/global/ios/APPLE_CAPABILITIES_AND_EXTENSIONS.md",
+        "knowledge/global/ios/APP_STORE_PRIVACY_AND_COMPLIANCE.md",
+        "knowledge/global/ios/IDENTITY_AUTHENTICATION_AND_APP_SECURITY.md",
+        "knowledge/global/ios/MEDIA_SENSORS_AND_DEVICE_INTEGRATIONS.md",
+        "knowledge/global/ios/NETWORKING_WEB_AND_REALTIME_SYSTEMS.md",
+        "knowledge/global/ios/PERFORMANCE_OBSERVABILITY_AND_OPERATIONS.md",
+        "knowledge/global/ios/PERSISTENCE_DATA_AND_CLOUDKIT.md",
+        "knowledge/global/ios/SWIFTUI_UIKIT_AND_ADAPTIVE_IPAD_UI.md",
+        "knowledge/global/ios/SWIFT_CONCURRENCY_DEEP_REFERENCE.md",
+        "knowledge/global/ios/SWIFT_LANGUAGE_RUNTIME_AND_API_DESIGN.md",
+        "knowledge/global/ios/TESTING_DEBUGGING_AND_DIAGNOSTICS.md",
+        "knowledge/global/ios/XCODE_BUILD_BINARY_AND_SUPPLY_CHAIN.md",
+        "knowledge/global/ios/examples/**",
+        "templates/**"
+      ],
+      "local_only_patterns": [
+        ".DS_Store",
+        "IOS_SENIOR_LEAD_ARCHITECT_STAFF_HANDBOOK_OUTLINE.md",
+        "PACKAGE_USAGE_IN_MVVMEXAMPLE.md",
+        "TEST_COVERAGE_PLAN.md",
+        "knowledge/global/agent-working-rules.md",
+        "knowledge/global/prompt-presets/**",
+        "reusable-baseline/**"
+      ]
+    },
+    {
+      "source": "root-scripts",
+      "target": "scripts",
+      "default_mode": "exact",
+      "overlay_patterns": [
+        "check_docs_index.py",
+        "check_forbidden_patterns.py",
+        "check_large_files.py",
+        "check_docs_consistency.py",
+        "check_localization.py",
+        "check_secrets.py",
+        "check_swiftui_hot_path_patterns.py",
+        "run_static_quality_gates.sh",
+        "validate_ios_production_framework.py"
+      ],
+      "canonical_only_patterns": [
+        "check_bootstrap_contract.py",
+        "check_docs_consistency.py",
+        "check_documentation_boundaries.py",
+        "check_documentation_remote_state.py",
+        "check_reusable_baseline_drift.py",
+        "check_task_type_documentation_router.py",
+        "report_documentation_context_cost.py",
+        "resolve_docs_route.py",
+        "static_gate_scope.py",
+        "validate_ios_knowledge_system.py"
+      ],
+      "local_only_patterns": [
+        "api_http_trace",
+        "static_quality_gate.py",
+        "static_quality_gate_selftest.py",
+        "verify.sh"
+      ]
+    },
+    {
+      "source": ".codex",
+      "target": ".codex",
+      "default_mode": "exact",
+      "overlay_patterns": [
+        "skills/ios-code-documentation/SKILL.md"
+      ],
+      "canonical_only_patterns": [
+        "skills/adopt-c-bounds-safety/**",
+        "skills/app-intents-specialist/**",
+        "skills/app-intents-whats-new-27/**",
+        "skills/audit-xcode-security-settings/**",
+        "skills/building-document-based-swiftui-applications/**",
+        "skills/device-interaction/**",
+        "skills/ios-app-store-compliance/**",
+        "skills/ios-architecture-router/**",
+        "skills/ios-build-system/**",
+        "skills/ios-identity-authentication/**",
+        "skills/ios-platform-capabilities/**",
+        "skills/ios-reusable-packages/**",
+        "skills/ios-swift-runtime/**",
+        "skills/ios-testing-debugging/**",
+        "skills/modernize-tests/**",
+        "skills/swiftui-specialist/**",
+        "skills/swiftui-whats-new-27/**",
+        "skills/uikit-app-modernization/**"
+      ],
+      "local_only_patterns": []
+    }
+  ]
+}

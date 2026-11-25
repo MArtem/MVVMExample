@@ -15,7 +15,7 @@ description: Use this skill for iOS accessibility reviews or implementation invo
 - Screen/flow scope.
 - Findings P0-P3.
 - Target state.
-- Manual verification steps.
+- Currently authorized verification and evidence gaps. Apply `DOC:CURRENT_USER_OVERRIDES.md`: omit iPad, physical-device and actual VoiceOver checks from plans and gates; mark excluded evidence `OMITTED_BY_USER`, never PASS. Preserve accessibility implementation requirements.
 
 ## References
 Resolve `DOC:` identifiers through the active task router in canonical

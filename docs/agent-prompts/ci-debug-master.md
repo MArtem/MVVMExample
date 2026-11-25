@@ -21,7 +21,7 @@ PROJECT CONTEXT
 Project:
 - Production iOS app
 - Swift / SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - Xcode-based project
 - May use SPM packages
 - May use CI/CD: GitHub Actions / Bitrise / Codemagic / Fastlane / Xcode Cloud

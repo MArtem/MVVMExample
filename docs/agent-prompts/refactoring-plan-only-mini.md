@@ -12,7 +12,7 @@ Do not write code yet.
 Context:
 - SwiftUI
 - existing project architecture/profile; preserve the selected style
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - production app
 - small team
 - avoid overengineering

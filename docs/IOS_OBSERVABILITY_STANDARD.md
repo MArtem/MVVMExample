@@ -10,9 +10,12 @@ observed evidence from proposed instrumentation.
 
 ## Required Signals
 ### Crash And Non-Fatal Reporting
-- Crash reporting configured before release.
-- dSYM upload verified.
-- Non-fatal errors reported for persistence, sync, auth, media import, and critical user actions.
+- Define the release crash-diagnosis path and its owner, privacy, retention and availability limits.
+  Configure external reporting only when the product adopts it and required consent exists.
+- Verify symbolication for the adopted diagnosis path, including matching dSYM availability and
+  upload where the service requires it.
+- Define privacy-safe diagnostics and user-visible handling for applicable non-fatal failures in
+  persistence, sync, auth, media import and critical actions; do not infer telemetry permission.
 
 ### Performance Metrics
 Track or signpost where relevant:
@@ -30,7 +33,8 @@ Track or signpost where relevant:
 - No PII/secrets/private payloads in event properties.
 
 ### Logging
-- Debug logs can be verbose locally.
+- Debug logs may be more detailed locally, but must still exclude secrets and credentials and
+  follow current privacy, minimization, redaction, retention and authorization rules for sensitive data.
 - Production logs are redacted, bounded, and action-oriented.
 - Logs distinguish user-facing failures from developer diagnostics.
 

@@ -8,7 +8,7 @@ description: Use this skill to choose a permission-bounded iOS verification stra
 ## Workflow
 1. Classify the change: UI, domain, persistence, network, auth, media, migration, release, or refactor.
 2. Pick the smallest verification that proves the risk.
-3. Identify what build/tests/manual/profiling are required for production confidence.
+3. Identify applicable evidence and current permissions. Apply `DOC:CURRENT_USER_OVERRIDES.md`: omit iPad, physical-device and actual VoiceOver checks from plans and gates; mark excluded evidence `OMITTED_BY_USER`, never PASS. Report resulting confidence gaps without creating or executing tests or runtime checks without authorization.
 4. State what is intentionally deferred and the remaining risk.
 
 ## Output

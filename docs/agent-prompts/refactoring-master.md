@@ -21,7 +21,7 @@ PROJECT CONTEXT
 Project:
 - Production iOS app
 - SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - Existing project architecture/profile
 - Small team: 2–3 iOS developers
 - AI-assisted development is part of workflow

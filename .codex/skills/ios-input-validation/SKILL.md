@@ -10,7 +10,7 @@ description: Use this skill for iOS input validation and content safety involvin
 2. Check type/size/count/duration/dimension/encoding limits.
 3. Check URL scheme allowlists and safe rich-text rendering.
 4. Check file storage, protection, cleanup, and corrupt-file behavior.
-5. Report manual/device validation needed for permissions/import flows.
+5. Select only currently authorized evidence for permission/import flows. Apply `DOC:CURRENT_USER_OVERRIDES.md`: omit iPad, physical-device and actual VoiceOver checks from plans and gates; report excluded evidence as `OMITTED_BY_USER`, never PASS. Keep implementation requirements and unverified behavior explicit. Do not execute runtime checks without current authorization.
 
 ## References
 Resolve `DOC:` identifiers through the active task router in canonical

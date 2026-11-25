@@ -57,7 +57,7 @@ Feature flag requirements:
 [YES/NO/UNKNOWN]
 
 Deployment target:
-iOS 17+
+Read from the active project configuration; do not assume a default.
 
 Project architecture:
 [EXISTING PROJECT STYLE / PROFILE]

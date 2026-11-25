@@ -9,22 +9,27 @@ They extend the active documentation set with reusable workflows for feature gen
 ## Mandatory Project Overrides
 Before applying any prompt here, apply the current project/task rules first:
 
-1. Apply the canonical bootstrap, Level 0, selected routes and MVVMExample project overlay.
-2. Apply the current canonical `MODEL_ROUTING_RULE.md`; historical model labels are not active routes.
+1. Apply the canonical global bootstrap and task router; read only the routed startup and task-relevant documents.
+2. Apply `DOC:MODEL_ROUTING_RULE.md` as the sole authority for model and reasoning-level selection; report any required user-performed switch before meaningful work.
 3. Do not add speculative UI, logic, tests, layers, protocols, UseCases, factories, or adapters.
 4. Tests are not written or run by default. Use test prompts only when the user explicitly asks for tests, test review, flaky-test diagnosis, or when a separately justified verification strategy requires it.
 5. Repository protocols, ViewState, and extra layers are allowed only when they protect a real boundary or solve a concrete current problem. UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate; use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
-6. SwiftUI design work from screenshots/Figma/PDF/CSS uses the current routed model/reasoning level and must stay pixel-focused.
-7. Verification commands follow `../../TESTING_INSTRUCTIONS.md`; do not run builds/tests unless the user asks or the current agreed verification policy allows it.
-8. Preserve verified `MVVMExample` conventions, localization, design tokens and product contracts; do not import another app's assumptions.
+6. SwiftUI design work from screenshots/Figma/PDF/CSS uses the model and reasoning level routed by `DOC:MODEL_ROUTING_RULE.md` and must stay pixel-focused. When the user provides a Figma link or asks to start from Figma, read `FIGMA_TASK_ROUTER.md`; load `figma-mcp-swiftui-implementation.md` only when the router requires deep reference.
+7. Resolve `TESTING_INSTRUCTIONS.md` from the active project root when present; do not run builds/tests unless the user asks or the current agreed verification policy allows it.
+8. Preserve the current app's conventions, design tokens, localization, persistence model, and product contracts.
+
+Resolve `DOC:` identifiers through the canonical bootstrap-selected `reusable/baseline/docs/` or its governed portable fallback; never relative to this prompt directory.
 
 ## Prompt Selection Index
 
 | Case | Use prompt | Notes |
 |---|---|---|
+| AI/ML/Apple Intelligence/App Intents/RAG/agent work | `AI_iOS_TASK_ROUTER.md` | Mandatory compact entry. Read only the routed ranges in `AI_iOS_MASTER_PROMPT.md`; load the complete master only for broad/cross-cutting AI work or master maintenance. |
 | New production feature | `feature-generation-master.md` | Use only when the user asks for a full feature and scope is broad enough. Adapt to project rules; do not generate tests unless asked. |
 | Small concrete feature | `feature-specific-quick.md` | Use for narrower feature work; keep implementation minimal. |
-| SwiftUI screen from Figma/PNG/PDF/SVG/CSS | `swiftui-design-generation-master.md` | Use for design-driven UI with the current routed model/reasoning level; ask when measurements or behavior are materially unclear. |
+| SwiftUI screen from Figma/PNG/PDF/SVG/CSS | `swiftui-design-generation-master.md` | Use for design-driven UI. Apply the routed model and reasoning level; ask questions if measurements/behavior are unclear. |
+| Figma task intake | `FIGMA_TASK_ROUTER.md` | Mandatory first read for a Figma URL or Figma-started design task. Selects the deep reference only when needed. |
+| Deep Figma MCP → native SwiftUI implementation | `figma-mcp-swiftui-implementation.md` | Load for complex layouts/components, uncertain assets or behavior, repeated visual mismatch, or an explicit full implementation plan. Use Figma MCP as design context; do not generate web code. |
 | Quick SwiftUI design task | `swiftui-design-generation-quick.md` | Use for smaller pixel-focused design fixes. |
 | Refactoring | `refactoring-master.md` | Use for broad refactor requests. Prefer small PR-sized changes. |
 | Quick refactoring | `refactoring-quick.md` | Use for local code-quality cleanup. |
@@ -43,6 +48,7 @@ Before applying any prompt here, apply the current project/task rules first:
 | iOS code documentation review | `ios-code-documentation-review.md` | Use for inline Swift documentation comments, ownership, external usage/call context, side effects, invariants, and workaround comments. |
 | Product requirements review | `product-requirements-review.md` | Use before non-trivial feature work when behavior/states/acceptance criteria must be proven. |
 | Architecture decision review | `architecture-decision-review.md` | Use when a change affects module boundaries, persistence, public API, security/privacy, or long-lived architecture. |
+| Architecture style review | `ios-architecture-style-review.md` | Use to detect MVVM/SwiftUI state/Clean/Coordinator/Modular/Hexagonal/TCA/UDF/Reactor/VIP/VIPER/MVP/RIBs/MVC style and apply the matching gate without importing conflicting rules. |
 | Evidence-based completion review | `evidence-based-completion-review.md` | Use before claiming done/fixed/verified/production-ready. |
 | Feature flag / rollout review | `feature-flag-rollout-review.md` | Use for staged rollout, kill switch, rollback, or remote config changes. |
 | Incident response review | `incident-response-review.md` | Use for production incident readiness, triage, mitigation, and postmortem planning. |
@@ -72,8 +78,10 @@ Before applying any prompt here, apply the current project/task rules first:
 
 ## Conflict Notes Found During Import
 
-- Several prompts recommend generating tests as part of feature work. In this project, tests remain opt-in unless the user explicitly asks.
-- Several prompts mention repository protocols and Action enums as defaults. In this project, repository protocols are allowed only at real seams, and UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate. Use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
-- Apply the active `../MODEL_ROUTING_RULE.md`; retired model labels in imported prompt history are non-authoritative.
-- The prompts are generic iOS production templates. Existing `MVVMExample` architecture, task rules, verified product contracts, localization, design tokens, and verification policy are higher priority.
+- `AI_iOS_MASTER_PROMPT.md` was normalized before adoption: mandatory tests/build/lint, universal AI layers, provider abstractions, mocks, and feature flags are conditional on current requirements and permissions.
+- Several prompts recommend generating tests as part of feature work. Under current user overrides, tests remain opt-in unless the user explicitly asks.
+- Several prompts mention repository protocols and Action enums as defaults. Under the current reusable baseline, repository protocols are allowed only at real seams, and UI action enums / `send(_ action:)` dispatch are not default MVVM boilerplate. Use explicit ViewModel intent methods unless reducer/state-machine architecture is explicitly approved and documented.
+- Model selection is governed only by `DOC:MODEL_ROUTING_RULE.md`; do not hardcode model versions in prompt presets.
+- AI route IDs and overlapping API/network/sync/testing ownership are governed by `AI_iOS_TASK_ROUTER.md`; do not activate every specialist route from a generic keyword.
+- The prompts are generic iOS production templates. Existing current-app architecture, task rules, product contracts, localization, design tokens, and verification policy are higher priority.
 - Evidence-based completion prompt is mandatory before claiming work is done when verification is non-trivial.

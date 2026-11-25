@@ -10,7 +10,7 @@ Analyze this iOS error log and find the real root cause.
 
 Project:
 - Swift / SwiftUI
-- iOS 17+
+- Deployment target: read from the active project configuration; do not assume a default.
 - Xcode project
 - SPM possible
 - CI possible

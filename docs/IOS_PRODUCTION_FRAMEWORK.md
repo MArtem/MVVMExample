@@ -46,7 +46,7 @@ evidence must remain visible rather than being promoted to normal PASS.
 5. Implement the simplest correct solution.
 6. Apply `./docs/PRODUCTION_CODE_REVIEW_CHECKLIST.md`.
 7. Apply `./docs/ENGINEERING_CHANGE_QUALITY_STANDARD.md` and `./docs/EVIDENCE_BASED_ENGINEERING_RULES.md` before claiming completion.
-8. Run appropriate static/build/test/manual/profiler gates.
+8. Select appropriate static/build/test/manual/profiler evidence; run only currently authorized checks and report unavailable or unrun evidence honestly.
 9. Record remaining risks, exceptions, or deferred debt.
 10. Update docs/risk/debt/runbooks when behavior or ownership changes.
 
@@ -106,4 +106,4 @@ evidence must remain visible rather than being promoted to normal PASS.
 | Scorecard | `./docs/IOS_PRODUCTION_SCORECARD.md` |
 
 ## Completion Rule
-Do not claim `production-ready` unless all applicable rows in the coverage matrix are checked, not applicable with reason, or recorded as remaining risk with owner and remediation path.
+Do not claim normal `production-ready` PASS unless applicable evidence supports each required row, or non-applicability is justified. Record missing evidence and remaining risks with an owner and remediation path; a risk record is not proof and cannot silently clear a blocking finding. Any accepted-risk decision follows the applicable higher-authority exception and readiness contract.

@@ -72,7 +72,7 @@ unavailable, use only the governed fallback and report missing skill availabilit
 Imported Xcode skills are domain references. Their presence does not grant permission to run tools or change project files, and their source claims must be checked against the active SDK and current rules.
 
 ## Stop Rule
-If no route clearly fits, run `./docs/agent-prompts/ios-production-readiness-review.md` and list uncertain domains explicitly.
+If no route clearly fits, state the uncertainty and select the smallest relevant owner or clarify a material scope ambiguity. Use `./docs/agent-prompts/ios-production-readiness-review.md` for a requested broad readiness review; do not expand a bounded task into one merely because routing is unclear.
 
 ## Architecture Style Routing
 - Use `./docs/agent-prompts/ios-architecture-style-review.md` with `./docs/IOS_ARCHITECTURE_STYLE_ROUTER.md` when code or requirements mention MVVM, SwiftUI native state, Clean/Layered, Coordinator, Modular, Hexagonal, TCA, Redux/Elm/UDF, ReactorKit, VIP/Clean Swift, VIPER, MVP, RIBs, or MVC migration.

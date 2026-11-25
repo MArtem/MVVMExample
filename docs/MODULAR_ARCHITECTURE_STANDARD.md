@@ -34,8 +34,9 @@ When promoting reusable behavior from one app to the baseline:
 A module exports a contract and creates a dependency edge. It does not acquire product
 ownership merely by being reusable. Trace imports, resources, generated code, public types
 and app/extension consumers before extracting it; a compiler boundary and a business boundary
-can differ. Source-only adoption remains the current app policy unless a concrete exception
-is approved; package documentation does not grant SwiftPM integration.
+can differ. Follow the selected project's explicit adoption policy: a source-only profile remains
+source-only unless its applicable authority changes it. Other projects choose their own supported
+integration; package documentation alone does not authorize SwiftPM adoption.
 
 For example, a widget and app both format a product's date. A small neutral formatter with
 explicit locale/calendar inputs may be shared; the app's entitlement, database and navigation

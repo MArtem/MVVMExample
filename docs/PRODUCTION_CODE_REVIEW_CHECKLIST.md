@@ -79,7 +79,7 @@ below add iOS-specific lenses.
 ### Architecture And Abstractions
 - No speculative layers, protocols, factories, adapters, managers, UseCases, services, or per-view models without one concrete current problem.
 - App-specific product policy stays in the app/feature layer.
-- Reusable entity-agnostic mechanics belong in the current package layer: `./PackagesInUse` for active source-only app integration and `./PackagesForReuse` for validated reusable package vault code.
+- Keep reusable, entity-agnostic mechanics in the justified shared boundary selected by the project. The `./PackagesInUse` / `./PackagesForReuse` paths apply only when that source-only layout is adopted; do not extract a package without a real need.
 - Package APIs should be used directly when they already fit; do not wrap them decoratively.
 - Use `./docs/IOS_UI_STATE_RENDERING_STANDARD.md` as the decision gate before adding a dedicated model/view model to any view.
 
